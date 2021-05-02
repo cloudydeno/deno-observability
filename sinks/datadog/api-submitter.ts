@@ -1,3 +1,5 @@
+import { DatadogClient, clientFromEnvironment } from "./api.ts";
+
 export type Tags = Record<string, string>;
 
 function listifyTags(obj: Tags = {}) {
@@ -17,7 +19,6 @@ class PointArray extends Array {
 
 export class Datadog {
   globalTags: string[];
-  apiRoot: string;
   gauges: Map<string,PointArray>;
   rates: Map<string,PointArray>;
   counts: Map<string,PointArray>;
@@ -25,33 +26,34 @@ export class Datadog {
   flushTimer: number | null = null;
 
   constructor(
-    public apiKey: string | false,
+    private api: DatadogClient,
     public hostName: string,
     globalTags: Tags,
   ) {
     this.globalTags = listifyTags(globalTags);
 
-    this.apiRoot = 'https://api.datadoghq.com/api';
     this.flushPeriod = 20; // seconds
     this.gauges = new Map();
     this.rates = new Map;
     this.counts = new Map;
+  }
 
-    if (this.apiKey) {
-      this.flushTimer = setInterval(this.flushNow.bind(this),
-        this.flushPeriod * 1000);
-      // TODO: Deno lacks unref
-      // if (this.flushTimer.unref) {
-      //   this.flushTimer.unref();
-      //   // TODO: trigger final flush at shutdown
-      // }
-    } else {
-      console.debug('WARN: DD_API_KEY not set, no metrics will be reported.');
-    }
+  startFlushInterval() {
+    if (this.flushTimer) clearInterval(this.flushTimer);
+    this.flushTimer = setInterval(this.flushNow.bind(this),
+      this.flushPeriod * 1000);
+    // TODO: Deno lacks unref
+    // if (this.flushTimer.unref) {
+    //   this.flushTimer.unref();
+    //   // TODO: trigger final flush at shutdown
+    // }
+  }
+  stopFlushInterval() {
+    if (this.flushTimer) clearInterval(this.flushTimer);
+    this.flushTimer = null;
   }
 
   appendPoint(mapName: 'gauges' | 'rates' | 'counts', metric: string, value: number, tags?: Tags) {
-    if (!this.apiKey) return;
     const tagList = listifyTags(tags).sort();
     const key = JSON.stringify([metric, tagList]);
 
@@ -66,21 +68,18 @@ export class Datadog {
     }
   }
 
-  doHTTP(apiPath: string, payload: unknown) {
-    if (!this.apiKey) return Promise.resolve(false);
-    return fetch(`${this.apiRoot}${apiPath}?api_key=${this.apiKey}`, {
-      method: 'POST',
-      mode: 'no-cors', // we won't get any info about how the request went
-      body: JSON.stringify(payload),
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    }).catch(err => {
+  async doHTTP(apiPath: string, payload: unknown) {
+    try {
+      return await this.api.fetchJson({
+        path: `/api${apiPath}`,
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
       // TODO: cache and retry the request
-      // don't we only get this in nodejs? because no-cors
-      console.log('Datadog request failed:', err.message);
+      console.error('WARN: Datadog request failed:',err.message);
       return err;
-    });
+    }
   }
 
   gauge(metric: string, value: number, tags?: Tags) {
@@ -94,6 +93,7 @@ export class Datadog {
   }
 
   statusCheck(metric: string, status: number, message: string, tags?: Tags) {
+    this.api
     return this.doHTTP('/v1/check_run', {
       check: metric,
       timestamp: Math.floor(+new Date() / 1000),
@@ -193,10 +193,8 @@ export class Datadog {
 // const packageInfo = require(join(mainDir, 'package.json'));
 // const packageName = packageInfo.name.replace(/^@/, '');
 
-let apiKey: string | boolean = false;
 let appName: string = Deno.mainModule;
 try {
-  apiKey = Deno.env.get('DD_API_KEY') ?? false;
   appName = Deno.env.get('DD_APP_NAME') ?? appName;
 } catch (err) {}
 
@@ -208,7 +206,8 @@ try {
 
 // Set up the singleton metrics sender to share
 const Singleton = new Datadog(
-  apiKey, hostname, {
+  clientFromEnvironment(Deno.env),
+  hostname, {
     app: appName,
     app_url: Deno.mainModule,
     // app_version: `${packageName}/${packageInfo.version}`,
