@@ -8,12 +8,12 @@ export function* scrapeDenoMetrics() {
   yield* buildDenoResMetrics(Deno.resources());
 
   // maybe record heap if the API is available
-  // https://github.com/denoland/deno/pull/9659
-  const {heapStats} = (Deno as unknown as {core: {
-    heapStats?: () => Record<string, number>;
-  }}).core;
-  if (heapStats) {
-    yield* buildDenoHeapMetrics(heapStats());
+  // since 1.9 always callable, but only typed in unstable
+  const {memoryUsage} = Deno as {
+    memoryUsage?: () => MemoryUsage;
+  };
+  if (memoryUsage) {
+    yield* buildDenoMemoryMetrics(memoryUsage());
   }
 }
 
@@ -102,37 +102,36 @@ export function* buildDenoResMetrics(resources: Deno.ResourceMap): Generator<Ope
   };
 }
 
-// https://github.com/denoland/deno/pull/9659
-export function* buildDenoHeapMetrics(stats: Record<string, number>): Generator<OpenMetric> {
-
-  // total_heap_size: 3653632
-  // total_heap_size_executable: 524288
-  // total_physical_size: 2772844
-  // total_available_size: 1515427048
-  // total_global_handles_size: 8192
-  // used_global_handles_size: 2880
-  // used_heap_size: 3232868
-  // heap_size_limit: 1518338048
-  // malloced_memory: 65644
-  // external_memory: 5763
-  // peak_malloced_memory: 90448
-  for (const [key, val] of Object.entries(stats)) {
-    if (key.endsWith('_contexts')) continue;
-    yield {
-      prefix: `deno_heap_${key}_bytes`,
-      type: 'gauge',
-      unit: 'bytes',
-      singleValue: val,
-    };
-  }
-
-  // number_of_native_contexts: 1
-  // number_of_detached_contexts: 0
+export function* buildDenoMemoryMetrics(stats: MemoryUsage): Generator<OpenMetric> {
   yield {
-    prefix: 'deno_native_contexts',
+    prefix: `deno_memory_rss_bytes`,
     type: 'gauge',
-    values: new Map([
-      [`{ctx_lifecycle="active"}`, stats['number_of_native_contexts']],
-      [`{ctx_lifecycle="detached"}`, stats['number_of_detached_contexts']],
-    ])};
+    unit: 'bytes',
+    singleValue: stats.rss,
+  };
+  yield {
+    prefix: `deno_memory_heap_total_bytes`,
+    type: 'gauge',
+    unit: 'bytes',
+    singleValue: stats.heapTotal,
+  };
+  yield {
+    prefix: `deno_memory_heap_used_bytes`,
+    type: 'gauge',
+    unit: 'bytes',
+    singleValue: stats.heapUsed,
+  };
+  yield {
+    prefix: `deno_memory_external_bytes`,
+    type: 'gauge',
+    unit: 'bytes',
+    singleValue: stats.external,
+  };
+}
+
+interface MemoryUsage {
+  rss: number;
+  heapTotal: number;
+  heapUsed: number;
+  external: number;
 }

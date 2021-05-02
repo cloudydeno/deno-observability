@@ -42,11 +42,17 @@ you'll want to look at `mod.ts` for inspiration instead of importing it as-is.
         In recent Deno versions, all bytes are counted as 'data' bytes.
         The 'send_slot' facet is still included as a leftover of that.
 * `deno_ops_received_bytes`: # of bytes received in response to an operation so far
+
 * `deno_open_resources`: # of currently registered Deno resources, split by resource type.
     * A process starts up with 3: `stdin`, `stdout`, `stderr`.
     * Starting the metrics server will add 1 `tcpListener`.
     * Your metrics HTTP request seemingly always shows up as an additional `tcpStream`.
     * All other resources are from your application's own code (or libraries in use).
+
+* `deno_memory_rss_bytes`: # of total resident bytes held by the Deno process
+* `deno_memory_heap_total_bytes`: allocated size of the Deno heap space
+* `deno_memory_heap_used_bytes`: used size of the Deno heap space
+* `deno_memory_external_bytes`: Not Yet Implemented in Deno. Currently 0.
 
 NOTE: If Deno is running with `--unstable`,
 all the `deno_ops_` metrics will include a `deno_op` facet.
@@ -79,6 +85,18 @@ deno_open_resources{res_type="stderr"} 1
 deno_open_resources{res_type="tcpListener"} 1
 deno_open_resources{res_type="child"} 30
 deno_open_resources{res_type="tcpStream"} 2
+# TYPE deno_memory_rss_bytes gauge
+# UNIT deno_memory_rss_bytes bytes
+deno_memory_rss_bytes 3232380
+# TYPE deno_memory_heap_total_bytes gauge
+# UNIT deno_memory_heap_total_bytes bytes
+deno_memory_heap_total_bytes 3948544
+# TYPE deno_memory_heap_used_bytes gauge
+# UNIT deno_memory_heap_used_bytes bytes
+deno_memory_heap_used_bytes 3690960
+# TYPE deno_memory_external_bytes gauge
+# UNIT deno_memory_external_bytes bytes
+deno_memory_external_bytes 16384
 ```
 
 ## HTTP Server Metrics
