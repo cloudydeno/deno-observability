@@ -111,7 +111,7 @@ export class Server extends http.Server {
 }
 
 
-// recreate the signatures of https://deno.land/std@0.84.0/http/server.ts
+// recreate the signatures of https://deno.land/std@0.95.0/http/server.ts
 // should make this module easy to drop into whatever
 
 /**
