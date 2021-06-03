@@ -73,7 +73,7 @@ export class Datadog {
       return await this.api.fetchJson({
         path: `/api${apiPath}`,
         method: 'POST',
-        body: JSON.stringify(payload),
+        body: payload,
       });
     } catch (err) {
       // TODO: cache and retry the request
@@ -193,7 +193,7 @@ export class Datadog {
 // const packageInfo = require(join(mainDir, 'package.json'));
 // const packageName = packageInfo.name.replace(/^@/, '');
 
-let appName: string = Deno.mainModule;
+let appName = "unknown";
 try {
   appName = Deno.env.get('DD_APP_NAME') ?? appName;
 } catch (err) {}
@@ -209,7 +209,7 @@ const Singleton = new Datadog(
   clientFromEnvironment(Deno.env),
   hostname, {
     app: appName,
-    app_url: Deno.mainModule,
+    // app_url: Deno.mainModule,
     // app_version: `${packageName}/${packageInfo.version}`,
 
     // host_ipv6: v6Prefix,
