@@ -1,4 +1,4 @@
-import { assertEquals, assertArrayIncludes } from "https://deno.land/std@0.95.0/testing/asserts.ts";
+import { assertEquals, assertArrayIncludes } from "https://deno.land/std@0.105.0/testing/asserts.ts";
 
 import { MetricsRegistry } from '../sinks/openmetrics/registry.ts';
 import { collectLinuxMetrics } from './linux-procfs.ts';

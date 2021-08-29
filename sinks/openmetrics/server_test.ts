@@ -1,4 +1,4 @@
-import { assertEquals, assertArrayIncludes, assertMatch } from "https://deno.land/std@0.95.0/testing/asserts.ts";
+import { assertEquals, assertArrayIncludes, assertMatch } from "https://deno.land/std@0.105.0/testing/asserts.ts";
 
 import { runMetricsServer, MetricsRegistry } from './server.ts';
 import { scrapeDenoMetrics } from '../../sources/deno.ts';

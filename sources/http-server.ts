@@ -1,16 +1,16 @@
 import { OpenMetric } from '../sinks/openmetrics/types.ts';
 import { DefaultRegistry } from '../sinks/openmetrics/registry.ts';
 
-import * as http from 'https://deno.land/std@0.95.0/http/server.ts';
+import * as http from 'https://deno.land/std@0.105.0/http/server.ts';
 export type {
   Response,
   HTTPOptions, HTTPSOptions,
-} from 'https://deno.land/std@0.95.0/http/server.ts';
+} from 'https://deno.land/std@0.105.0/http/server.ts';
 export {
   ServerRequest,
-} from 'https://deno.land/std@0.95.0/http/server.ts';
+} from 'https://deno.land/std@0.105.0/http/server.ts';
 
-import { STATUS_TEXT } from "https://deno.land/std@0.95.0/http/http_status.ts";
+import { STATUS_TEXT } from "https://deno.land/std@0.105.0/http/http_status.ts";
 
 const encoder = new TextEncoder();
 
@@ -111,7 +111,7 @@ export class Server extends http.Server {
 }
 
 
-// recreate the signatures of https://deno.land/std@0.95.0/http/server.ts
+// recreate the signatures of https://deno.land/std@0.105.0/http/server.ts
 // should make this module easy to drop into whatever
 
 /**

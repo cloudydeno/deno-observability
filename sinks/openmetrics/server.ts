@@ -5,7 +5,7 @@ import { MetricsRegistry, DefaultRegistry } from './registry.ts';
 import '../../sources/deno.ts';
 import '../../sources/linux-procfs.ts';
 import { serve, ServerRequest } from "../../sources/http-server.ts";
-// import { serve, ServerRequest } from "https://deno.land/std@0.95.0/http/server.ts";
+// import { serve, ServerRequest } from "https://deno.land/std@0.105.0/http/server.ts";
 
 export * from './exposition.ts';
 export * from './registry.ts';
