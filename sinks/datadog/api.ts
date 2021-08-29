@@ -1,4 +1,4 @@
-import DatadogApi from "https://deno.land/x/datadog_api@v0.1.3/client.ts";
+import DatadogApi from "https://deno.land/x/datadog_api@v0.1.4/client.ts";
 
 // subset of Deno.env
 interface EnvGetter {
