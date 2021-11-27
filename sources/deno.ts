@@ -6,15 +6,7 @@ const seenResources = new Set<string>();
 export function* scrapeDenoMetrics() {
   yield* buildDenoOpsMetrics(Deno.metrics());
   yield* buildDenoResMetrics(Deno.resources());
-
-  // maybe record heap if the API is available
-  // since 1.9 always callable, but only typed in unstable
-  const {memoryUsage} = Deno as {
-    memoryUsage?: () => MemoryUsage;
-  };
-  if (memoryUsage) {
-    yield* buildDenoMemoryMetrics(memoryUsage());
-  }
+  yield* buildDenoMemoryMetrics(Deno.memoryUsage());
 }
 
 // Always register us in the default registry
@@ -23,26 +15,17 @@ DefaultRegistry.sources.push({
 });
 
 export function* buildDenoOpsMetrics(metrics: Deno.Metrics): Generator<OpenMetric> {
-  // API which might be exposed if Deno is running w/ --unstable
-  // Feel for it instead of actually needing --unstable types to compile
-  // https://github.com/denoland/deno/pull/9240/files
-  const perOps = (metrics as unknown as {ops?: Record<string,Deno.Metrics>}).ops;
-  if (perOps) {
-    // Clean op names a little bit
-    yield* buildDenoPerOpMetrics(Object
-      .entries(perOps)
-      .map(([opId, metrics]) => {
-        const opName = opId.replace(/^op_/, '').replace(/_a?sync$/, '');
-        return [`,deno_op=${JSON.stringify(opName)}`, metrics];
-      }));
-
-  } else {
-    // If per-op API isn't available then just don't attach a tag
-    yield* buildDenoPerOpMetrics([['', metrics]]);
-  }
+  // Clean op names a little bit
+  yield* buildDenoPerOpMetrics(Object
+    .entries(metrics.ops)
+    .filter(x => x[1])
+    .map(([opId, metrics]) => {
+      const opName = opId.replace(/^op_/, '').replace(/_a?sync$/, '');
+      return [`,deno_op=${JSON.stringify(opName)}`, metrics];
+    }));
 }
 
-export function* buildDenoPerOpMetrics(ops: Array<[string,Deno.Metrics]>): Generator<OpenMetric> {
+export function* buildDenoPerOpMetrics(ops: Array<[string,Deno.OpMetrics]>): Generator<OpenMetric> {
   yield {
     prefix: 'deno_ops_dispatched',
     type: 'counter',
@@ -59,22 +42,7 @@ export function* buildDenoPerOpMetrics(ops: Array<[string,Deno.Metrics]>): Gener
       [`_total{op_type="async"${opFacet}}`, metrics.opsCompletedAsync],
       [`_total{op_type="async_unref"${opFacet}}`, metrics.opsCompletedAsyncUnref],
     ]).filter(x => x[1] > 0))};
-
-  yield {
-    prefix: 'deno_ops_sent_bytes',
-    type: 'counter',
-    unit: 'bytes',
-    values: new Map(ops.flatMap(([opFacet, metrics]): [string, number][] => [
-      [`_total{send_slot="control"${opFacet}}`, metrics.bytesSentControl],
-      [`_total{send_slot="data"${opFacet}}`, metrics.bytesSentData],
-    ]).filter(x => x[1] > 0))};
-  yield {
-    prefix: 'deno_ops_received_bytes',
-    type: 'counter',
-    unit: 'bytes',
-    values: new Map(ops.flatMap(([opFacet, metrics]): [string, number][] => [
-      [`_total{recv_slot="response"${opFacet}}`, metrics.bytesReceived],
-    ]))};
+  // send/received fields are still present, but always 0's nowadays
 }
 
 export function* buildDenoResMetrics(resources: Deno.ResourceMap): Generator<OpenMetric> {
