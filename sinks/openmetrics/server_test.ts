@@ -23,10 +23,10 @@ Deno.test("basics", async () => {
   const resp = await fetch(`${url}/metrics`);
   assertEquals(resp.status, 200);
   const text = await resp.text();
-  assertMatch(text, /^deno_ops_completed_total{op_type="async"} \d+($| )/m);
+  assertMatch(text, /^deno_ops_completed_total{op_type="sync",deno_op="metrics"} \d+($| )/m);
   assertArrayIncludes(text.split('\n'), [
-    '# TYPE deno_ops_sent_bytes counter',
-    '# UNIT deno_ops_sent_bytes bytes',
+    '# TYPE deno_memory_rss_bytes gauge',
+    '# UNIT deno_memory_rss_bytes bytes',
     'deno_open_resources{res_type="stdin"} 1',
     'deno_open_resources{res_type="tcpListener"} 1',
     'denohttp_requests_in_flight 1',
@@ -45,9 +45,9 @@ Deno.test("datadog compatibility", async () => {
     }});
     assertEquals(resp.status, 200);
     const text = await resp.text();
-    assertMatch(text, /^deno_ops_completed_total{op_type="async"} \d+($| )/m);
+    assertMatch(text, /^deno_ops_completed_total{op_type="sync",deno_op="metrics"} \d+($| )/m);
     assertArrayIncludes(text.split('\n'), [
-      '# TYPE deno_ops_sent_bytes_total counter',
+      '# TYPE deno_memory_rss_bytes gauge',
   ]);
 
   server.close();
@@ -63,9 +63,9 @@ Deno.test("browser compatibility", async () => {
   assertEquals(resp.status, 200);
   assertEquals(resp.headers.get('content-type'), 'text/plain');
   const text = await resp.text();
-  assertMatch(text, /^deno_ops_completed_total{op_type="async"} \d+($| )/m);
+  assertMatch(text, /^deno_ops_completed_total{op_type="sync",deno_op="metrics"} \d+($| )/m);
   assertArrayIncludes(text.split('\n'), [
-    '# TYPE deno_ops_sent_bytes counter', // openmetrics, not prometheus
+    '# TYPE deno_memory_rss_bytes gauge', // openmetrics, not prometheus
     '# EOF',
   ]);
 
