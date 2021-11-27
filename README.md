@@ -6,10 +6,15 @@ initially targetting OpenMetrics (Prometheus) and the Datadog API
 
 ## Project Status
 
-The code in this repository will be in-flux until a v1.0 possibly eventually happens.
-Right now I'm trying to reconsile the design differences between pushing & polling,
+The code in this repository will be a sorta scratch-pad until a v1.0 possibly eventually happens.
+I'm trying to reconsile the design differences between pushing & polling,
 and figure out one way of instrumenting metrics
 that will be able to transmit to different types of metric sinks.
+
+The current version requires Deno 1.15 or later.
+
+The Deno `--unstable` flag is not required,
+while any latency metrics will be very rough unless `--allow-hrtime` is passed.
 
 ## Prometheus Example
 
@@ -35,13 +40,8 @@ you'll want to look at `mod.ts` for inspiration instead of importing it as-is.
 
 ## Deno Metrics
 
-* `deno_ops_dispatched`: # of operations started, split into 3 categories
-* `deno_ops_completed`: # of operations finished, split into 3 categories
-* `deno_ops_sent_bytes_total`: # of bytes dispatched with all operations so far
-    * There historically was a difference between 'control' and 'data' bytes.
-        In recent Deno versions, all bytes are counted as 'data' bytes.
-        The 'send_slot' facet is still included as a leftover of that.
-* `deno_ops_received_bytes`: # of bytes received in response to an operation so far
+* `deno_ops_dispatched`: # of operations started, split into 3 categories & faceted by op name
+* `deno_ops_completed`: # of operations finished, split into 3 categories & faceted by op name
 
 * `deno_open_resources`: # of currently registered Deno resources, split by resource type.
     * A process starts up with 3: `stdin`, `stdout`, `stderr`.
@@ -54,15 +54,6 @@ you'll want to look at `mod.ts` for inspiration instead of importing it as-is.
 * `deno_memory_heap_used_bytes`: used size of the Deno heap space
 * `deno_memory_external_bytes`: Not Yet Implemented in Deno. Currently 0.
 
-NOTE: If Deno is running with `--unstable`,
-all the `deno_ops_` metrics will include a `deno_op` facet.
-
-Please note that the `ops_..._bytes` metrics refer to bytes 'transfered' within your process,
-between Javascript and the actual Deno runtime.
-They are not directly related to bytes transfered over the network or similar metrics.
-You'll want to monitor network bytes from a lower level source such as Docker or Kubernetes metrics
-if that is an interesting metric to you.
-
 Here's an example of the payload:
 
 ```
@@ -72,12 +63,6 @@ deno_ops_dispatched_total{op_type="async"} 252
 # TYPE deno_ops_completed counter
 deno_ops_completed_total{op_type="sync"} 179
 deno_ops_completed_total{op_type="async"} 245
-# TYPE deno_ops_sent_bytes counter
-# UNIT deno_ops_sent_bytes bytes
-deno_ops_sent_bytes_total{send_slot="data"} 1214641
-# TYPE deno_ops_received_bytes counter
-# UNIT deno_ops_received_bytes bytes
-deno_ops_received_bytes_total{recv_slot="response"} 23640
 # TYPE deno_open_resources gauge
 deno_open_resources{res_type="stdin"} 1
 deno_open_resources{res_type="stdout"} 1
@@ -137,7 +122,7 @@ denohttp_response_bytes_total{purpose="header"} 24936
 * [x] Serve data from `Deno.resources()`
 * [ ] Accept custom metrics from the user's code
 * [ ] Include 'created' timestamp on counters to aid in monotonic tracking
-* [ ] Publish on deno.land
+* [x] Publish on deno.land
 * [ ] Keep track of previous metrics to include zero gauges in future bodies
 
 ## License
