@@ -4,6 +4,7 @@ import {
   InstrumentationBase,
   type InstrumentationConfig,
 } from 'npm:@opentelemetry/instrumentation';
+import { context } from "../api.ts";
 
 export class SubProcessInstrumentation extends InstrumentationBase<
   Promise<Deno.Process>
@@ -33,11 +34,18 @@ export class SubProcessInstrumentation extends InstrumentationBase<
             'exec.argv': opt.cmd.map(x => x.toString()),
             'component': plugin.moduleName,
           },
-        });
+        }, context.active());
 
         try {
           const proc = original(opt);
-          proc.status().finally(() => span.end());
+          proc.status().then(status => {
+            span.setAttribute('exec.exit_code', status.code);
+            if (status.signal) {
+              span.setAttribute('exec.signal', status.signal);
+            }
+          }).finally(() => {
+            span.end();
+          });
           return proc;
         } catch (err) {
           span.recordException(err);
