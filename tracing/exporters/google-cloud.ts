@@ -1,4 +1,4 @@
-import { ServiceAccount } from "https://crux.land/32WBxC#google-service-account";
+import { ServiceAccount, ShortLivedToken } from "https://crux.land/32WBxC#google-service-account";
 
 // import { SpanExporter, ReadableSpan } from "npm:@opentelemetry/sdk-trace-base";
 // import { ExportResult, ExportResultCode } from "npm:@opentelemetry/core";
@@ -18,7 +18,6 @@ const sa = await (gac
     : ServiceAccount.readFromFile(gac))
   : ServiceAccount.loadFromJson({type: 'metadata_service_account'}));
 const projectId = await sa.getProjectId();
-const token = await sa.issueToken(['https://www.googleapis.com/auth/cloud-platform']);
 
 export class GcpBatchSpanExporter implements SpanExporter {
   export(spans: ReadableSpan[], resultCallback: (result: ExportResult) => void): void {
@@ -28,7 +27,8 @@ export class GcpBatchSpanExporter implements SpanExporter {
     );
   }
   async exportAsync(spans: ReadableSpan[]) {
-    await sendSpans(spans.map(getReadableSpanTransformer(projectId)));
+    const token = await sa.issueToken(['https://www.googleapis.com/auth/cloud-platform']);
+    await sendSpans(token, spans.map(getReadableSpanTransformer(projectId)));
   }
   async shutdown(): Promise<void> {
     // throw new Error("Method not implemented.");
@@ -96,7 +96,7 @@ function getReadableSpanTransformer(
   };
 }
 
-export async function sendSpans(spans: GcpSpan[]) {
+export async function sendSpans(token: ShortLivedToken, spans: GcpSpan[]) {
   // console.log(JSON.stringify(spans))
   const resp = await fetch(`https://cloudtrace.googleapis.com/v2/projects/${projectId}/traces:batchWrite`, {
     method: 'POST',
