@@ -27,8 +27,13 @@ export class GcpBatchSpanExporter implements SpanExporter {
     );
   }
   async exportAsync(spans: ReadableSpan[]) {
-    const token = await sa.issueToken(['https://www.googleapis.com/auth/cloud-platform']);
-    await sendSpans(token, spans.map(getReadableSpanTransformer(projectId)));
+    try {
+      const token = await sa.issueToken(['https://www.googleapis.com/auth/cloud-platform']);
+      await sendSpans(token, spans.map(getReadableSpanTransformer(projectId)));
+    } catch (err) {
+      console.error('GcpBatchSpanExporter:', err.message);
+      throw err;
+    }
   }
   async shutdown(): Promise<void> {
     // throw new Error("Method not implemented.");
