@@ -78,7 +78,7 @@ export class DenoFetchInstrumentation extends InstrumentationBase<
   moduleName = this.component;
 
   constructor(config?: FetchInstrumentationConfig) {
-    super('@opentelemetry/instrumentation-fetch-deno', '0.1.0', config);
+    super('fetch', '0.1.0', config);
   }
 
   init(): void {}
