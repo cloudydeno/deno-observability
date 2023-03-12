@@ -1,3 +1,23 @@
+// import {
+//   appendResourcePathToUrl,
+//   appendRootPathToUrlIfNeeded,
+//   OTLPExporterBase,
+//   OTLPExporterError,
+//   OTLPExporterConfigBase,
+//   parseHeaders,
+// } from "npm:@opentelemetry/otlp-exporter-base";
+// import {
+//   baggageUtils,
+// } from "npm:@opentelemetry/core";
+// import type {
+//   ReadableSpan,
+//   SpanExporter,
+// } from "npm:@opentelemetry/sdk-trace-base";
+// import {
+//   createExportTraceServiceRequest,
+//   IExportTraceServiceRequest,
+// } from "npm:@opentelemetry/otlp-transformer";
+
 import {
   appendResourcePathToUrl,
   appendRootPathToUrlIfNeeded,
@@ -5,18 +25,18 @@ import {
   OTLPExporterError,
   OTLPExporterConfigBase,
   parseHeaders,
-} from "npm:@opentelemetry/otlp-exporter-base";
+} from "https://esm.sh/@opentelemetry/otlp-exporter-base@0.35.1";
 import {
   baggageUtils,
-} from "npm:@opentelemetry/core";
+} from "https://esm.sh/@opentelemetry/core@1.9.1";
 import type {
   ReadableSpan,
   SpanExporter,
-} from "npm:@opentelemetry/sdk-trace-base";
+} from "https://esm.sh/@opentelemetry/sdk-trace-base@1.9.1";
 import {
   createExportTraceServiceRequest,
   IExportTraceServiceRequest,
-} from "npm:@opentelemetry/otlp-transformer";
+} from "https://esm.sh/@opentelemetry/otlp-transformer@0.35.1";
 
 /**
  * Collector Metric Exporter abstract base class

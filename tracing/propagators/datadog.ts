@@ -7,6 +7,18 @@
  * Copyright 2020 Datadog, Inc.
  */
 
+// import {
+//   Context,
+//   trace,
+//   isSpanContextValid,
+//   TextMapGetter,
+//   TextMapPropagator,
+//   TextMapSetter,
+//   TraceFlags,
+//   SpanContext,
+// } from 'npm:@opentelemetry/api';
+// import { TraceState } from 'npm:@opentelemetry/core';
+
 import {
   Context,
   trace,
@@ -16,8 +28,8 @@ import {
   TextMapSetter,
   TraceFlags,
   SpanContext,
-} from 'npm:@opentelemetry/api';
-import { TraceState } from 'npm:@opentelemetry/core';
+} from "../api.ts";
+import { TraceState } from "https://esm.sh/@opentelemetry/core@1.9.1";
 
 const VALID_TRACEID_REGEX = /^([0-9a-f]{16}){1,2}$/i;
 const VALID_SPANID_REGEX = /^[0-9a-f]{16}$/i;

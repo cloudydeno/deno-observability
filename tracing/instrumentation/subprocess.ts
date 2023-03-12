@@ -1,10 +1,14 @@
+// import {
+//   isWrapped,
+//   InstrumentationBase,
+//   type InstrumentationConfig,
+// } from 'npm:@opentelemetry/instrumentation';
 
 import {
   isWrapped,
   InstrumentationBase,
   type InstrumentationConfig,
-} from 'npm:@opentelemetry/instrumentation';
-import { context } from "../api.ts";
+} from "https://esm.sh/@opentelemetry/instrumentation@0.35.1";
 
 export class SubProcessInstrumentation extends InstrumentationBase<
   Promise<Deno.Process>
@@ -34,7 +38,7 @@ export class SubProcessInstrumentation extends InstrumentationBase<
             'exec.argv': opt.cmd.map(x => x.toString()),
             'component': plugin.moduleName,
           },
-        }, context.active());
+        });
 
         try {
           const proc = original(opt);

@@ -26,7 +26,7 @@ export interface FetchError {
 }
 export interface SpanData {
   spanUrl: string;
-  startTime: api.HrTime;
+  startTime: HrTime;
 }
 export enum AttributeNames {
   COMPONENT = 'component',
@@ -34,19 +34,28 @@ export enum AttributeNames {
   HTTP_STATUS_TEXT = 'http.status_text',
 }
 
-import * as api from 'npm:@opentelemetry/api';
+// import {
+//   isWrapped,
+//   InstrumentationBase,
+//   InstrumentationConfig,
+//   safeExecuteInTheMiddle,
+// } from 'npm:@opentelemetry/instrumentation';
+// import * as core from 'npm:@opentelemetry/core';
+// import { SemanticAttributes } from 'npm:@opentelemetry/semantic-conventions';
 import {
   isWrapped,
   InstrumentationBase,
   InstrumentationConfig,
   safeExecuteInTheMiddle,
-} from 'npm:@opentelemetry/instrumentation';
-import * as core from 'npm:@opentelemetry/core';
-import { SemanticAttributes } from 'npm:@opentelemetry/semantic-conventions';
+} from "https://esm.sh/@opentelemetry/instrumentation@0.35.1";
+import * as core from "https://esm.sh/@opentelemetry/core@1.9.1";
+import { SemanticAttributes } from "https://esm.sh/@opentelemetry/semantic-conventions@1.9.1";
+
+import { context, HrTime, propagation, Span, SpanKind, trace } from "../api.ts";
 
 export interface FetchCustomAttributeFunction {
   (
-    span: api.Span,
+    span: Span,
     request: Request | RequestInit,
     result: Response | FetchError
   ): void;
@@ -93,7 +102,7 @@ export class DenoFetchInstrumentation extends InstrumentationBase<
    * @param response
    */
   private _addFinalSpanAttributes(
-    span: api.Span,
+    span: Span,
     response: FetchResponse
   ): void {
     const parsedUrl = new URL(response.url);
@@ -116,16 +125,16 @@ export class DenoFetchInstrumentation extends InstrumentationBase<
    */
   private _addHeaders(options: Request | RequestInit, spanUrl: string): void {
     if (options instanceof Request) {
-      api.propagation.inject(api.context.active(), options.headers, {
+      propagation.inject(context.active(), options.headers, {
         set: (h, k, v) => h.set(k, typeof v === 'string' ? v : String(v)),
       });
     } else if (options.headers instanceof Headers) {
-      api.propagation.inject(api.context.active(), options.headers, {
+      propagation.inject(context.active(), options.headers, {
         set: (h, k, v) => h.set(k, typeof v === 'string' ? v : String(v)),
       });
     } else {
       const headers: Partial<Record<string, unknown>> = {};
-      api.propagation.inject(api.context.active(), headers);
+      propagation.inject(context.active(), headers);
       options.headers = Object.assign({}, headers, options.headers || {});
     }
   }
@@ -138,7 +147,7 @@ export class DenoFetchInstrumentation extends InstrumentationBase<
   private _createSpan(
     url: string,
     options: Partial<Request | RequestInit> = {}
-  ): api.Span | undefined {
+  ): Span | undefined {
     if (core.isUrlIgnored(url, this._getConfig().ignoreUrls)) {
       this._diag.debug('ignoring span as url matches ignored url');
       return;
@@ -146,7 +155,7 @@ export class DenoFetchInstrumentation extends InstrumentationBase<
     const method = (options.method || 'GET').toUpperCase();
     const spanName = `HTTP ${method}`;
     return this.tracer.startSpan(spanName, {
-      kind: api.SpanKind.CLIENT,
+      kind: SpanKind.CLIENT,
       attributes: {
         [AttributeNames.COMPONENT]: this.moduleName,
         [SemanticAttributes.HTTP_METHOD]: method,
@@ -162,7 +171,7 @@ export class DenoFetchInstrumentation extends InstrumentationBase<
    * @param response
    */
   private _endSpan(
-    span: api.Span,
+    span: Span,
     spanData: SpanData,
     response: FetchResponse
   ) {
@@ -193,7 +202,7 @@ export class DenoFetchInstrumentation extends InstrumentationBase<
         }
         const spanData = { startTime: core.hrTime(), spanUrl: url };
 
-        function endSpanOnError(span: api.Span, error: FetchError) {
+        function endSpanOnError(span: Span, error: FetchError) {
           plugin._applyAttributesAfterFetch(span, options, error);
           plugin._endSpan(span, spanData, {
             status: error.status || 0,
@@ -202,7 +211,7 @@ export class DenoFetchInstrumentation extends InstrumentationBase<
           });
         }
 
-        function endSpanOnSuccess(span: api.Span, response: Response) {
+        function endSpanOnSuccess(span: Span, response: Response) {
           plugin._applyAttributesAfterFetch(span, options, response);
           if (response.status >= 200 && response.status < 400) {
             plugin._endSpan(span, spanData, response);
@@ -216,7 +225,7 @@ export class DenoFetchInstrumentation extends InstrumentationBase<
         }
 
         function onSuccess(
-          span: api.Span,
+          span: Span,
           resolve: (value: Response | PromiseLike<Response>) => void,
           response: Response
         ): void {
@@ -251,7 +260,7 @@ export class DenoFetchInstrumentation extends InstrumentationBase<
         }
 
         function onError(
-          span: api.Span,
+          span: Span,
           reject: (reason?: unknown) => void,
           error: FetchError
         ) {
@@ -263,8 +272,8 @@ export class DenoFetchInstrumentation extends InstrumentationBase<
         }
 
         return new Promise((resolve, reject) => {
-          return api.context.with(
-            api.trace.setSpan(api.context.active(), createdSpan),
+          return context.with(
+            trace.setSpan(context.active(), createdSpan),
             () => {
               plugin._addHeaders(options, url);
               // TypeScript complains about arrow function captured a this typed as globalThis
@@ -286,7 +295,7 @@ export class DenoFetchInstrumentation extends InstrumentationBase<
   }
 
   private _applyAttributesAfterFetch(
-    span: api.Span,
+    span: Span,
     request: Request | RequestInit,
     result: Response | FetchError
   ) {

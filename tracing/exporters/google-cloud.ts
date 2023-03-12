@@ -1,9 +1,15 @@
 import { ServiceAccount } from "https://crux.land/32WBxC#google-service-account";
-import { SpanExporter, ReadableSpan } from "npm:@opentelemetry/sdk-trace-base";
-import { ExportResult, ExportResultCode } from "npm:@opentelemetry/core";
-import { AttributeValue, HrTime, Link, SpanAttributes, SpanKind, SpanStatus, SpanStatusCode } from "npm:@opentelemetry/api";
-import { Resource } from "npm:/@opentelemetry/resources";
+
+// import { SpanExporter, ReadableSpan } from "npm:@opentelemetry/sdk-trace-base";
+// import { ExportResult, ExportResultCode } from "npm:@opentelemetry/core";
+// import { Resource } from "npm:/@opentelemetry/resources";
 // import {mapOtelResourceToMonitoredResource} from 'npm:@google-cloud/opentelemetry-resource-util';
+
+import { SpanExporter, ReadableSpan } from "https://esm.sh/@opentelemetry/sdk-trace-base@1.9.1";
+import { ExportResult, ExportResultCode } from "https://esm.sh/@opentelemetry/core@1.9.1";
+import { Resource } from "https://esm.sh/@opentelemetry/resources@1.9.1";
+
+import { AttributeValue, HrTime, Link, SpanAttributes, SpanKind, SpanStatus, SpanStatusCode } from "../api.ts";
 
 const gac = Deno.env.get('GOOGLE_APPLICATION_CREDENTIALS');
 const sa = await (gac

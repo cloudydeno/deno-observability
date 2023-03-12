@@ -1,12 +1,10 @@
 import {
-  context,
   propagation,
   ROOT_CONTEXT,
   SpanKind,
-  trace,
   type TextMapGetter,
   type TracerProvider,
-} from 'npm:@opentelemetry/api';
+} from "../api.ts";
 
 export function httpTracer(provider: TracerProvider, inner: Handler): Handler {
   const tracer = provider.getTracer('http');
