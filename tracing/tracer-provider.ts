@@ -1,4 +1,3 @@
-
 // import {
 //   BasicTracerProvider,
 //   BatchSpanProcessor,
@@ -17,11 +16,10 @@ import {
   type BufferConfig,
   SpanExporter,
   type TracerConfig,
-  type SDKRegistrationConfig,
 } from "https://esm.sh/@opentelemetry/sdk-trace-base@1.9.1";
 import { InstrumentationOption, registerInstrumentations } from "https://esm.sh/@opentelemetry/instrumentation@0.35.1";
 import { TextMapPropagator } from './api.ts';
-import { AsyncLocalStorageContextManager } from "https://esm.sh/@opentelemetry/context-async-hooks@1.9.1";
+import { DenoAsyncHooksContextManager } from "./context-manager.ts";
 
 export class DenoTracerProvider extends BasicTracerProvider {
 
@@ -32,8 +30,10 @@ export class DenoTracerProvider extends BasicTracerProvider {
   }) {
     super(config);
 
+    const ctxMgr = new DenoAsyncHooksContextManager();
+    ctxMgr.enable();
     this.register({
-      contextManager: new AsyncLocalStorageContextManager(),
+      contextManager: ctxMgr,
       propagator: config?.propagator,
     });
 
