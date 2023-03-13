@@ -34,6 +34,10 @@ Deno[Deno.internal].core.setPromiseHooks(
   },
 );
 
+// Lots of this is copied from opentelemetry
+// because AbstractAsyncHooksContextManager isn't exported
+
+
 type Func<T> = (...args: unknown[]) => T;
 
 /**
