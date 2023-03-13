@@ -51,7 +51,7 @@ import {
 import * as core from "https://esm.sh/@opentelemetry/core@1.9.1";
 import { SemanticAttributes } from "https://esm.sh/@opentelemetry/semantic-conventions@1.9.1";
 
-import { context, HrTime, propagation, Span, SpanKind, trace } from "../api.ts";
+import { Context, context, HrTime, propagation, Span, SpanKind, trace } from "../api.ts";
 
 export interface FetchCustomAttributeFunction {
   (
@@ -123,18 +123,18 @@ export class DenoFetchInstrumentation extends InstrumentationBase<
    * @param options
    * @param spanUrl
    */
-  private _addHeaders(options: Request | RequestInit, spanUrl: string): void {
+  private _addHeaders(ctx: Context, options: Request | RequestInit, spanUrl: string): void {
     if (options instanceof Request) {
-      propagation.inject(context.active(), options.headers, {
+      propagation.inject(ctx, options.headers, {
         set: (h, k, v) => h.set(k, typeof v === 'string' ? v : String(v)),
       });
     } else if (options.headers instanceof Headers) {
-      propagation.inject(context.active(), options.headers, {
+      propagation.inject(ctx, options.headers, {
         set: (h, k, v) => h.set(k, typeof v === 'string' ? v : String(v)),
       });
     } else {
       const headers: Partial<Record<string, unknown>> = {};
-      propagation.inject(context.active(), headers);
+      propagation.inject(ctx, headers);
       options.headers = Object.assign({}, headers, options.headers || {});
     }
   }
@@ -272,10 +272,11 @@ export class DenoFetchInstrumentation extends InstrumentationBase<
         }
 
         return new Promise((resolve, reject) => {
-          return context.with(
-            trace.setSpan(context.active(), createdSpan),
-            () => {
-              plugin._addHeaders(options, url);
+          const ctx = trace.setSpan(context.active(), createdSpan);
+          // return context.with(
+          //   trace.setSpan(context.active(), createdSpan),
+          //   () => {
+              plugin._addHeaders(ctx, options, url);
               // TypeScript complains about arrow function captured a this typed as globalThis
               // ts(7041)
               return original
@@ -287,8 +288,8 @@ export class DenoFetchInstrumentation extends InstrumentationBase<
                   onSuccess.bind(self, createdSpan, resolve),
                   onError.bind(self, createdSpan, reject)
                 );
-            }
-          );
+          //   }
+          // );
         });
       };
     };
