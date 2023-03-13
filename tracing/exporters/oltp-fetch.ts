@@ -81,15 +81,19 @@ export abstract class OTLPFetchExporterBase<
       return;
     }
 
-    console.error('req:', this.url);
+    console.info('OLTP push with', items.length, 'spans...');
     const promise = fetch(this.url, {
       method: 'POST',
       body: JSON.stringify(this.convert(items)),
       headers: this._headers,
       signal: AbortSignal.timeout(this.timeoutMillis),
+    }).catch(err => {
+      console.error('OLTP failed:', err.message);
+      throw new OTLPExporterError(err.message);
     }).then(resp => {
-      console.error('resp:', resp.status);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status} from ${this.url}`);
+      console.info('OLTP response:', resp.status);
+      if (!resp.ok) throw new OTLPExporterError(
+        `HTTP ${resp.statusText ?? 'error'} from ${this.url}`, resp.status);
     }).then(onSuccess, onError);
 
     // TODO: retry etc.
