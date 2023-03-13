@@ -8,7 +8,7 @@ import {
   isWrapped,
   InstrumentationBase,
   type InstrumentationConfig,
-} from "https://esm.sh/@opentelemetry/instrumentation@0.35.1";
+} from "https://esm.sh/@opentelemetry/instrumentation@0.36.0";
 
 export class SubProcessInstrumentation extends InstrumentationBase<
   Promise<Deno.Process>

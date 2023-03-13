@@ -1,6 +1,6 @@
 export { trace, context, type Context } from './api.ts';
 // export { Resource } from "npm:@opentelemetry/resources";
-export { Resource } from "https://esm.sh/@opentelemetry/resources@1.9.1";
+export { Resource } from "https://esm.sh/@opentelemetry/resources@1.10.0";
 export { DenoTracerProvider } from './tracer-provider.ts';
 
 export { httpTracer } from './instrumentation/http-server.ts';

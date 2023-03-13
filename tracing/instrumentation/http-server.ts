@@ -1,4 +1,4 @@
-import { NetTransportValues, SemanticAttributes } from "https://esm.sh/@opentelemetry/semantic-conventions@1.9.1";
+import { NetTransportValues, SemanticAttributes } from "https://esm.sh/@opentelemetry/semantic-conventions@1.10.0";
 import {
   metrics,
   propagation,

@@ -47,9 +47,9 @@ import {
   InstrumentationBase,
   InstrumentationConfig,
   safeExecuteInTheMiddle,
-} from "https://esm.sh/@opentelemetry/instrumentation@0.35.1";
-import * as core from "https://esm.sh/@opentelemetry/core@1.9.1";
-import { SemanticAttributes } from "https://esm.sh/@opentelemetry/semantic-conventions@1.9.1";
+} from "https://esm.sh/@opentelemetry/instrumentation@0.36.0";
+import * as core from "https://esm.sh/@opentelemetry/core@1.10.0";
+import { SemanticAttributes } from "https://esm.sh/@opentelemetry/semantic-conventions@1.10.0";
 
 import { Context, context, HrTime, propagation, Span, SpanKind, trace } from "../api.ts";
 

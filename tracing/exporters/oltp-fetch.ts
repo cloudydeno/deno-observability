@@ -25,18 +25,18 @@ import {
   OTLPExporterError,
   OTLPExporterConfigBase,
   parseHeaders,
-} from "https://esm.sh/@opentelemetry/otlp-exporter-base@0.35.1";
+} from "https://esm.sh/@opentelemetry/otlp-exporter-base@0.36.0";
 import {
   baggageUtils,
-} from "https://esm.sh/@opentelemetry/core@1.9.1";
+} from "https://esm.sh/@opentelemetry/core@1.10.0";
 import type {
   ReadableSpan,
   SpanExporter,
-} from "https://esm.sh/@opentelemetry/sdk-trace-base@1.9.1";
+} from "https://esm.sh/@opentelemetry/sdk-trace-base@1.10.0";
 import {
   createExportTraceServiceRequest,
   IExportTraceServiceRequest,
-} from "https://esm.sh/@opentelemetry/otlp-transformer@0.35.1";
+} from "https://esm.sh/@opentelemetry/otlp-transformer@0.36.0";
 
 /**
  * Collector Metric Exporter abstract base class

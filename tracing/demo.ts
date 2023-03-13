@@ -104,4 +104,4 @@ async function getData() {
   return body;
 }
 
-await serve(httpTracer(provider, handler));
+await serve(httpTracer(handler));

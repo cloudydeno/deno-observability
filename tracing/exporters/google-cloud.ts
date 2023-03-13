@@ -5,9 +5,9 @@ import { ServiceAccount, ShortLivedToken } from "https://crux.land/32WBxC#google
 // import { Resource } from "npm:/@opentelemetry/resources";
 // import {mapOtelResourceToMonitoredResource} from 'npm:@google-cloud/opentelemetry-resource-util';
 
-import { SpanExporter, ReadableSpan } from "https://esm.sh/@opentelemetry/sdk-trace-base@1.9.1";
-import { ExportResult, ExportResultCode } from "https://esm.sh/@opentelemetry/core@1.9.1";
-import { Resource } from "https://esm.sh/@opentelemetry/resources@1.9.1";
+import { SpanExporter, ReadableSpan } from "https://esm.sh/@opentelemetry/sdk-trace-base@1.10.0";
+import { ExportResult, ExportResultCode } from "https://esm.sh/@opentelemetry/core@1.10.0";
+import { IResource } from "https://esm.sh/@opentelemetry/resources@1.10.0";
 
 import { AttributeValue, HrTime, Link, SpanAttributes, SpanKind, SpanStatus, SpanStatusCode } from "../api.ts";
 
@@ -304,7 +304,7 @@ function mergeAttributes(...attributeList: Attributes[]): Attributes {
 }
 
 function transformResourceToAttributes(
-  resource: Resource,
+  resource: IResource,
   projectId: string,
   resourceFilter?: RegExp,
   stringifyArrayAttributes?: boolean

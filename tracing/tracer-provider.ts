@@ -16,8 +16,8 @@ import {
   type BufferConfig,
   SpanExporter,
   type TracerConfig,
-} from "https://esm.sh/@opentelemetry/sdk-trace-base@1.9.1";
-import { InstrumentationOption, registerInstrumentations } from "https://esm.sh/@opentelemetry/instrumentation@0.35.1";
+} from "https://esm.sh/@opentelemetry/sdk-trace-base@1.10.0";
+import { InstrumentationOption, registerInstrumentations } from "https://esm.sh/@opentelemetry/instrumentation@0.36.0";
 import { TextMapPropagator } from './api.ts';
 import { DenoAsyncHooksContextManager } from "./context-manager.ts";
 
