@@ -5,6 +5,7 @@ import { DenoFetchInstrumentation } from './instrumentation/fetch.ts';
 import { GcpBatchSpanExporter } from "./exporters/google-cloud.ts";
 import { DenoTracerProvider, httpTracer, OTLPTraceFetchExporter, trace } from "./mod.ts";
 import { DatadogPropagator } from "./propagators/datadog.ts";
+import { GoogleCloudPropagator } from "./propagators/google-cloud.ts";
 import { Resource } from "npm:@opentelemetry/resources";
 import { SubProcessInstrumentation } from './instrumentation/subprocess.ts';
 
@@ -14,8 +15,8 @@ const provider = new DenoTracerProvider({
     'deployment.environment': 'local',
     'service.version': 'adhoc',
   }),
-  // propagator: new GoogleCloudPropagator(),
-  propagator: new DatadogPropagator(),
+  propagator: new GoogleCloudPropagator(),
+  // propagator: new DatadogPropagator(),
   instrumentations: [
     new DenoFetchInstrumentation(),
     new SubProcessInstrumentation(),

@@ -93,8 +93,10 @@ export abstract class OTLPFetchExporterBase<
       throw new OTLPExporterError(err.message);
     }).then(resp => {
       console.info('OLTP response:', resp.status);
-      if (!resp.ok) throw new OTLPExporterError(
-        `HTTP ${resp.statusText ?? 'error'} from ${this.url}`, resp.status);
+      if (!resp.ok) {
+        resp.text().then(text => console.log(text));
+        throw new OTLPExporterError(`HTTP ${resp.statusText ?? 'error'} from ${this.url}`, resp.status);
+      }
     }).then(onSuccess, onError);
 
     // TODO: retry etc.
