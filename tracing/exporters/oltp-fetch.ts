@@ -81,7 +81,8 @@ export abstract class OTLPFetchExporterBase<
       return;
     }
 
-    console.info('OLTP push with', items.length, 'spans...');
+    console.info(`OLTP push to ${new URL(this.url).pathname} with`, items.length, 'spans...');
+    // console.log(JSON.stringify(this.convert(items)))
     const promise = fetch(this.url, {
       method: 'POST',
       body: JSON.stringify(this.convert(items)),

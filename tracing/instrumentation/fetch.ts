@@ -111,6 +111,7 @@ export class DenoFetchInstrumentation extends InstrumentationBase<
       span.setAttribute(AttributeNames.HTTP_STATUS_TEXT, response.statusText);
     }
     span.setAttribute(SemanticAttributes.HTTP_HOST, parsedUrl.host);
+    span.setAttribute(SemanticAttributes.HTTP_ROUTE, parsedUrl.hostname); // Datadog likes having this
     span.setAttribute(
       SemanticAttributes.HTTP_SCHEME,
       parsedUrl.protocol.replace(':', '')
