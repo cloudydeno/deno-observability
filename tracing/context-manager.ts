@@ -10,29 +10,35 @@ interface HookCallbacks {
 
 const enabledCallbacks = new Set<HookCallbacks>();
 
-//@ts-expect-error Unstable?
-Deno[Deno.internal].core.setPromiseHooks(
-  (promise: Promise<unknown>) => {
-    for (const { init } of enabledCallbacks) {
-      init(promise);
-    }
-  },
-  (promise: Promise<unknown>) => {
-    for (const { before } of enabledCallbacks) {
-      before(promise);
-    }
-  },
-  (promise: Promise<unknown>) => {
-    for (const { after } of enabledCallbacks) {
-      after(promise);
-    }
-  },
-  (promise: Promise<unknown>) => {
-    for (const { resolve } of enabledCallbacks) {
-      resolve(promise);
-    }
-  },
-);
+let hasBeenSet = false;
+function maybeSetHooks() {
+  if (hasBeenSet) return;
+  hasBeenSet = true;
+
+  //@ts-expect-error Unstable?
+  Deno[Deno.internal].core.setPromiseHooks(
+    (promise: Promise<unknown>) => {
+      for (const { init } of enabledCallbacks) {
+        init(promise);
+      }
+    },
+    (promise: Promise<unknown>) => {
+      for (const { before } of enabledCallbacks) {
+        before(promise);
+      }
+    },
+    (promise: Promise<unknown>) => {
+      for (const { after } of enabledCallbacks) {
+        after(promise);
+      }
+    },
+    (promise: Promise<unknown>) => {
+      for (const { resolve } of enabledCallbacks) {
+        resolve(promise);
+      }
+    },
+  );
+}
 
 // Lots of this is copied from opentelemetry
 // because AbstractAsyncHooksContextManager isn't exported
@@ -249,6 +255,9 @@ abstract class AbstractAsyncHooksContextManager
   private _wrapped = false;
 }
 
+const originalSetTimeout = setTimeout;
+const originalSetInterval = setInterval;
+const originalQueueMicrotask = queueMicrotask;
 
 export class DenoAsyncHooksContextManager extends AbstractAsyncHooksContextManager {
   private _contexts: Map<Promise<unknown>, Context> = new Map();
@@ -293,7 +302,12 @@ export class DenoAsyncHooksContextManager extends AbstractAsyncHooksContextManag
   }
 
   enable(): this {
+    maybeSetHooks();
     enabledCallbacks.add(this._callbacks);
+
+    globalThis.setTimeout = (cb, delay) => originalSetTimeout(this.bind(this.active(), cb), delay);
+    globalThis.setInterval = (cb, delay) => originalSetInterval(this.bind(this.active(), cb), delay);
+    globalThis.queueMicrotask = (cb) => originalQueueMicrotask(this.bind(this.active(), cb));
     return this;
   }
 
@@ -301,6 +315,10 @@ export class DenoAsyncHooksContextManager extends AbstractAsyncHooksContextManag
     enabledCallbacks.delete(this._callbacks);
     this._contexts.clear();
     this._stack = [];
+
+    globalThis.setTimeout = originalSetTimeout;
+    globalThis.setInterval = originalSetInterval;
+    globalThis.queueMicrotask = originalQueueMicrotask;
     return this;
   }
 

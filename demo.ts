@@ -71,7 +71,7 @@ async function handler(req: Request): Promise<Response> {
   }
 
   if (url.pathname == '/uptime') {
-    // const text = await new Promise<string>(ok => setTimeout(async () => {
+    const text = await new Promise<string>(ok => setTimeout(async () => {
       const proc = Deno.run({
         cmd: ['uptime'],
         stdin: 'null',
@@ -80,8 +80,8 @@ async function handler(req: Request): Promise<Response> {
       });
       const text = await new Response(proc.stdout.readable).text();
       await proc.status();
-      // ok(text);
-    // }, 50));
+      ok(text);
+    }, 50));
     return new Response(text);
   }
 
