@@ -28,7 +28,7 @@ import {
   TextMapSetter,
   TraceFlags,
   SpanContext,
-} from "../api.ts";
+} from "../../api.ts";
 import { TraceState } from "https://esm.sh/@opentelemetry/core@1.10.0";
 
 const VALID_TRACEID_REGEX = /^([0-9a-f]{16}){1,2}$/i;

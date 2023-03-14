@@ -1,5 +1,5 @@
 import EventEmitter from "https://deno.land/std@0.177.0/node/events.ts";
-import { Context, ContextManager, ROOT_CONTEXT } from "./api.ts";
+import { Context, ContextManager, ROOT_CONTEXT } from "../api.ts";
 
 interface HookCallbacks {
   init: (promise: Promise<unknown>) => void

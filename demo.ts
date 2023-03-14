@@ -4,17 +4,39 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { DenoFetchInstrumentation } from './instrumentation/fetch.ts';
 import { GcpBatchSpanExporter } from "./exporters/google-cloud.ts";
 import { DenoTracerProvider, httpTracer, OTLPTraceFetchExporter, trace } from "./mod.ts";
-import { DatadogPropagator } from "./propagators/datadog.ts";
-import { GoogleCloudPropagator } from "./propagators/google-cloud.ts";
-import { Resource } from "npm:@opentelemetry/resources";
+import { GoogleCloudPropagator } from "./tracing/propagators/google-cloud.ts";
+import { Resource } from "https://esm.sh/@opentelemetry/resources@1.10.0";
 import { SubProcessInstrumentation } from './instrumentation/subprocess.ts';
+import { DenoLoggingProvider } from "./logging/provider.ts";
+import { DenoMetricsProvider, OTLPMetricExporter } from "./metrics/provider.ts";
+import { metrics, ValueType } from "./api.ts";
+import { SemanticAttributes } from "https://esm.sh/@opentelemetry/semantic-conventions@1.10.0";
+
+const resource = new Resource({
+  'service.name': 'observability-demo',
+  'deployment.environment': 'local',
+  'service.version': 'adhoc',
+});
+
+const logger = new DenoLoggingProvider({
+  resource,
+}).getLogger('demo.ts');
+
+new DenoMetricsProvider({
+  resource,
+  metricExporter: new OTLPMetricExporter(),
+});
+
+const myMeter = metrics.getMeter('my-service-meter');
+const test3 = myMeter.createCounter('test3', {valueType: ValueType.INT})
+const test2 = myMeter.createHistogram('test2', {valueType: ValueType.INT})
+
+logger.emit({
+  body: 'im alive',
+});
 
 const provider = new DenoTracerProvider({
-  resource: new Resource({
-    'service.name': 'observability-demo',
-    'deployment.environment': 'local',
-    'service.version': 'adhoc',
-  }),
+  resource,
   propagator: new GoogleCloudPropagator(),
   // propagator: new DatadogPropagator(),
   instrumentations: [
@@ -30,6 +52,15 @@ const provider = new DenoTracerProvider({
 async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url);
   console.log(req.method, url.pathname);
+
+
+  test3.add(1, {[SemanticAttributes.HTTP_METHOD]: req.method});
+  test2.record(50+Math.round(Math.random()*25), {[SemanticAttributes.HTTP_METHOD]: req.method});
+
+  logger.emit({
+    body: 'hello world',
+  });
+
 
   if (url.pathname == '/inner') {
     await getData();
