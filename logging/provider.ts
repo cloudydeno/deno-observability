@@ -1,9 +1,9 @@
 import { Logger, LoggerOptions, LoggerProvider, LogRecord, logs } from "https://esm.sh/@opentelemetry/api-logs@0.36.0";
-import { Attributes, SpanAttributes, trace } from "../api.ts";
+import { Attributes, context, SpanAttributes, trace } from "../api.ts";
 
 // import { OTLP } from "https://esm.sh/@opentelemetry/exporter-metrics-otlp-http@0.36.0"
 
-import { baggageUtils } from "https://esm.sh/@opentelemetry/core@1.10.0";
+import { baggageUtils, suppressTracing } from "https://esm.sh/@opentelemetry/core@1.10.0";
 
 import {
   // OTLPExporterBrowserBase,
@@ -84,13 +84,13 @@ export class DenoLoggingProvider implements LoggerProvider {
     //   }));
     // }
 
-    setInterval(() => {
+    setInterval(context.bind(suppressTracing(context.active()), () => {
       if (!TODOpendinglogs.length) return;
       const payload = toLogPayload(this.resource, TODOpendinglogs);
       TODOpendinglogs.length = 0;
       new Promise<void>((ok,fail) =>
         new OTLPLogExporterBrowserProxy().send([payload], ok, fail));
-    }, 5000)
+    }), 5000);
   }
   getLogger(name: string, version?: string, options?: LoggerOptions): DenoLogger {
     return new DenoLogger(name, version, options);
