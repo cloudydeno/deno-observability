@@ -4,6 +4,8 @@ export { DenoTracerProvider } from './provider.ts';
 
 import { context, type Context } from '../api.ts';
 
+export { W3CTraceContextPropagator } from "https://esm.sh/@opentelemetry/core@1.10.0";
+
 export async function* asyncGeneratorWithContext<T, TReturn, TNext>(
   operationContext: Context,
   operation: () => AsyncGenerator<T, TReturn, TNext>,

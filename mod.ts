@@ -7,4 +7,9 @@ export { SubProcessInstrumentation } from './instrumentation/subprocess.ts'
 export { DenoFetchInstrumentation } from './instrumentation/fetch.ts'
 
 export { OTLPTraceFetchExporter } from './exporters/oltp-fetch.ts';
-export { DenoTracerProvider } from './tracing/mod.ts';
+
+export {
+  DenoTracerProvider,
+  W3CTraceContextPropagator,
+  asyncGeneratorWithContext,
+} from './tracing/mod.ts';
