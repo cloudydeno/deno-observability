@@ -1,12 +1,18 @@
-import { MeterProvider, MeterProviderOptions, PeriodicExportingMetricReader, PushMetricExporter, ResourceMetrics } from "https://esm.sh/@opentelemetry/sdk-metrics@1.10.0";
-import { metrics } from "../api.ts";
-
-import { OTLPMetricExporterBase, type OTLPMetricExporterOptions } from "https://esm.sh/@opentelemetry/exporter-metrics-otlp-http@0.36.0"
-
-import { baggageUtils } from "https://esm.sh/@opentelemetry/core@1.10.0";
-
 import {
-  // OTLPExporterBrowserBase,
+  MeterProvider,
+  MeterProviderOptions,
+  PeriodicExportingMetricReader,
+  PushMetricExporter,
+  ResourceMetrics,
+} from "https://esm.sh/@opentelemetry/sdk-metrics@1.10.0";
+import {
+  OTLPMetricExporterBase,
+  type OTLPMetricExporterOptions,
+} from "https://esm.sh/@opentelemetry/exporter-metrics-otlp-http@0.36.0"
+import {
+  baggageUtils,
+} from "https://esm.sh/@opentelemetry/core@1.10.0";
+import {
   type OTLPExporterConfigBase,
   appendResourcePathToUrl,
   appendRootPathToUrlIfNeeded,
@@ -15,13 +21,14 @@ import {
   createExportMetricsServiceRequest,
   type IExportMetricsServiceRequest,
 } from 'https://esm.sh/@opentelemetry/otlp-transformer@0.36.0';
+
+import { metrics } from "../api.ts";
 import { OTLPFetchExporterBase } from "../exporters/oltp-fetch.ts";
 
 const DEFAULT_COLLECTOR_RESOURCE_PATH = 'v1/metrics';
 const DEFAULT_COLLECTOR_URL = `http://localhost:4318/${DEFAULT_COLLECTOR_RESOURCE_PATH}`;
 
-
-class OTLPExporterBrowserProxy extends OTLPFetchExporterBase<
+class OTLPExporterDeno extends OTLPFetchExporterBase<
   ResourceMetrics,
   IExportMetricsServiceRequest
 > {
@@ -58,13 +65,11 @@ class OTLPExporterBrowserProxy extends OTLPFetchExporterBase<
 /**
  * Collector Metric Exporter for Web
  */
-export class OTLPMetricExporter extends OTLPMetricExporterBase<OTLPExporterBrowserProxy> {
+export class OTLPMetricExporter extends OTLPMetricExporterBase<OTLPExporterDeno> {
   constructor(config?: OTLPExporterConfigBase & OTLPMetricExporterOptions) {
-    super(new OTLPExporterBrowserProxy(config), config);
+    super(new OTLPExporterDeno(config), config);
   }
 }
-
-
 
 export class DenoMetricsProvider extends MeterProvider {
   constructor(config?: MeterProviderOptions & {
@@ -78,7 +83,7 @@ export class DenoMetricsProvider extends MeterProvider {
     if (config?.metricExporter) {
       this.addMetricReader(new PeriodicExportingMetricReader({
         exporter: config.metricExporter,
-        exportIntervalMillis: config.metricExporterInterval ?? 10_000,
+        exportIntervalMillis: config.metricExporterInterval ?? 20_000,
       }));
     }
   }

@@ -37,6 +37,7 @@ import {
   createExportTraceServiceRequest,
   IExportTraceServiceRequest,
 } from "https://esm.sh/@opentelemetry/otlp-transformer@0.36.0";
+import { diag } from "../api.ts";
 
 /**
  * Collector Metric Exporter abstract base class
@@ -81,21 +82,23 @@ export abstract class OTLPFetchExporterBase<
       return;
     }
 
-    console.info(`OLTP push to ${new URL(this.url).pathname} with`, items.length, 'spans...');
+    diag.debug(`OLTP push to ${new URL(this.url).pathname} with ${items.length} spans...`);
     // console.log(JSON.stringify(this.convert(items)))
-    const promise = fetch(this.url, {
+    fetch(this.url, {
       method: 'POST',
       body: JSON.stringify(this.convert(items)),
       headers: this._headers,
       signal: AbortSignal.timeout(this.timeoutMillis),
     }).catch(err => {
-      console.error('OLTP failed:', err.message);
+      diag.error(`OLTP failed: ${err.message}`);
       throw new OTLPExporterError(err.message);
     }).then(resp => {
-      console.info('OLTP response:', resp.status);
+      diag.debug(`OLTP response: ${resp.status}`);
       if (!resp.ok) {
-        resp.text().then(text => console.log(text));
+        resp.text().then(text => diag.debug(text));
         throw new OTLPExporterError(`HTTP ${resp.statusText ?? 'error'} from ${this.url}`, resp.status);
+      } else {
+        resp.body?.cancel();
       }
     }).then(onSuccess, onError);
 
