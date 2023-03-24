@@ -233,6 +233,7 @@ export class DenoFetchInstrumentation extends InstrumentationBase<
           try {
             const resClone = response.clone();
             const resClone4Hook = response.clone();
+            resClone4Hook.body?.cancel();
             const body = resClone.body;
             if (body) {
               const reader = body.getReader();
