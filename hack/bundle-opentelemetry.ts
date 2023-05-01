@@ -133,9 +133,10 @@ export async function buildModuleWithRollup(directory: string, modName: string, 
       if (match[2].startsWith('@opentelemetry/')) {
         newImport = './' + match[2].split('/')[1] + '.js';
       } else if (['path', 'os', 'process', 'fs'].includes(match[2])) {
-        newImport = 'node:'+match[2];
-      } else if (['semver', 'shimmer', 'require-in-the-middle'].includes(match[2])) {
-        newImport = 'npm:'+match[2];
+        // newImport = 'node:'+match[2];
+        return '';
+      } else if (['shimmer'].includes(match[2])) {
+        newImport = `https://esm.sh/${match[2]}`;
       } else {
         console.log('Unhandled import:', match[2]);
       }
@@ -150,6 +151,10 @@ export async function buildModuleWithRollup(directory: string, modName: string, 
     text = text.replace(`os.hostname()`, `Deno.hostname()`);
     text = text.replace("${process.argv0}", "deno");
     text = text.replace("import * as shimmer from 'npm:shimmer';", "import shimmer from 'npm:shimmer';");
+    // text = text.replace("os.userInfo()", "") // this is ok if it just doesn't work so w/e
+    text = text.replace("promises.readFile(path, { encoding: 'utf8' })", "Deno.readTextFile(path)");
+    text = text.replace("import { hostname, arch, platform, release } from 'node:os';",
+      `const hostname = () => Deno.hostname(), arch = Deno.build.arch, platform = Deno.build.os, release = () => Deno.osRelease();`);
     text = text.replaceAll(/^  +/gm, x => '\t\t\t\t\t\t\t\t'.slice(0, Math.floor(x.length / 4)));
 
     await Deno.writeTextFile('opentelemetry/'+chunk.fileName, text);

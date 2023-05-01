@@ -18,9 +18,9 @@
 import { diag } from './api.js';
 import { SemanticResourceAttributes } from './semantic-conventions.js';
 import { SDK_INFO, getEnv } from './core.js';
-import * as os from 'node:os';
-import { hostname, arch, platform, release } from 'node:os';
-import { promises } from 'node:fs';
+
+
+
 
 function defaultServiceName() {
 	return `unknown_service:deno`;
@@ -53,7 +53,7 @@ async function getMachineId() {
 	const paths = ['/etc/machine-id', '/var/lib/dbus/machine-id'];
 	for (const path of paths) {
 		try {
-			const result = await promises.readFile(path, { encoding: 'utf8' });
+			const result = await Deno.readTextFile(path);
 			return result.trim();
 		}
 		catch (e) {

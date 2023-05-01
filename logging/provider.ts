@@ -1,10 +1,10 @@
 import { logs } from "../opentelemetry/api-logs.js";
 import { BatchLogRecordProcessor, LoggerProvider, LogRecordExporter, ReadableLogRecord } from "../opentelemetry/sdk-logs.js";
-import { SpanAttributes } from "../api.ts";
+import { context, SpanAttributes } from "../api.ts";
 
 // import { OTLP } from "../opentelemetry/exporter-metrics-otlp-http.js";
 
-import { baggageUtils, ExportResult, ExportResultCode } from "../opentelemetry/core.js";
+import { baggageUtils, ExportResult, ExportResultCode, suppressTracing } from "../opentelemetry/core.js";
 
 import {
   // OTLPExporterBrowserBase,
@@ -72,11 +72,12 @@ class OTLPLogRecordExporter implements LogRecordExporter {
     if (logs.length == 0) {
       return resCb({ code: ExportResultCode.SUCCESS });
     }
-    new Promise<void>((ok, fail) =>
-      new OTLPLogExporterBrowserProxy().send(logs, ok, fail))
-    .then(
-      () => resCb({ code: ExportResultCode.SUCCESS }),
-      (error) => resCb({ code: ExportResultCode.FAILED, error }));
+    context.with(suppressTracing(context.active()), () =>
+      new Promise<void>((ok, fail) =>
+        new OTLPLogExporterBrowserProxy().send(logs, ok, fail))
+      .then(
+        () => resCb({ code: ExportResultCode.SUCCESS }),
+        (error) => resCb({ code: ExportResultCode.FAILED, error })));
   }
   async shutdown() {}
 }

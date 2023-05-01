@@ -51,7 +51,7 @@ import {
 import * as core from "../opentelemetry/core.js";
 import { SemanticAttributes } from "../opentelemetry/semantic-conventions.js";
 
-import { Context, context, HrTime, propagation, Span, SpanKind, trace } from "../api.ts";
+import { Context, context, HrTime, propagation, Span, SpanKind, SpanStatusCode, trace } from "../api.ts";
 
 export interface FetchCustomAttributeFunction {
   (
@@ -115,6 +115,13 @@ export class DenoFetchInstrumentation extends InstrumentationBase {
       parsedUrl.protocol.replace(':', '')
     );
     span.setAttribute(SemanticAttributes.HTTP_USER_AGENT, navigator.userAgent);
+
+    if (response.status >= 500) {
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: `HTTP ${response.status}: ${response.statusText ?? response.status}`,
+      });
+    }
   }
 
   /**

@@ -16,7 +16,7 @@
 /// <reference types="./instrumentation.d.ts" />
 
 import { trace, metrics, diag } from './api.js';
-import shimmer from 'npm:shimmer';
+import * as shimmer from 'https://esm.sh/shimmer';
 
 function parseInstrumentationOptions(options = []) {
 	let instrumentations = [];

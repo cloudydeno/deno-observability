@@ -16,7 +16,7 @@
 /// <reference types="./core.d.ts" />
 
 import { createContextKey, baggageEntryMetadataFromString, propagation, diag, DiagLogLevel, trace, isSpanContextValid, TraceFlags, SamplingDecision, isValidTraceId, context } from './api.js';
-import * as os from 'node:os';
+
 import { SemanticResourceAttributes, TelemetrySdkLanguageValues } from './semantic-conventions.js';
 
 const SUPPRESS_TRACING_KEY = createContextKey('OpenTelemetry SDK Context Key SUPPRESS_TRACING');
