@@ -148,13 +148,13 @@ export async function buildModuleWithRollup(directory: string, modName: string, 
 
     text = text.replace(`typeof process !== 'undefined' && process && process.env\n        ? parseEnvironment(process.env)\n        : parseEnvironment(_globalThis$1);`, `parseEnvironment(Deno.env.toObject())`);
     text = text.replace(`(process.env)`, `(Deno.env.toObject())`);
-    text = text.replace(`os.hostname()`, `Deno.hostname()`);
+    text = text.replace(`os.hostname()`, `Deno.hostname?.()`);
     text = text.replace("${process.argv0}", "deno");
     text = text.replace("import * as shimmer from 'npm:shimmer';", "import shimmer from 'npm:shimmer';");
     // text = text.replace("os.userInfo()", "") // this is ok if it just doesn't work so w/e
     text = text.replace("promises.readFile(path, { encoding: 'utf8' })", "Deno.readTextFile(path)");
     text = text.replace("import { hostname, arch, platform, release } from 'node:os';",
-      `const hostname = () => Deno.hostname(), arch = Deno.build.arch, platform = Deno.build.os, release = () => Deno.osRelease();`);
+      `const hostname = () => Deno.hostname?.(), arch = Deno.build.arch, platform = Deno.build.os, release = () => Deno.osRelease();`);
     text = text.replaceAll(/^  +/gm, x => '\t\t\t\t\t\t\t\t'.slice(0, Math.floor(x.length / 4)));
 
     await Deno.writeTextFile('opentelemetry/'+chunk.fileName, text);
@@ -196,7 +196,7 @@ await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/otlp-expor
 await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-core/src/platform/node/timer-util.ts',
 `export function unrefTimer(timer: number): void {
   //@ts-expect-error TODO: deno types in tsc
-  Deno.unrefTimer(timer);
+  Deno.unrefTimer?.(timer);
 }`);
 
 // TODO: maybe put a deno impl in there?

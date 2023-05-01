@@ -473,7 +473,7 @@ function getEnvWithoutDefaults() {
 function getEnv() {
 	const processEnv = parseEnvironment(Deno.env.toObject());
 	return Object.assign({
-		HOSTNAME: Deno.hostname(),
+		HOSTNAME: Deno.hostname?.(),
 	}, DEFAULT_ENVIRONMENT, processEnv);
 }
 
@@ -523,7 +523,8 @@ const SDK_INFO = {
 };
 
 function unrefTimer(timer) {
-	Deno.unrefTimer(timer);
+	var _a;
+	(_a = Deno.unrefTimer) === null || _a === void 0 ? void 0 : _a.call(Deno, timer);
 }
 
 const NANOSECOND_DIGITS = 9;
