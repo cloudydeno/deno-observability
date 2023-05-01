@@ -155,6 +155,7 @@ export async function buildModuleWithRollup(directory: string, modName: string, 
     text = text.replace("promises.readFile(path, { encoding: 'utf8' })", "Deno.readTextFile(path)");
     text = text.replace("import { hostname, arch, platform, release } from 'node:os';",
       `const hostname = () => Deno.hostname?.(), arch = Deno.build.arch, platform = Deno.build.os, release = () => Deno.osRelease();`);
+    text = text.replaceAll("declare const enum", "declare enum"); // Cannot access ambient const enums when 'isolatedModules' is enabled.
     text = text.replaceAll(/^  +/gm, x => '\t\t\t\t\t\t\t\t'.slice(0, Math.floor(x.length / 4)));
 
     await Deno.writeTextFile('opentelemetry/'+chunk.fileName, text);

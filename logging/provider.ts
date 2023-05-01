@@ -1,5 +1,5 @@
 import { logs } from "../opentelemetry/api-logs.js";
-import { BatchLogRecordProcessor, LoggerProvider, LogRecordExporter, ReadableLogRecord } from "../opentelemetry/sdk-logs.js";
+import { BatchLogRecordProcessor, LoggerProvider, LogRecordExporter, LogRecordProcessor, ReadableLogRecord } from "../opentelemetry/sdk-logs.js";
 import { context, SpanAttributes } from "../api.ts";
 
 // import { OTLP } from "../opentelemetry/exporter-metrics-otlp-http.js";
@@ -67,7 +67,7 @@ class OTLPLogExporterBrowserProxy extends OTLPFetchExporterBase<
 //   }
 // }
 
-class OTLPLogRecordExporter implements LogRecordExporter {
+export class OTLPLogRecordExporter implements LogRecordExporter {
   export(logs: ReadableLogRecord[], resCb: (result: ExportResult) => void) {
     if (logs.length == 0) {
       return resCb({ code: ExportResultCode.SUCCESS });
@@ -83,16 +83,17 @@ class OTLPLogRecordExporter implements LogRecordExporter {
 }
 
 export class DenoLoggingProvider extends LoggerProvider {
-  constructor(opts?: {
+  constructor(config?: {
     resource?: IResource,
+    batchLogExporters?: LogRecordExporter[];
   }) {
-    super(opts);
+    super(config);
 
     logs.setGlobalLoggerProvider(this);
 
-    this.addLogRecordProcessor(
-      new BatchLogRecordProcessor(new OTLPLogRecordExporter())
-    );
+    for (const exporter of config?.batchLogExporters ?? []) {
+      this.addLogRecordProcessor(new BatchLogRecordProcessor(exporter));
+    }
   }
 }
 

@@ -264,7 +264,7 @@ interface IExemplar {
  * values. It describes how those values relate to the time interval over
  * which they are aggregated.
  */
-declare const enum EAggregationTemporality {
+declare enum EAggregationTemporality {
 	AGGREGATION_TEMPORALITY_UNSPECIFIED = 0,
 	/** DELTA is an AggregationTemporality for a metric aggregator which reports
 	changes since last report time. Successive metrics contain aggregation of
@@ -423,7 +423,7 @@ interface IStatus {
 	code: EStatusCode;
 }
 /** StatusCode enum. */
-declare const enum EStatusCode {
+declare enum EStatusCode {
 	/** The default status. */
 	STATUS_CODE_UNSET = 0,
 	/** The Span has been evaluated by an Application developers or Operator to have completed successfully. */

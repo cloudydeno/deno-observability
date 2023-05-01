@@ -8,7 +8,7 @@ import { DenoTracerProvider, httpTracer, OTLPTraceFetchExporter, trace } from ".
 import { Resource } from "./opentelemetry/resources.js";
 import { SubProcessInstrumentation } from './instrumentation/subprocess.ts';
 import { registerDenoRuntimeMetrics } from './instrumentation/deno-runtime.ts';
-import { DenoLoggingProvider } from "./logging/provider.ts";
+import { DenoLoggingProvider, OTLPLogRecordExporter } from "./logging/provider.ts";
 import { DenoMetricsProvider, OTLPMetricExporter } from "./metrics/provider.ts";
 import { metrics, ValueType } from "./api.ts";
 import { SemanticAttributes } from "./opentelemetry/semantic-conventions.js";
@@ -21,6 +21,9 @@ const resource = new Resource({
 
 const logger = new DenoLoggingProvider({
   resource,
+  batchLogExporters: [
+    new OTLPLogRecordExporter(),
+  ],
 }).getLogger('demo.ts');
 
 new DenoMetricsProvider({
