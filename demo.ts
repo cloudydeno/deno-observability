@@ -2,15 +2,16 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
 import { DenoFetchInstrumentation } from './instrumentation/fetch.ts';
-import { GcpBatchSpanExporter } from "./exporters/google-cloud.ts";
+// import { GcpBatchSpanExporter } from "./exporters/google-cloud.ts";
 import { DenoTracerProvider, httpTracer, OTLPTraceFetchExporter, trace } from "./mod.ts";
-import { GoogleCloudPropagator } from "./tracing/propagators/google-cloud.ts";
-import { Resource } from "https://esm.sh/@opentelemetry/resources@1.10.0";
+// import { GoogleCloudPropagator } from "./tracing/propagators/google-cloud.ts";
+import { Resource } from "./opentelemetry/resources.js";
 import { SubProcessInstrumentation } from './instrumentation/subprocess.ts';
+import { registerDenoRuntimeMetrics } from './instrumentation/deno-runtime.ts';
 import { DenoLoggingProvider } from "./logging/provider.ts";
 import { DenoMetricsProvider, OTLPMetricExporter } from "./metrics/provider.ts";
 import { metrics, ValueType } from "./api.ts";
-import { SemanticAttributes } from "https://esm.sh/@opentelemetry/semantic-conventions@1.10.0";
+import { SemanticAttributes } from "./opentelemetry/semantic-conventions.js";
 
 const resource = new Resource({
   'service.name': 'observability-demo',
@@ -27,6 +28,8 @@ new DenoMetricsProvider({
   metricExporter: new OTLPMetricExporter(),
 });
 
+registerDenoRuntimeMetrics();
+
 const myMeter = metrics.getMeter('my-service-meter');
 const test3 = myMeter.createCounter('test3', {valueType: ValueType.INT})
 const test2 = myMeter.createHistogram('test2', {valueType: ValueType.INT})
@@ -35,9 +38,9 @@ logger.emit({
   body: 'im alive',
 });
 
-const provider = new DenoTracerProvider({
+const traceProvider = new DenoTracerProvider({
   resource,
-  propagator: new GoogleCloudPropagator(),
+  // propagator: new GoogleCloudPropagator(),
   // propagator: new DatadogPropagator(),
   instrumentations: [
     new DenoFetchInstrumentation(),

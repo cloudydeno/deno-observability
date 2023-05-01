@@ -8,11 +8,9 @@ import {
   isWrapped,
   InstrumentationBase,
   type InstrumentationConfig,
-} from "https://esm.sh/@opentelemetry/instrumentation@0.36.0";
+} from "../opentelemetry/instrumentation.js";
 
-export class SubProcessInstrumentation extends InstrumentationBase<
-  Promise<Deno.Process>
-> {
+export class SubProcessInstrumentation extends InstrumentationBase {
   readonly component: string = 'subprocess';
   moduleName = this.component;
 

@@ -1,4 +1,4 @@
-export { W3CTraceContextPropagator } from "https://esm.sh/@opentelemetry/core@1.10.0";
+export { W3CTraceContextPropagator } from "../opentelemetry/core.js";
 
 export { trace, context, type Context } from '../api.ts';
 export { DenoTracerProvider } from './provider.ts';

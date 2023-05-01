@@ -1,20 +1,20 @@
-import { Logger, LoggerOptions, LoggerProvider, LogRecord, logs } from "https://esm.sh/@opentelemetry/api-logs@0.36.0";
+import { Logger, LoggerOptions, LoggerProvider, LogRecord, logs } from "../opentelemetry/api-logs.js";
 import { Attributes, context, SpanAttributes, trace } from "../api.ts";
 
-// import { OTLP } from "https://esm.sh/@opentelemetry/exporter-metrics-otlp-http@0.36.0"
+// import { OTLP } from "../opentelemetry/exporter-metrics-otlp-http.js";
 
-import { baggageUtils, suppressTracing } from "https://esm.sh/@opentelemetry/core@1.10.0";
+import { baggageUtils, suppressTracing } from "../opentelemetry/core.js";
 
 import {
   // OTLPExporterBrowserBase,
   type OTLPExporterConfigBase,
   appendResourcePathToUrl,
   appendRootPathToUrlIfNeeded,
-} from "https://esm.sh/@opentelemetry/otlp-exporter-base@0.36.0";
+} from "../opentelemetry/otlp-exporter-base.js";
 import type {
   IAnyValue,
   IKeyValue,
-} from 'https://esm.sh/@opentelemetry/otlp-transformer@0.36.0';
+} from '../opentelemetry/otlp-transformer.js';
 import { OTLPFetchExporterBase } from "../exporters/oltp-fetch.ts";
 import { Resource } from "../mod.ts";
 

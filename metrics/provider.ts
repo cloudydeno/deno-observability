@@ -4,23 +4,23 @@ import {
   PeriodicExportingMetricReader,
   PushMetricExporter,
   ResourceMetrics,
-} from "https://esm.sh/@opentelemetry/sdk-metrics@1.10.0";
+} from "../opentelemetry/sdk-metrics.js";
 import {
   OTLPMetricExporterBase,
   type OTLPMetricExporterOptions,
-} from "https://esm.sh/@opentelemetry/exporter-metrics-otlp-http@0.36.0"
+} from "../opentelemetry/exporter-metrics-otlp-http.js";
 import {
   baggageUtils,
-} from "https://esm.sh/@opentelemetry/core@1.10.0";
+} from "../opentelemetry/core.js";
 import {
   type OTLPExporterConfigBase,
   appendResourcePathToUrl,
   appendRootPathToUrlIfNeeded,
-} from "https://esm.sh/@opentelemetry/otlp-exporter-base@0.36.0";
+} from "../opentelemetry/otlp-exporter-base.js";
 import {
   createExportMetricsServiceRequest,
   type IExportMetricsServiceRequest,
-} from 'https://esm.sh/@opentelemetry/otlp-transformer@0.36.0';
+} from '../opentelemetry/otlp-transformer.js';
 
 import { metrics } from "../api.ts";
 import { OTLPFetchExporterBase } from "../exporters/oltp-fetch.ts";

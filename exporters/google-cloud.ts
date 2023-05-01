@@ -5,9 +5,9 @@ import { ServiceAccount, ShortLivedToken } from "https://crux.land/32WBxC#google
 // import { Resource } from "npm:/@opentelemetry/resources";
 // import {mapOtelResourceToMonitoredResource} from 'npm:@google-cloud/opentelemetry-resource-util';
 
-import { SpanExporter, ReadableSpan } from "https://esm.sh/@opentelemetry/sdk-trace-base@1.10.0";
-import { ExportResult, ExportResultCode } from "https://esm.sh/@opentelemetry/core@1.10.0";
-import { IResource } from "https://esm.sh/@opentelemetry/resources@1.10.0";
+import { SpanExporter, ReadableSpan } from "../opentelemetry/sdk-trace-base.js";
+import { ExportResult, ExportResultCode } from "../opentelemetry/core.js";
+import { IResource } from "../opentelemetry/resources.js";
 
 import { AttributeValue, HrTime, Link, SpanAttributes, SpanKind, SpanStatus, SpanStatusCode } from "../api.ts";
 

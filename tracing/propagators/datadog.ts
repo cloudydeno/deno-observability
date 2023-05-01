@@ -29,7 +29,7 @@ import {
   TraceFlags,
   SpanContext,
 } from "../../api.ts";
-import { TraceState } from "https://esm.sh/@opentelemetry/core@1.10.0";
+import { TraceState } from "../../opentelemetry/core.js";
 
 const VALID_TRACEID_REGEX = /^([0-9a-f]{16}){1,2}$/i;
 const VALID_SPANID_REGEX = /^[0-9a-f]{16}$/i;

@@ -25,18 +25,18 @@ import {
   OTLPExporterError,
   OTLPExporterConfigBase,
   parseHeaders,
-} from "https://esm.sh/@opentelemetry/otlp-exporter-base@0.36.0";
+} from "../opentelemetry/otlp-exporter-base.js";
 import {
   baggageUtils,
-} from "https://esm.sh/@opentelemetry/core@1.10.0";
+} from "../opentelemetry/core.js";
 import type {
   ReadableSpan,
   SpanExporter,
-} from "https://esm.sh/@opentelemetry/sdk-trace-base@1.10.0";
+} from "../opentelemetry/sdk-trace-base.js";
 import {
   createExportTraceServiceRequest,
   IExportTraceServiceRequest,
-} from "https://esm.sh/@opentelemetry/otlp-transformer@0.36.0";
+} from "../opentelemetry/otlp-transformer.js";
 import { diag } from "../api.ts";
 
 /**

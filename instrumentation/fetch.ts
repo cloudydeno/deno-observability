@@ -47,9 +47,9 @@ import {
   InstrumentationBase,
   InstrumentationConfig,
   safeExecuteInTheMiddle,
-} from "https://esm.sh/@opentelemetry/instrumentation@0.36.0";
-import * as core from "https://esm.sh/@opentelemetry/core@1.10.0";
-import { SemanticAttributes } from "https://esm.sh/@opentelemetry/semantic-conventions@1.10.0";
+} from "../opentelemetry/instrumentation.js";
+import * as core from "../opentelemetry/core.js";
+import { SemanticAttributes } from "../opentelemetry/semantic-conventions.js";
 
 import { Context, context, HrTime, propagation, Span, SpanKind, trace } from "../api.ts";
 
@@ -80,9 +80,7 @@ export interface FetchInstrumentationConfig extends InstrumentationConfig {
 /**
  * This class represents a fetch plugin for auto instrumentation
  */
-export class DenoFetchInstrumentation extends InstrumentationBase<
-  Promise<Response>
-> {
+export class DenoFetchInstrumentation extends InstrumentationBase {
   readonly component: string = 'fetch';
   moduleName = this.component;
 

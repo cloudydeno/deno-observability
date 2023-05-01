@@ -1,6 +1,6 @@
 export { trace, metrics, context, type Context } from './api.ts';
 
-export { Resource } from "https://esm.sh/@opentelemetry/resources@1.10.0";
+export { Resource } from "./opentelemetry/resources.js";
 
 export { httpTracer } from './instrumentation/http-server.ts';
 export { SubProcessInstrumentation } from './instrumentation/subprocess.ts'
