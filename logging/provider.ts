@@ -1,9 +1,10 @@
-import { Logger, LoggerOptions, LoggerProvider, LogRecord, logs } from "../opentelemetry/api-logs.js";
-import { Attributes, context, SpanAttributes, trace } from "../api.ts";
+import { logs } from "../opentelemetry/api-logs.js";
+import { BatchLogRecordProcessor, LoggerProvider, LogRecordExporter, ReadableLogRecord } from "../opentelemetry/sdk-logs.js";
+import { SpanAttributes } from "../api.ts";
 
 // import { OTLP } from "../opentelemetry/exporter-metrics-otlp-http.js";
 
-import { baggageUtils, suppressTracing } from "../opentelemetry/core.js";
+import { baggageUtils, ExportResult, ExportResultCode } from "../opentelemetry/core.js";
 
 import {
   // OTLPExporterBrowserBase,
@@ -17,13 +18,14 @@ import type {
 } from '../opentelemetry/otlp-transformer.js';
 import { OTLPFetchExporterBase } from "../exporters/oltp-fetch.ts";
 import { Resource } from "../mod.ts";
+import { IResource } from "../opentelemetry/resources.d.ts";
 
 const DEFAULT_COLLECTOR_RESOURCE_PATH = 'v1/logs';
 const DEFAULT_COLLECTOR_URL = `http://localhost:4318/${DEFAULT_COLLECTOR_RESOURCE_PATH}`;
 
 
 class OTLPLogExporterBrowserProxy extends OTLPFetchExporterBase<
-  LogPayload,
+  ReadableLogRecord,
   LogPayload
 > {
   constructor(config?: OTLPExporterConfigBase) {
@@ -51,8 +53,8 @@ class OTLPLogExporterBrowserProxy extends OTLPFetchExporterBase<
       : DEFAULT_COLLECTOR_URL;
   }
 
-  convert(logs: LogPayload[]): LogPayload {
-    return logs[0];
+  convert(logs: ReadableLogRecord[]): LogPayload {
+    return toLogPayload(logs[0].resource, logs);
   }
 }
 
@@ -65,51 +67,38 @@ class OTLPLogExporterBrowserProxy extends OTLPFetchExporterBase<
 //   }
 // }
 
+class OTLPLogRecordExporter implements LogRecordExporter {
+  export(logs: ReadableLogRecord[], resCb: (result: ExportResult) => void) {
+    if (logs.length == 0) {
+      return resCb({ code: ExportResultCode.SUCCESS });
+    }
+    new Promise<void>((ok, fail) =>
+      new OTLPLogExporterBrowserProxy().send(logs, ok, fail))
+    .then(
+      () => resCb({ code: ExportResultCode.SUCCESS }),
+      (error) => resCb({ code: ExportResultCode.FAILED, error }));
+  }
+  async shutdown() {}
+}
 
-
-export class DenoLoggingProvider implements LoggerProvider {
-  resource?: Resource;
-  constructor(config?: {
-    resource?: Resource,
+export class DenoLoggingProvider extends LoggerProvider {
+  constructor(opts?: {
+    resource?: IResource,
   }) {
-    // super(config);
-    this.resource = config?.resource;
+    super(opts);
 
     logs.setGlobalLoggerProvider(this);
 
-    // if (config?.metricExporter) {
-    //   this.addMetricReader(new PeriodicExportingMetricReader({
-    //     exporter: config.metricExporter,
-    //     exportIntervalMillis: config.metricExporterInterval ?? 10_000,
-    //   }));
-    // }
-
-    setInterval(context.bind(suppressTracing(context.active()), () => {
-      if (!TODOpendinglogs.length) return;
-      const payload = toLogPayload(this.resource, TODOpendinglogs);
-      TODOpendinglogs.length = 0;
-      new Promise<void>((ok,fail) =>
-        new OTLPLogExporterBrowserProxy().send([payload], ok, fail));
-    }), 5000);
-  }
-  getLogger(name: string, version?: string, options?: LoggerOptions): DenoLogger {
-    return new DenoLogger(name, version, options);
+    this.addLogRecordProcessor(
+      new BatchLogRecordProcessor(new OTLPLogRecordExporter())
+    );
   }
 }
 
 // btw, events are event.name and event.domain
 
-const TODOpendinglogs: {
-  record: LogRecord;
-  scope: {
-    name: string,
-    version?: string,
-    attributes: Attributes;
-    schemaUrl?: string;
-  };
-}[] = [];
 type LogPayload = ReturnType<typeof toLogPayload>;
-function toLogPayload(resource: Resource | undefined, allLogs: typeof TODOpendinglogs) {
+function toLogPayload(resource: Resource | undefined, allLogs: ReadableLogRecord[]) {
   // {"resourceLogs":[
   //   {"resource":{"attributes":[
   //     {"key":"resource-attr","value":{"stringValue":"resource-attr-val-1"}}]},
@@ -129,56 +118,25 @@ function toLogPayload(resource: Resource | undefined, allLogs: typeof TODOpendin
       } : {},
       scopeLogs: allLogs.map(logItem => ({
         scope: {
-          name: logItem.scope.name,
-          version: logItem.scope.version,
-          attributes: toAttributes(logItem.scope.attributes),
+          name: logItem.instrumentationScope.name,
+          version: logItem.instrumentationScope.version,
+          // attributes: toAttributes(logItem.),
         },
-        schemaUrl: logItem.scope.schemaUrl,
-        logRecords: [logItem.record].map(log => ({
-          timeUnixNano: log.timestamp?.toFixed(0),
-          severityNumber: log.severityNumber,
-          severityText: log.severityText,
+        schemaUrl: logItem.instrumentationScope.schemaUrl,
+        logRecords: [{
+          timeUnixNano: `${logItem.hrTime[0]}${logItem.hrTime[1].toString().padStart(9, '0')}`,
+          severityNumber: logItem.severityNumber,
+          severityText: logItem.severityText,
           // name: 'TODO: logger name',
-          body: toAnyValue(log.body),
-          attributes: toAttributes(log.attributes ?? {}),
+          body: toAnyValue(logItem.body),
+          attributes: toAttributes(logItem.attributes ?? {}),
           droppedAttributesCount: 0,
-          traceId: log.traceId,
-          spanId: log.spanId,
-        })),
+          traceId: logItem.spanContext?.traceId,
+          spanId: logItem.spanContext?.spanId,
+        }],
       })),
     }],
   };
-}
-
-export class DenoLogger implements Logger {
-  attributes: Attributes;
-  schemaUrl?: string;
-  constructor(
-    public readonly name: string,
-    public readonly version?: string,
-    options?: LoggerOptions,
-  ) {
-    this.attributes = options?.scopeAttributes ?? {};
-    this.schemaUrl = options?.schemaUrl;
-  }
-
-  emit(logRecord: LogRecord): void {
-    const spanCtx = trace.getActiveSpan()?.spanContext();
-    TODOpendinglogs.push({
-      scope: {
-        name: this.name,
-        version: this.version,
-        attributes: this.attributes,
-      },
-      record: {
-        timestamp: Date.now() * 1_000_000,
-        ...logRecord,
-        spanId: spanCtx?.spanId,
-        traceId: spanCtx?.traceId,
-        traceFlags: spanCtx?.traceFlags,
-      },
-    });
-  }
 }
 
 
