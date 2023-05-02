@@ -2,16 +2,18 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
 import { DenoFetchInstrumentation } from './instrumentation/fetch.ts';
-// import { GcpBatchSpanExporter } from "./exporters/google-cloud.ts";
-import { DenoTracerProvider, httpTracer, OTLPTraceFetchExporter, trace } from "./mod.ts";
-// import { GoogleCloudPropagator } from "./tracing/propagators/google-cloud.ts";
+import { DenoTracerProvider, httpTracer, trace } from "./mod.ts";
 import { Resource } from "./opentelemetry/resources.js";
 import { SubProcessInstrumentation } from './instrumentation/subprocess.ts';
 import { registerDenoRuntimeMetrics } from './instrumentation/deno-runtime.ts';
-import { DenoLoggingProvider, OTLPLogRecordExporter } from "./logging/provider.ts";
-import { DenoMetricsProvider, OTLPMetricExporter } from "./metrics/provider.ts";
-import { metrics, ValueType } from "./api.ts";
+import { DenoLoggingProvider } from "./logging/provider.ts";
+import { DenoMetricsProvider } from "./metrics/provider.ts";
+import { diag, metrics, ValueType, DiagConsoleLogger } from "./api.ts";
 import { SemanticAttributes } from "./opentelemetry/semantic-conventions.js";
+import { OTLPLogsExporter, OTLPMetricsExporter, OTLPTracesExporter } from "./otel-platform/otlp-exporters.ts";
+import { OTLPMetricExporterBase } from "./opentelemetry/exporter-metrics-otlp-http.js";
+
+diag.setLogger(new DiagConsoleLogger());
 
 const resource = new Resource({
   'service.name': 'observability-demo',
@@ -22,13 +24,13 @@ const resource = new Resource({
 const logger = new DenoLoggingProvider({
   resource,
   batchLogExporters: [
-    new OTLPLogRecordExporter(),
+    new OTLPLogsExporter(),
   ],
 }).getLogger('demo.ts');
 
 new DenoMetricsProvider({
   resource,
-  metricExporter: new OTLPMetricExporter(),
+  metricExporter: new OTLPMetricExporterBase(new OTLPMetricsExporter()),
 });
 
 registerDenoRuntimeMetrics();
@@ -50,8 +52,7 @@ const traceProvider = new DenoTracerProvider({
     new SubProcessInstrumentation(),
   ],
   batchSpanProcessors: [
-    // new GcpBatchSpanExporter(),
-    new OTLPTraceFetchExporter(),
+    new OTLPTracesExporter(),
   ],
 });
 

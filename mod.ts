@@ -6,7 +6,7 @@ export { httpTracer } from './instrumentation/http-server.ts';
 export { SubProcessInstrumentation } from './instrumentation/subprocess.ts'
 export { DenoFetchInstrumentation } from './instrumentation/fetch.ts'
 
-export { OTLPTraceFetchExporter } from './exporters/oltp-fetch.ts';
+export { OTLPLogsExporter, OTLPMetricsExporter, OTLPTracesExporter } from "./otel-platform/otlp-exporters.ts";
 
 export {
   DenoTracerProvider,

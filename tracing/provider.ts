@@ -1,15 +1,3 @@
-// import {
-//   BasicTracerProvider,
-//   BatchSpanProcessor,
-//   type BufferConfig,
-//   SpanExporter,
-//   type TracerConfig,
-//   type SDKRegistrationConfig,
-// } from 'npm:@opentelemetry/sdk-trace-base';
-// import { InstrumentationOption, registerInstrumentations } from 'npm:@opentelemetry/instrumentation';
-// import { TextMapPropagator } from 'npm:@opentelemetry/api';
-// import { AsyncLocalStorageContextManager } from 'npm:@opentelemetry/context-async-hooks';
-
 import {
   BasicTracerProvider,
   BatchSpanProcessor,
