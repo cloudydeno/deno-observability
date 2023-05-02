@@ -28,10 +28,15 @@ import type {
   LogRecordExporter,
 } from "../opentelemetry/sdk-logs.d.ts";
 
-type FetchExporterOpts = OTLPExporterConfigBase & {
-  defaultPath: string;
+type AbstractExporterOpts = OTLPExporterConfigBase & {
+  resourceBase?: string;
+  resourcePath: string;
   envKey: string;
 };
+
+type ExporterOpts = OTLPExporterConfigBase & {
+  resourceBase?: string;
+}
 
 /**
  * Collector Metric Exporter abstract base class
@@ -40,14 +45,14 @@ abstract class OTLPFetchExporterBase<
   ExportItem,
   ServiceRequest
 > extends OTLPExporterBase<
-  FetchExporterOpts,
+  AbstractExporterOpts,
   ExportItem,
   ServiceRequest
 > {
   protected _headers: Headers;
 
   constructor(
-    config: FetchExporterOpts,
+    config: AbstractExporterOpts,
   ) {
     super(config);
     this._headers = new Headers({
@@ -63,12 +68,14 @@ abstract class OTLPFetchExporterBase<
     });
   }
 
-  getDefaultUrl(config: FetchExporterOpts): string {
+  getDefaultUrl(config: AbstractExporterOpts): string {
     if (typeof config.url === 'string') return config.url;
     return Deno.env.get(`OTEL_EXPORTER_OTLP_${config.envKey}_ENDPOINT`)
       ?? appendResourcePathToUrl(
-          Deno.env.get("OTEL_EXPORTER_OTLP_ENDPOINT") ?? 'http://localhost:4318',
-          config.defaultPath);
+          config.resourceBase
+            ?? Deno.env.get("OTEL_EXPORTER_OTLP_ENDPOINT")
+            ?? 'http://localhost:4318',
+          config.resourcePath);
   }
 
   onInit(): void {
@@ -120,10 +127,11 @@ export class OTLPTracesExporter
   extends OTLPFetchExporterBase<ReadableSpan, IExportTraceServiceRequest>
   implements SpanExporter
 {
-  constructor(config: OTLPExporterConfigBase = {}) {
-    super({ ...config,
+  constructor(config?: ExporterOpts) {
+    super({
+      resourcePath: 'v1/traces',
+      ...config,
       envKey: 'TRACES',
-      defaultPath: 'v1/traces',
     });
   }
 
@@ -137,10 +145,11 @@ export class OTLPMetricsExporter extends OTLPFetchExporterBase<
   ResourceMetrics,
   IExportMetricsServiceRequest
 > {
-  constructor(config?: OTLPExporterConfigBase) {
-    super({ ...config,
+  constructor(config?: ExporterOpts) {
+    super({
+      resourcePath: 'v1/metrics',
+      ...config,
       envKey: 'METRICS',
-      defaultPath: 'v1/metrics',
     });
   }
 
@@ -153,10 +162,11 @@ export class OTLPLogsExporter extends OTLPFetchExporterBase<
   ReadableLogRecord,
   IExportLogsServiceRequest
 > implements LogRecordExporter {
-  constructor(config?: OTLPExporterConfigBase) {
-    super({ ...config,
+  constructor(config?: ExporterOpts) {
+    super({
+      resourcePath: 'v1/logs',
+      ...config,
       envKey: 'LOGS',
-      defaultPath: 'v1/logs',
     });
   }
 
