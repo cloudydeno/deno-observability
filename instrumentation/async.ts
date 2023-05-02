@@ -4,7 +4,7 @@ import {
   SpanStatusCode,
   context,
   trace,
-} from "../api.ts";
+} from "../opentelemetry/api.js";
 
 // Richer version of this here:
 // https://github.com/danopia/dist-app-meteor/blob/main/imports/lib/tracing.ts

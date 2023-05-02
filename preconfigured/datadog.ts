@@ -2,7 +2,7 @@ import {
   diag,
   DiagConsoleLogger,
   DiagLogLevel,
-} from "../api.ts";
+} from "../opentelemetry/api.js";
 diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.INFO);
 
 import {

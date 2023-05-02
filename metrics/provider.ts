@@ -5,7 +5,7 @@ import {
   PushMetricExporter,
 } from "../opentelemetry/sdk-metrics.js";
 
-import { metrics } from "../api.ts";
+import { metrics } from "../opentelemetry/api.js";
 
 export class DenoMetricsProvider extends MeterProvider {
   constructor(config?: MeterProviderOptions & {

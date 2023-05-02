@@ -7,7 +7,7 @@ import {
   trace,
   ValueType,
   type TextMapGetter,
-} from "../api.ts";
+} from "../opentelemetry/api.js";
 
 export function httpTracer(inner: Handler): Handler {
 

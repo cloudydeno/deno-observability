@@ -34,14 +34,6 @@ export enum AttributeNames {
   HTTP_STATUS_TEXT = 'http.status_text',
 }
 
-// import {
-//   isWrapped,
-//   InstrumentationBase,
-//   InstrumentationConfig,
-//   safeExecuteInTheMiddle,
-// } from 'npm:@opentelemetry/instrumentation';
-// import * as core from 'npm:@opentelemetry/core';
-// import { SemanticAttributes } from 'npm:@opentelemetry/semantic-conventions';
 import {
   isWrapped,
   InstrumentationBase,
@@ -50,8 +42,7 @@ import {
 } from "../opentelemetry/instrumentation.js";
 import * as core from "../opentelemetry/core.js";
 import { SemanticAttributes } from "../opentelemetry/semantic-conventions.js";
-
-import { Context, context, HrTime, propagation, Span, SpanKind, SpanStatusCode, trace } from "../api.ts";
+import { Context, context, HrTime, propagation, Span, SpanKind, SpanStatusCode, trace } from "../opentelemetry/api.js";
 
 export interface FetchCustomAttributeFunction {
   (

@@ -1,4 +1,4 @@
-import { metrics, ValueType } from "../api.ts";
+import { metrics, ValueType } from "../opentelemetry/api.js";
 
 const meter = metrics.getMeter("deno.runtime");
 

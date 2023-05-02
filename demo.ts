@@ -3,14 +3,15 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
 import { DenoFetchInstrumentation } from './instrumentation/fetch.ts';
 import { DenoTracerProvider, httpTracer, trace } from "./mod.ts";
-import { Resource } from "./opentelemetry/resources.js";
 import { SubProcessInstrumentation } from './instrumentation/subprocess.ts';
 import { registerDenoRuntimeMetrics } from './instrumentation/deno-runtime.ts';
 import { DenoLoggingProvider } from "./logging/provider.ts";
 import { DenoMetricsProvider } from "./metrics/provider.ts";
-import { diag, metrics, ValueType, DiagConsoleLogger } from "./api.ts";
-import { SemanticAttributes } from "./opentelemetry/semantic-conventions.js";
 import { OTLPLogsExporter, OTLPMetricsExporter, OTLPTracesExporter } from "./otel-platform/otlp-exporters.ts";
+
+import { diag, metrics, ValueType, DiagConsoleLogger } from "./opentelemetry/api.js";
+import { Resource } from "./opentelemetry/resources.js";
+import { SemanticAttributes } from "./opentelemetry/semantic-conventions.js";
 import { OTLPMetricExporterBase } from "./opentelemetry/exporter-metrics-otlp-http.js";
 
 diag.setLogger(new DiagConsoleLogger());

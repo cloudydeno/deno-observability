@@ -1,4 +1,4 @@
-import { Context, ContextManager, ROOT_CONTEXT } from "../api.ts";
+import { Context, ContextManager, ROOT_CONTEXT } from "../opentelemetry/api.js";
 
 interface HookCallbacks {
   init: (promise: Promise<unknown>) => void

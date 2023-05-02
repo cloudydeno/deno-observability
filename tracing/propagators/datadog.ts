@@ -28,7 +28,7 @@ import {
   TextMapSetter,
   TraceFlags,
   SpanContext,
-} from "../../api.ts";
+} from "../../opentelemetry/api.js";
 import { TraceState } from "../../opentelemetry/core.js";
 
 const VALID_TRACEID_REGEX = /^([0-9a-f]{16}){1,2}$/i;

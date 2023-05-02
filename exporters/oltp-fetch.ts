@@ -37,7 +37,7 @@ import {
   createExportTraceServiceRequest,
   IExportTraceServiceRequest,
 } from "../opentelemetry/otlp-transformer.js";
-import { diag } from "../api.ts";
+import { diag } from "../opentelemetry/api.js";
 
 /**
  * Collector Metric Exporter abstract base class

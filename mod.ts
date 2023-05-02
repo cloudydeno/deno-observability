@@ -1,5 +1,4 @@
-export { trace, metrics, context, type Context } from './api.ts';
-
+export { trace, metrics, context, type Context } from './opentelemetry/api.js';
 export { Resource } from "./opentelemetry/resources.js";
 
 export { httpTracer } from './instrumentation/http-server.ts';
