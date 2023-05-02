@@ -8,7 +8,7 @@ import cleanup from 'npm:rollup-plugin-cleanup';
 import dts from 'npm:rollup-plugin-dts';
 // import { terser } from "npm:rollup-plugin-terser";
 
-import magicString from 'npm:rollup-plugin-magic-string'
+// import magicString from 'npm:rollup-plugin-magic-string'
 
 
 // import MagicStringMod from 'npm:magic-string';

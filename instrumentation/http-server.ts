@@ -17,7 +17,7 @@ export function httpTracer(inner: Handler): Handler {
   // https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/metrics/semantic_conventions/http-metrics.md
   const myMeter = metrics.getMeter('http');
   const durationMetric = myMeter.createHistogram('http.server.duration', {valueType: ValueType.DOUBLE});
-  const inflightMetric = myMeter.createCounter('http.server.active_requests', {valueType: ValueType.INT});
+  const inflightMetric = myMeter.createUpDownCounter('http.server.active_requests', {valueType: ValueType.INT});
 
   return async (req: Request, connInfo: ConnInfo) => {
     const d0 = performance.now();

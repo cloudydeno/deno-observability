@@ -2,6 +2,8 @@ import { metrics, ValueType } from "../opentelemetry/api.js";
 
 const meter = metrics.getMeter("deno.runtime");
 
+// TODO: refactor on top of InstrumentationBase
+
 export function registerDenoRuntimeMetrics(options?: {
   enabledMetrics?: Array<
   | "open_resources"
