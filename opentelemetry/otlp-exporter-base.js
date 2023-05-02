@@ -45,7 +45,7 @@ function appendRootPathToUrlIfNeeded(url) {
 		}
 		return parsedUrl.toString();
 	}
-	catch (_a) {
+	catch {
 		diag.warn(`Could not parse export URL: '${url}'`);
 		return url;
 	}
@@ -62,8 +62,8 @@ function configureExporterTimeout(timeoutMillis) {
 	}
 }
 function getExporterTimeoutFromEnv() {
-	var _a;
-	const definedTimeout = Number((_a = getEnv().OTEL_EXPORTER_OTLP_TRACES_TIMEOUT) !== null && _a !== void 0 ? _a : getEnv().OTEL_EXPORTER_OTLP_TIMEOUT);
+	const definedTimeout = Number(getEnv().OTEL_EXPORTER_OTLP_TRACES_TIMEOUT ??
+		getEnv().OTEL_EXPORTER_OTLP_TIMEOUT);
 	if (definedTimeout <= 0) {
 		return invalidTimeout(definedTimeout, DEFAULT_TRACE_TIMEOUT);
 	}

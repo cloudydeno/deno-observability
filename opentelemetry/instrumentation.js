@@ -71,7 +71,10 @@ class InstrumentationAbstract {
 		this._unwrap = shimmer.unwrap;
 		this._massWrap = shimmer.massWrap;
 		this._massUnwrap = shimmer.massUnwrap;
-		this._config = Object.assign({ enabled: true }, config);
+		this._config = {
+			enabled: true,
+			...config,
+		};
 		this._diag = diag.createComponentLogger({
 			namespace: instrumentationName,
 		});

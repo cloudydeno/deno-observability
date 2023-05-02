@@ -81,8 +81,8 @@ class LogsAPI {
 		return provider;
 	}
 	getLoggerProvider() {
-		var _a, _b;
-		return ((_b = (_a = _global[GLOBAL_LOGS_API_KEY]) === null || _a === void 0 ? void 0 : _a.call(_global, API_BACKWARDS_COMPATIBILITY_VERSION)) !== null && _b !== void 0 ? _b : NOOP_LOGGER_PROVIDER);
+		return (_global[GLOBAL_LOGS_API_KEY]?.(API_BACKWARDS_COMPATIBILITY_VERSION) ??
+			NOOP_LOGGER_PROVIDER);
 	}
 	getLogger(name, version, options) {
 		return this.getLoggerProvider().getLogger(name, version, options);

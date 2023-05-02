@@ -249,61 +249,14 @@ for (const mod of modules) {
 
   await yarnInstall(mod);
 
-
-
-// // Deno.cw
-//   const jsonText = await Deno.readTextFile(mod+'/tsconfig.esnext.json');
-//   const parsed = ts.parseConfigFileTextToJson('tsconfig.esnext.json', jsonText);
-//   // const tsconfig = JSON.parse(await Deno.readTextFile(mod+'/tsconfig.esnext.json'));
-//   // const tscConfig = ts.parseJsonConfigFileContent(tsconfig, ts.sys, 'hack', undefined, `${mod}/tsconfig.esnext.json`.slice(5));
-//   const tscConfig = ts.parseJsonConfigFileContent(parsed.config, {
-//     useCaseSensitiveFileNames: false,
-//     readDirectory: function(rootDir: string,extensions: readonly string[],excludes: readonly string[]|undefined,includes: readonly string[],depth?: number|undefined): readonly string[] {
-//       console.log({rootDir, extensions, excludes, includes, depth})
-//       const res = ts.sys.readDirectory(mod, extensions, excludes, includes, depth);
-//       console.log({res})
-//       return res;
-//     },
-//     fileExists: function(path: string): boolean {
-//       console.log({path})
-//       return ts.sys.fileExists(mod+'/'+path);
-//     },
-//     readFile: function(path: string): string|undefined {
-//       console.log({path})
-//       return ts.sys.readFile(mod+'/'+path);
-//     }
-//   }, '', undefined, `tsconfig.esnext.json`);
-//   console.log(mod, tscConfig.fileNames);
-//   const program = ts.createProgram(tscConfig.fileNames.filter(filename => {
-//     if (filename.includes('/test/')) return false;
-//     return true;
-//   }), tscConfig.options);
-//   const emitResult = program.emit();
-
-//   let allDiagnostics = ts
-//     .getPreEmitDiagnostics(program)
-//     .concat(emitResult.diagnostics);
-
-//   allDiagnostics.forEach(diagnostic => {
-//     if (diagnostic.file) {
-//       let { line, character } = ts.getLineAndCharacterOfPosition(diagnostic.file, diagnostic.start!);
-//       let message = ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n");
-//       console.log(`${diagnostic.file.fileName} (${line + 1},${character + 1}): ${message}`);
-//     } else {
-//       // console.log(ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"));
-//     }
-//   });
-
-//   let exitCode = emitResult.emitSkipped ? 1 : 0;
-//   console.log(`tsc exited with code '${exitCode}'.`);
-
-//   throw new Error('tod')
-
-
-
   const tsc = new Deno.Command('hack/opentelemetry-js/node_modules/.bin/tsc', {
-    args: ['--build', mod+'/tsconfig.esnext.json'],
-  });// --build tsconfig.json tsconfig.esm.json tsconfig.esnext.json')
+    args: [
+      '--project', mod+'/tsconfig.esnext.json',
+      '--target', 'es2020',
+      '--module', 'es2020',
+      // '--lib', TODO: can we provide deno's lib somehow?
+    ],
+  });
   const tscOut = await tsc.output();
   console.log(new TextDecoder().decode(tscOut.stdout));
   if (!tscOut.success) throw new Error(`TSC failed on ${mod}`);

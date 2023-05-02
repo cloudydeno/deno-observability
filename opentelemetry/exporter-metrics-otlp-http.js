@@ -56,7 +56,7 @@ function chooseTemporalitySelector(temporalityPreference) {
 class OTLPMetricExporterBase {
 	constructor(exporter, config) {
 		this._otlpExporter = exporter;
-		this._aggregationTemporalitySelector = chooseTemporalitySelector(config === null || config === void 0 ? void 0 : config.temporalityPreference);
+		this._aggregationTemporalitySelector = chooseTemporalitySelector(config?.temporalityPreference);
 	}
 	export(metrics, resultCallback) {
 		this._otlpExporter.export([metrics], resultCallback);

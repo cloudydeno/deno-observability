@@ -64,7 +64,6 @@ function toAnyValue(value) {
 }
 
 function sdkSpanToOtlpSpan(span, useHex) {
-	var _a;
 	const ctx = span.spanContext();
 	const status = span.status;
 	const parentSpanId = useHex
@@ -76,7 +75,7 @@ function sdkSpanToOtlpSpan(span, useHex) {
 		traceId: useHex ? ctx.traceId : core.hexToBase64(ctx.traceId),
 		spanId: useHex ? ctx.spanId : core.hexToBase64(ctx.spanId),
 		parentSpanId: parentSpanId,
-		traceState: (_a = ctx.traceState) === null || _a === void 0 ? void 0 : _a.serialize(),
+		traceState: ctx.traceState?.serialize(),
 		name: span.name,
 		kind: span.kind == null ? 0 : span.kind + 1,
 		startTimeUnixNano: hrTimeToNanoseconds(span.startTime),
@@ -94,7 +93,6 @@ function sdkSpanToOtlpSpan(span, useHex) {
 	};
 }
 function toOtlpLink(link, useHex) {
-	var _a;
 	return {
 		attributes: link.attributes ? toAttributes(link.attributes) : [],
 		spanId: useHex
@@ -103,7 +101,7 @@ function toOtlpLink(link, useHex) {
 		traceId: useHex
 			? link.context.traceId
 			: core.hexToBase64(link.context.traceId),
-		traceState: (_a = link.context.traceState) === null || _a === void 0 ? void 0 : _a.serialize(),
+		traceState: link.context.traceState?.serialize(),
 		droppedAttributesCount: link.droppedAttributesCount || 0,
 	};
 }

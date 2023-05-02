@@ -151,13 +151,18 @@ function loadDefaultConfig() {
 	};
 }
 function reconfigureLimits(userConfig) {
-	var _a, _b, _c, _d, _e, _f, _g, _h;
 	const logRecordLimits = Object.assign({}, userConfig.logRecordLimits);
 	const parsedEnvConfig = getEnvWithoutDefaults();
 	logRecordLimits.attributeCountLimit =
-		(_d = (_c = (_b = (_a = userConfig.logRecordLimits) === null || _a === void 0 ? void 0 : _a.attributeCountLimit) !== null && _b !== void 0 ? _b : parsedEnvConfig.OTEL_LOGRECORD_ATTRIBUTE_COUNT_LIMIT) !== null && _c !== void 0 ? _c : parsedEnvConfig.OTEL_ATTRIBUTE_COUNT_LIMIT) !== null && _d !== void 0 ? _d : DEFAULT_ATTRIBUTE_COUNT_LIMIT;
+		userConfig.logRecordLimits?.attributeCountLimit ??
+			parsedEnvConfig.OTEL_LOGRECORD_ATTRIBUTE_COUNT_LIMIT ??
+			parsedEnvConfig.OTEL_ATTRIBUTE_COUNT_LIMIT ??
+			DEFAULT_ATTRIBUTE_COUNT_LIMIT;
 	logRecordLimits.attributeValueLengthLimit =
-		(_h = (_g = (_f = (_e = userConfig.logRecordLimits) === null || _e === void 0 ? void 0 : _e.attributeValueLengthLimit) !== null && _f !== void 0 ? _f : parsedEnvConfig.OTEL_LOGRECORD_ATTRIBUTE_VALUE_LENGTH_LIMIT) !== null && _g !== void 0 ? _g : parsedEnvConfig.OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT) !== null && _h !== void 0 ? _h : DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT;
+		userConfig.logRecordLimits?.attributeValueLengthLimit ??
+			parsedEnvConfig.OTEL_LOGRECORD_ATTRIBUTE_VALUE_LENGTH_LIMIT ??
+			parsedEnvConfig.OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT ??
+			DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT;
 	return Object.assign({}, userConfig, { logRecordLimits });
 }
 function mergeConfig(userConfig) {
@@ -178,7 +183,10 @@ class Logger {
 		const currentContext = this._loggerConfig.includeTraceContext
 			? context.active()
 			: undefined;
-		const logRecordInstance = new LogRecord(this, Object.assign({ context: currentContext }, logRecord));
+		const logRecordInstance = new LogRecord(this, {
+			context: currentContext,
+			...logRecord,
+		});
 		this.getActiveLogRecordProcessor().onEmit(logRecordInstance, currentContext);
 		logRecordInstance.makeReadonly();
 	}
@@ -241,11 +249,11 @@ class LoggerProvider {
 			diag.warn('Logger requested without instrumentation scope name.');
 		}
 		const loggerName = name || DEFAULT_LOGGER_NAME;
-		const key = `${loggerName}@${version || ''}:${(options === null || options === void 0 ? void 0 : options.schemaUrl) || ''}`;
+		const key = `${loggerName}@${version || ''}:${options?.schemaUrl || ''}`;
 		if (!this._loggers.has(key)) {
-			this._loggers.set(key, new Logger({ name: loggerName, version, schemaUrl: options === null || options === void 0 ? void 0 : options.schemaUrl }, {
+			this._loggers.set(key, new Logger({ name: loggerName, version, schemaUrl: options?.schemaUrl }, {
 				logRecordLimits: this._config.logRecordLimits,
-				includeTraceContext: options === null || options === void 0 ? void 0 : options.includeTraceContext,
+				includeTraceContext: options?.includeTraceContext,
 			}, this));
 		}
 		return this._loggers.get(key);
@@ -292,12 +300,11 @@ class ConsoleLogRecordExporter {
 		return Promise.resolve();
 	}
 	_exportInfo(logRecord) {
-		var _a, _b, _c;
 		return {
 			timestamp: hrTimeToMicroseconds(logRecord.hrTime),
-			traceId: (_a = logRecord.spanContext) === null || _a === void 0 ? void 0 : _a.traceId,
-			spanId: (_b = logRecord.spanContext) === null || _b === void 0 ? void 0 : _b.spanId,
-			traceFlags: (_c = logRecord.spanContext) === null || _c === void 0 ? void 0 : _c.traceFlags,
+			traceId: logRecord.spanContext?.traceId,
+			spanId: logRecord.spanContext?.spanId,
+			traceFlags: logRecord.spanContext?.traceFlags,
 			severityText: logRecord.severityText,
 			severityNumber: logRecord.severityNumber,
 			body: logRecord.body,
@@ -308,7 +315,7 @@ class ConsoleLogRecordExporter {
 		for (const logRecord of logRecords) {
 			console.dir(this._exportInfo(logRecord), { depth: 3 });
 		}
-		done === null || done === void 0 ? void 0 : done({ code: ExportResultCode.SUCCESS });
+		done?.({ code: ExportResultCode.SUCCESS });
 	}
 }
 
@@ -322,9 +329,9 @@ class SimpleLogRecordProcessor {
 			return;
 		}
 		this._exporter.export([logRecord], (res) => {
-			var _a;
 			if (res.code !== ExportResultCode.SUCCESS) {
-				globalErrorHandler((_a = res.error) !== null && _a !== void 0 ? _a : new Error(`SimpleLogRecordProcessor: log record export failed (status ${res})`));
+				globalErrorHandler(res.error ??
+					new Error(`SimpleLogRecordProcessor: log record export failed (status ${res})`));
 				return;
 			}
 		});
@@ -370,17 +377,16 @@ class InMemoryLogRecordExporter {
 
 class BatchLogRecordProcessorBase {
 	constructor(_exporter, config) {
-		var _a, _b, _c, _d;
 		this._exporter = _exporter;
 		this._finishedLogRecords = [];
 		const env = getEnv();
 		this._maxExportBatchSize =
-			(_a = config === null || config === void 0 ? void 0 : config.maxExportBatchSize) !== null && _a !== void 0 ? _a : env.OTEL_BLRP_MAX_EXPORT_BATCH_SIZE;
-		this._maxQueueSize = (_b = config === null || config === void 0 ? void 0 : config.maxQueueSize) !== null && _b !== void 0 ? _b : env.OTEL_BLRP_MAX_QUEUE_SIZE;
+			config?.maxExportBatchSize ?? env.OTEL_BLRP_MAX_EXPORT_BATCH_SIZE;
+		this._maxQueueSize = config?.maxQueueSize ?? env.OTEL_BLRP_MAX_QUEUE_SIZE;
 		this._scheduledDelayMillis =
-			(_c = config === null || config === void 0 ? void 0 : config.scheduledDelayMillis) !== null && _c !== void 0 ? _c : env.OTEL_BLRP_SCHEDULE_DELAY;
+			config?.scheduledDelayMillis ?? env.OTEL_BLRP_SCHEDULE_DELAY;
 		this._exportTimeoutMillis =
-			(_d = config === null || config === void 0 ? void 0 : config.exportTimeoutMillis) !== null && _d !== void 0 ? _d : env.OTEL_BLRP_EXPORT_TIMEOUT;
+			config?.exportTimeoutMillis ?? env.OTEL_BLRP_EXPORT_TIMEOUT;
 		this._shutdownOnce = new BindOnceFuture(this._shutdown, this);
 		if (this._maxExportBatchSize > this._maxQueueSize) {
 			diag.warn('BatchLogRecordProcessor: maxExportBatchSize must be smaller or equal to maxQueueSize, setting maxExportBatchSize to match maxQueueSize');
@@ -466,9 +472,9 @@ class BatchLogRecordProcessorBase {
 	_export(logRecords) {
 		return new Promise((resolve, reject) => {
 			this._exporter.export(logRecords, (res) => {
-				var _a;
 				if (res.code !== ExportResultCode.SUCCESS) {
-					reject((_a = res.error) !== null && _a !== void 0 ? _a : new Error(`BatchLogRecordProcessorBase: log record export failed (status ${res})`));
+					reject(res.error ??
+						new Error(`BatchLogRecordProcessorBase: log record export failed (status ${res})`));
 					return;
 				}
 				resolve(res);

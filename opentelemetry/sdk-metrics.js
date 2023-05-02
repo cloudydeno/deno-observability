@@ -45,8 +45,7 @@ function hashAttributes(attributes) {
 	return JSON.stringify(keys.map(key => [key, attributes[key]]));
 }
 function instrumentationScopeId(instrumentationScope) {
-	var _a, _b;
-	return `${instrumentationScope.name}:${(_a = instrumentationScope.version) !== null && _a !== void 0 ? _a : ''}:${(_b = instrumentationScope.schemaUrl) !== null && _b !== void 0 ? _b : ''}`;
+	return `${instrumentationScope.name}:${instrumentationScope.version ?? ''}:${instrumentationScope.schemaUrl ?? ''}`;
 }
 class TimeoutError extends Error {
 	constructor(message) {
@@ -165,20 +164,18 @@ var InstrumentType;
 	InstrumentType["OBSERVABLE_UP_DOWN_COUNTER"] = "OBSERVABLE_UP_DOWN_COUNTER";
 })(InstrumentType || (InstrumentType = {}));
 function createInstrumentDescriptor(name, type, options) {
-	var _a, _b, _c;
 	return {
 		name,
 		type,
-		description: (_a = options === null || options === void 0 ? void 0 : options.description) !== null && _a !== void 0 ? _a : '',
-		unit: (_b = options === null || options === void 0 ? void 0 : options.unit) !== null && _b !== void 0 ? _b : '',
-		valueType: (_c = options === null || options === void 0 ? void 0 : options.valueType) !== null && _c !== void 0 ? _c : ValueType.DOUBLE,
+		description: options?.description ?? '',
+		unit: options?.unit ?? '',
+		valueType: options?.valueType ?? ValueType.DOUBLE,
 	};
 }
 function createInstrumentDescriptorWithView(view, instrument) {
-	var _a, _b;
 	return {
-		name: (_a = view.name) !== null && _a !== void 0 ? _a : instrument.name,
-		description: (_b = view.description) !== null && _b !== void 0 ? _b : instrument.description,
+		name: view.name ?? instrument.name,
+		description: view.description ?? instrument.description,
 		type: instrument.type,
 		unit: instrument.unit,
 		valueType: instrument.valueType,
@@ -1179,12 +1176,12 @@ const DEFAULT_AGGREGATION_TEMPORALITY_SELECTOR = _instrumentType => AggregationT
 
 class MetricReader {
 	constructor(options) {
-		var _a, _b;
 		this._shutdown = false;
 		this._aggregationSelector =
-			(_a = options === null || options === void 0 ? void 0 : options.aggregationSelector) !== null && _a !== void 0 ? _a : DEFAULT_AGGREGATION_SELECTOR;
+			options?.aggregationSelector ?? DEFAULT_AGGREGATION_SELECTOR;
 		this._aggregationTemporalitySelector =
-			(_b = options === null || options === void 0 ? void 0 : options.aggregationTemporalitySelector) !== null && _b !== void 0 ? _b : DEFAULT_AGGREGATION_TEMPORALITY_SELECTOR;
+			options?.aggregationTemporalitySelector ??
+				DEFAULT_AGGREGATION_TEMPORALITY_SELECTOR;
 	}
 	setMetricProducer(metricProducer) {
 		if (this._metricProducer) {
@@ -1209,7 +1206,7 @@ class MetricReader {
 			throw new Error('MetricReader is shutdown');
 		}
 		return this._metricProducer.collect({
-			timeoutMillis: options === null || options === void 0 ? void 0 : options.timeoutMillis,
+			timeoutMillis: options?.timeoutMillis,
 		});
 	}
 	async shutdown(options) {
@@ -1217,7 +1214,7 @@ class MetricReader {
 			api.diag.error('Cannot call shutdown twice.');
 			return;
 		}
-		if ((options === null || options === void 0 ? void 0 : options.timeoutMillis) == null) {
+		if (options?.timeoutMillis == null) {
 			await this.onShutdown();
 		}
 		else {
@@ -1230,7 +1227,7 @@ class MetricReader {
 			api.diag.warn('Cannot forceFlush on already shutdown MetricReader.');
 			return;
 		}
-		if ((options === null || options === void 0 ? void 0 : options.timeoutMillis) == null) {
+		if (options?.timeoutMillis == null) {
 			await this.onForceFlush();
 			return;
 		}
@@ -1240,10 +1237,9 @@ class MetricReader {
 
 class PeriodicExportingMetricReader extends MetricReader {
 	constructor(options) {
-		var _a, _b, _c, _d;
 		super({
-			aggregationSelector: (_a = options.exporter.selectAggregation) === null || _a === void 0 ? void 0 : _a.bind(options.exporter),
-			aggregationTemporalitySelector: (_b = options.exporter.selectAggregationTemporality) === null || _b === void 0 ? void 0 : _b.bind(options.exporter),
+			aggregationSelector: options.exporter.selectAggregation?.bind(options.exporter),
+			aggregationTemporalitySelector: options.exporter.selectAggregationTemporality?.bind(options.exporter),
 		});
 		if (options.exportIntervalMillis !== undefined &&
 			options.exportIntervalMillis <= 0) {
@@ -1258,8 +1254,8 @@ class PeriodicExportingMetricReader extends MetricReader {
 			options.exportIntervalMillis < options.exportTimeoutMillis) {
 			throw Error('exportIntervalMillis must be greater than or equal to exportTimeoutMillis');
 		}
-		this._exportInterval = (_c = options.exportIntervalMillis) !== null && _c !== void 0 ? _c : 60000;
-		this._exportTimeout = (_d = options.exportTimeoutMillis) !== null && _d !== void 0 ? _d : 30000;
+		this._exportInterval = options.exportIntervalMillis ?? 60000;
+		this._exportTimeout = options.exportTimeoutMillis ?? 30000;
 		this._exporter = options.exporter;
 	}
 	async _runOnce() {
@@ -1275,7 +1271,6 @@ class PeriodicExportingMetricReader extends MetricReader {
 		}
 	}
 	async _doRun() {
-		var _a, _b;
 		const { resourceMetrics, errors } = await this.collect({
 			timeoutMillis: this._exportTimeout,
 		});
@@ -1289,7 +1284,9 @@ class PeriodicExportingMetricReader extends MetricReader {
 			}
 		};
 		if (resourceMetrics.resource.asyncAttributesPending) {
-			(_b = (_a = resourceMetrics.resource).waitForAsyncAttributes) === null || _b === void 0 ? void 0 : _b.call(_a).then(doExport, err => diag.debug('Error while resolving async portion of resource: ', err));
+			resourceMetrics.resource
+				.waitForAsyncAttributes?.()
+				.then(doExport, err => diag.debug('Error while resolving async portion of resource: ', err));
 		}
 		else {
 			await doExport();
@@ -1347,10 +1344,9 @@ class InMemoryMetricExporter {
 
 class ConsoleMetricExporter {
 	constructor(options) {
-		var _a;
 		this._shutdown = false;
 		this._temporalitySelector =
-			(_a = options === null || options === void 0 ? void 0 : options.temporalitySelector) !== null && _a !== void 0 ? _a : DEFAULT_AGGREGATION_TEMPORALITY_SELECTOR;
+			options?.temporalitySelector ?? DEFAULT_AGGREGATION_TEMPORALITY_SELECTOR;
 	}
 	export(metrics, resultCallback) {
 		if (this._shutdown) {
@@ -1537,7 +1533,7 @@ class HashMap {
 		this._keyMap = new Map();
 	}
 	get(key, hashCode) {
-		hashCode !== null && hashCode !== void 0 ? hashCode : (hashCode = this._hash(key));
+		hashCode ?? (hashCode = this._hash(key));
 		return this._valueMap.get(hashCode);
 	}
 	getOrDefault(key, defaultFactory) {
@@ -1553,14 +1549,14 @@ class HashMap {
 		return val;
 	}
 	set(key, value, hashCode) {
-		hashCode !== null && hashCode !== void 0 ? hashCode : (hashCode = this._hash(key));
+		hashCode ?? (hashCode = this._hash(key));
 		if (!this._keyMap.has(hashCode)) {
 			this._keyMap.set(hashCode, key);
 		}
 		this._valueMap.set(hashCode, value);
 	}
 	has(key, hashCode) {
-		hashCode !== null && hashCode !== void 0 ? hashCode : (hashCode = this._hash(key));
+		hashCode ?? (hashCode = this._hash(key));
 		return this._valueMap.has(hashCode);
 	}
 	*keys() {
@@ -1597,12 +1593,12 @@ class DeltaMetricProcessor {
 	}
 	record(value, attributes, _context, collectionTime) {
 		const accumulation = this._activeCollectionStorage.getOrDefault(attributes, () => this._aggregator.createAccumulation(collectionTime));
-		accumulation === null || accumulation === void 0 ? void 0 : accumulation.record(value);
+		accumulation?.record(value);
 	}
 	batchCumulate(measurements, collectionTime) {
 		Array.from(measurements.entries()).forEach(([attributes, value, hashCode]) => {
 			const accumulation = this._aggregator.createAccumulation(collectionTime);
-			accumulation === null || accumulation === void 0 ? void 0 : accumulation.record(value);
+			accumulation?.record(value);
 			let delta = accumulation;
 			if (this._cumulativeMemoStorage.has(attributes, hashCode)) {
 				const previous = this._cumulativeMemoStorage.get(attributes, hashCode);
@@ -1699,7 +1695,7 @@ class TemporalMetricProcessor {
 	static calibrateStartTime(last, current, lastCollectionTime) {
 		for (const [key, hash] of last.keys()) {
 			const currentAccumulation = current.get(key, hash);
-			currentAccumulation === null || currentAccumulation === void 0 ? void 0 : currentAccumulation.setStartTime(lastCollectionTime);
+			currentAccumulation?.setStartTime(lastCollectionTime);
 		}
 		return current;
 	}
@@ -2072,7 +2068,7 @@ class MeterSharedState {
 		return storages;
 	}
 	async collect(collector, collectionTime, options) {
-		const errors = await this.observableRegistry.observe(collectionTime, options === null || options === void 0 ? void 0 : options.timeoutMillis);
+		const errors = await this.observableRegistry.observe(collectionTime, options?.timeoutMillis);
 		const metricDataList = Array.from(this.metricStorageRegistry.getStorages(collector))
 			.map(metricStorage => {
 			return metricStorage.collect(collector, this._meterProviderSharedState.metricCollectors, collectionTime);
@@ -2175,11 +2171,10 @@ class MetricCollector {
 
 class MeterProvider {
 	constructor(options) {
-		var _a;
 		this._shutdown = false;
-		const resource = Resource.default().merge((_a = options === null || options === void 0 ? void 0 : options.resource) !== null && _a !== void 0 ? _a : Resource.empty());
+		const resource = Resource.default().merge(options?.resource ?? Resource.empty());
 		this._sharedState = new MeterProviderSharedState(resource);
-		if ((options === null || options === void 0 ? void 0 : options.views) != null && options.views.length > 0) {
+		if (options?.views != null && options.views.length > 0) {
 			for (const view of options.views) {
 				this._sharedState.viewRegistry.addView(view);
 			}
@@ -2265,10 +2260,9 @@ class ExactPredicate {
 
 class InstrumentSelector {
 	constructor(criteria) {
-		var _a;
-		this._nameFilter = new PatternPredicate((_a = criteria === null || criteria === void 0 ? void 0 : criteria.name) !== null && _a !== void 0 ? _a : '*');
-		this._type = criteria === null || criteria === void 0 ? void 0 : criteria.type;
-		this._unitFilter = new ExactPredicate(criteria === null || criteria === void 0 ? void 0 : criteria.unit);
+		this._nameFilter = new PatternPredicate(criteria?.name ?? '*');
+		this._type = criteria?.type;
+		this._unitFilter = new ExactPredicate(criteria?.unit);
 	}
 	getType() {
 		return this._type;
@@ -2283,9 +2277,9 @@ class InstrumentSelector {
 
 class MeterSelector {
 	constructor(criteria) {
-		this._nameFilter = new ExactPredicate(criteria === null || criteria === void 0 ? void 0 : criteria.name);
-		this._versionFilter = new ExactPredicate(criteria === null || criteria === void 0 ? void 0 : criteria.version);
-		this._schemaUrlFilter = new ExactPredicate(criteria === null || criteria === void 0 ? void 0 : criteria.schemaUrl);
+		this._nameFilter = new ExactPredicate(criteria?.name);
+		this._versionFilter = new ExactPredicate(criteria?.version);
+		this._schemaUrlFilter = new ExactPredicate(criteria?.schemaUrl);
 	}
 	getNameFilter() {
 		return this._nameFilter;
@@ -2308,12 +2302,11 @@ function isSelectorNotProvided(options) {
 }
 class View {
 	constructor(viewOptions) {
-		var _a;
 		if (isSelectorNotProvided(viewOptions)) {
 			throw new Error('Cannot create view with no selector arguments supplied');
 		}
 		if (viewOptions.name != null &&
-			((viewOptions === null || viewOptions === void 0 ? void 0 : viewOptions.instrumentName) == null ||
+			(viewOptions?.instrumentName == null ||
 				PatternPredicate.hasWildcard(viewOptions.instrumentName))) {
 			throw new Error('Views with a specified name must be declared with an instrument selector that selects at most one instrument per meter.');
 		}
@@ -2325,7 +2318,7 @@ class View {
 		}
 		this.name = viewOptions.name;
 		this.description = viewOptions.description;
-		this.aggregation = (_a = viewOptions.aggregation) !== null && _a !== void 0 ? _a : Aggregation.Default();
+		this.aggregation = viewOptions.aggregation ?? Aggregation.Default();
 		this.instrumentSelector = new InstrumentSelector({
 			name: viewOptions.instrumentName,
 			type: viewOptions.instrumentType,

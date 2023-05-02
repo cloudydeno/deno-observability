@@ -148,11 +148,10 @@ const processDetector = new ProcessDetector();
 class Resource {
 	constructor(
 	attributes, asyncAttributesPromise) {
-		var _a;
 		this._attributes = attributes;
 		this.asyncAttributesPending = asyncAttributesPromise != null;
-		this._syncAttributes = (_a = this._attributes) !== null && _a !== void 0 ? _a : {};
-		this._asyncAttributesPromise = asyncAttributesPromise === null || asyncAttributesPromise === void 0 ? void 0 : asyncAttributesPromise.then(asyncAttributes => {
+		this._syncAttributes = this._attributes ?? {};
+		this._asyncAttributesPromise = asyncAttributesPromise?.then(asyncAttributes => {
 			this._attributes = Object.assign({}, this._attributes, asyncAttributes);
 			this.asyncAttributesPending = false;
 			return asyncAttributes;
@@ -174,11 +173,10 @@ class Resource {
 		});
 	}
 	get attributes() {
-		var _a;
 		if (this.asyncAttributesPending) {
 			diag.error('Accessing resource attributes before async attributes settled');
 		}
-		return (_a = this._attributes) !== null && _a !== void 0 ? _a : {};
+		return this._attributes ?? {};
 	}
 	async waitForAsyncAttributes() {
 		if (this.asyncAttributesPending) {
@@ -186,10 +184,12 @@ class Resource {
 		}
 	}
 	merge(other) {
-		var _a;
 		if (!other)
 			return this;
-		const mergedSyncAttributes = Object.assign(Object.assign({}, this._syncAttributes), ((_a = other._syncAttributes) !== null && _a !== void 0 ? _a : other.attributes));
+		const mergedSyncAttributes = {
+			...this._syncAttributes,
+			...(other._syncAttributes ?? other.attributes),
+		};
 		if (!this._asyncAttributesPromise &&
 			!other._asyncAttributesPromise) {
 			return new Resource(mergedSyncAttributes);
@@ -198,8 +198,12 @@ class Resource {
 			this._asyncAttributesPromise,
 			other._asyncAttributesPromise,
 		]).then(([thisAsyncAttributes, otherAsyncAttributes]) => {
-			var _a;
-			return Object.assign(Object.assign(Object.assign(Object.assign({}, this._syncAttributes), thisAsyncAttributes), ((_a = other._syncAttributes) !== null && _a !== void 0 ? _a : other.attributes)), otherAsyncAttributes);
+			return {
+				...this._syncAttributes,
+				...thisAsyncAttributes,
+				...(other._syncAttributes ?? other.attributes),
+				...otherAsyncAttributes,
+			};
 		});
 		return new Resource(mergedSyncAttributes, mergedAttributesPromise);
 	}
@@ -311,7 +315,9 @@ class BrowserDetectorSync {
 			return Resource.empty();
 		}
 		else {
-			return new Resource(Object.assign({}, browserResource));
+			return new Resource({
+				...browserResource,
+			});
 		}
 	}
 }
@@ -337,8 +343,7 @@ const detectResources = async (config = {}) => {
 	return resources.reduce((acc, resource) => acc.merge(resource), Resource.empty());
 };
 const detectResourcesSync = (config = {}) => {
-	var _a;
-	const resources = ((_a = config.detectors) !== null && _a !== void 0 ? _a : []).map((d) => {
+	const resources = (config.detectors ?? []).map((d) => {
 		try {
 			const resourceOrPromise = d.detect(config);
 			let resource;

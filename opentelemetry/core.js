@@ -255,7 +255,7 @@ function globalErrorHandler(ex) {
 	try {
 		delegateHandler(ex);
 	}
-	catch (_a) { }
+	catch { }
 }
 
 var TracesSamplerValues;
@@ -523,8 +523,7 @@ const SDK_INFO = {
 };
 
 function unrefTimer(timer) {
-	var _a;
-	(_a = Deno.unrefTimer) === null || _a === void 0 ? void 0 : _a.call(Deno, timer);
+	Deno.unrefTimer?.(timer);
 }
 
 const NANOSECOND_DIGITS = 9;
@@ -622,8 +621,7 @@ var ExportResultCode;
 
 class CompositePropagator {
 	constructor(config = {}) {
-		var _a;
-		this._propagators = (_a = config.propagators) !== null && _a !== void 0 ? _a : [];
+		this._propagators = config.propagators ?? [];
 		this._fields = Array.from(new Set(this._propagators
 			.map(p => (typeof p.fields === 'function' ? p.fields() : []))
 			.reduce((x, y) => x.concat(y), [])));
@@ -835,20 +833,19 @@ class AlwaysOnSampler {
 
 class ParentBasedSampler {
 	constructor(config) {
-		var _a, _b, _c, _d;
 		this._root = config.root;
 		if (!this._root) {
 			globalErrorHandler(new Error('ParentBasedSampler must have a root sampler configured'));
 			this._root = new AlwaysOnSampler();
 		}
 		this._remoteParentSampled =
-			(_a = config.remoteParentSampled) !== null && _a !== void 0 ? _a : new AlwaysOnSampler();
+			config.remoteParentSampled ?? new AlwaysOnSampler();
 		this._remoteParentNotSampled =
-			(_b = config.remoteParentNotSampled) !== null && _b !== void 0 ? _b : new AlwaysOffSampler();
+			config.remoteParentNotSampled ?? new AlwaysOffSampler();
 		this._localParentSampled =
-			(_c = config.localParentSampled) !== null && _c !== void 0 ? _c : new AlwaysOnSampler();
+			config.localParentSampled ?? new AlwaysOnSampler();
 		this._localParentNotSampled =
-			(_d = config.localParentNotSampled) !== null && _d !== void 0 ? _d : new AlwaysOffSampler();
+			config.localParentNotSampled ?? new AlwaysOffSampler();
 	}
 	shouldSample(context, traceId, spanName, spanKind, attributes, links) {
 		const parentContext = trace.getSpanContext(context);

@@ -48,7 +48,7 @@ class Span {
 		this._performanceOffset =
 			now - (this._performanceStartTime + getTimeOrigin());
 		this._startTimeProvided = startTime != null;
-		this.startTime = this._getTime(startTime !== null && startTime !== void 0 ? startTime : now);
+		this.startTime = this._getTime(startTime ?? now);
 		this.resource = parentTracer.resource;
 		this.instrumentationLibrary = parentTracer.instrumentationLibrary;
 		this._spanLimits = parentTracer.getSpanLimits();
@@ -265,20 +265,19 @@ class AlwaysOnSampler {
 
 class ParentBasedSampler {
 	constructor(config) {
-		var _a, _b, _c, _d;
 		this._root = config.root;
 		if (!this._root) {
 			globalErrorHandler(new Error('ParentBasedSampler must have a root sampler configured'));
 			this._root = new AlwaysOnSampler();
 		}
 		this._remoteParentSampled =
-			(_a = config.remoteParentSampled) !== null && _a !== void 0 ? _a : new AlwaysOnSampler();
+			config.remoteParentSampled ?? new AlwaysOnSampler();
 		this._remoteParentNotSampled =
-			(_b = config.remoteParentNotSampled) !== null && _b !== void 0 ? _b : new AlwaysOffSampler();
+			config.remoteParentNotSampled ?? new AlwaysOffSampler();
 		this._localParentSampled =
-			(_c = config.localParentSampled) !== null && _c !== void 0 ? _c : new AlwaysOnSampler();
+			config.localParentSampled ?? new AlwaysOnSampler();
 		this._localParentNotSampled =
-			(_d = config.localParentNotSampled) !== null && _d !== void 0 ? _d : new AlwaysOffSampler();
+			config.localParentNotSampled ?? new AlwaysOffSampler();
 	}
 	shouldSample(context, traceId, spanName, spanKind, attributes, links) {
 		const parentContext = trace.getSpanContext(context);
@@ -408,13 +407,20 @@ function mergeConfig(userConfig) {
 	return target;
 }
 function reconfigureLimits(userConfig) {
-	var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m;
 	const spanLimits = Object.assign({}, userConfig.spanLimits);
 	const parsedEnvConfig = getEnvWithoutDefaults();
 	spanLimits.attributeCountLimit =
-		(_f = (_e = (_d = (_b = (_a = userConfig.spanLimits) === null || _a === void 0 ? void 0 : _a.attributeCountLimit) !== null && _b !== void 0 ? _b : (_c = userConfig.generalLimits) === null || _c === void 0 ? void 0 : _c.attributeCountLimit) !== null && _d !== void 0 ? _d : parsedEnvConfig.OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT) !== null && _e !== void 0 ? _e : parsedEnvConfig.OTEL_ATTRIBUTE_COUNT_LIMIT) !== null && _f !== void 0 ? _f : DEFAULT_ATTRIBUTE_COUNT_LIMIT;
+		userConfig.spanLimits?.attributeCountLimit ??
+			userConfig.generalLimits?.attributeCountLimit ??
+			parsedEnvConfig.OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT ??
+			parsedEnvConfig.OTEL_ATTRIBUTE_COUNT_LIMIT ??
+			DEFAULT_ATTRIBUTE_COUNT_LIMIT;
 	spanLimits.attributeValueLengthLimit =
-		(_m = (_l = (_k = (_h = (_g = userConfig.spanLimits) === null || _g === void 0 ? void 0 : _g.attributeValueLengthLimit) !== null && _h !== void 0 ? _h : (_j = userConfig.generalLimits) === null || _j === void 0 ? void 0 : _j.attributeValueLengthLimit) !== null && _k !== void 0 ? _k : parsedEnvConfig.OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT) !== null && _l !== void 0 ? _l : parsedEnvConfig.OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT) !== null && _m !== void 0 ? _m : DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT;
+		userConfig.spanLimits?.attributeValueLengthLimit ??
+			userConfig.generalLimits?.attributeValueLengthLimit ??
+			parsedEnvConfig.OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT ??
+			parsedEnvConfig.OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT ??
+			DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT;
 	return Object.assign({}, userConfig, { spanLimits });
 }
 
@@ -425,19 +431,19 @@ class BatchSpanProcessorBase {
 		this._droppedSpansCount = 0;
 		const env = getEnv();
 		this._maxExportBatchSize =
-			typeof (config === null || config === void 0 ? void 0 : config.maxExportBatchSize) === 'number'
+			typeof config?.maxExportBatchSize === 'number'
 				? config.maxExportBatchSize
 				: env.OTEL_BSP_MAX_EXPORT_BATCH_SIZE;
 		this._maxQueueSize =
-			typeof (config === null || config === void 0 ? void 0 : config.maxQueueSize) === 'number'
+			typeof config?.maxQueueSize === 'number'
 				? config.maxQueueSize
 				: env.OTEL_BSP_MAX_QUEUE_SIZE;
 		this._scheduledDelayMillis =
-			typeof (config === null || config === void 0 ? void 0 : config.scheduledDelayMillis) === 'number'
+			typeof config?.scheduledDelayMillis === 'number'
 				? config.scheduledDelayMillis
 				: env.OTEL_BSP_SCHEDULE_DELAY;
 		this._exportTimeoutMillis =
-			typeof (config === null || config === void 0 ? void 0 : config.exportTimeoutMillis) === 'number'
+			typeof config?.exportTimeoutMillis === 'number'
 				? config.exportTimeoutMillis
 				: env.OTEL_BSP_EXPORT_TIMEOUT;
 		this._shutdownOnce = new BindOnceFuture(this._shutdown, this);
@@ -518,13 +524,13 @@ class BatchSpanProcessorBase {
 			context.with(suppressTracing(context.active()), () => {
 				const spans = this._finishedSpans.splice(0, this._maxExportBatchSize);
 				const doExport = () => this._exporter.export(spans, result => {
-					var _a;
 					clearTimeout(timer);
 					if (result.code === ExportResultCode.SUCCESS) {
 						resolve();
 					}
 					else {
-						reject((_a = result.error) !== null && _a !== void 0 ? _a : new Error('BatchSpanProcessor: span export failed'));
+						reject(result.error ??
+							new Error('BatchSpanProcessor: span export failed'));
 					}
 				});
 				const pendingResources = spans
@@ -534,7 +540,7 @@ class BatchSpanProcessorBase {
 					doExport();
 				}
 				else {
-					Promise.all(pendingResources.map(resource => { var _a; return (_a = resource.waitForAsyncAttributes) === null || _a === void 0 ? void 0 : _a.call(resource); })).then(doExport, err => {
+					Promise.all(pendingResources.map(resource => resource.waitForAsyncAttributes?.())).then(doExport, err => {
 						globalErrorHandler(err);
 						reject(err);
 					});
@@ -604,7 +610,6 @@ class Tracer {
 		this.instrumentationLibrary = instrumentationLibrary;
 	}
 	startSpan(name, options = {}, context = api.context.active()) {
-		var _a, _b, _c;
 		if (options.root) {
 			context = api.trace.deleteSpan(context);
 		}
@@ -614,7 +619,7 @@ class Tracer {
 			const nonRecordingSpan = api.trace.wrapSpanContext(api.INVALID_SPAN_CONTEXT);
 			return nonRecordingSpan;
 		}
-		const parentSpanContext = parentSpan === null || parentSpan === void 0 ? void 0 : parentSpan.spanContext();
+		const parentSpanContext = parentSpan?.spanContext();
 		const spanId = this._idGenerator.generateSpanId();
 		let traceId;
 		let traceState;
@@ -628,8 +633,8 @@ class Tracer {
 			traceState = parentSpanContext.traceState;
 			parentSpanId = parentSpanContext.spanId;
 		}
-		const spanKind = (_a = options.kind) !== null && _a !== void 0 ? _a : api.SpanKind.INTERNAL;
-		const links = ((_b = options.links) !== null && _b !== void 0 ? _b : []).map(link => {
+		const spanKind = options.kind ?? api.SpanKind.INTERNAL;
+		const links = (options.links ?? []).map(link => {
 			return {
 				context: link.context,
 				attributes: sanitizeAttributes(link.attributes),
@@ -637,7 +642,7 @@ class Tracer {
 		});
 		const attributes = sanitizeAttributes(options.attributes);
 		const samplingResult = this._sampler.shouldSample(context, traceId, name, spanKind, attributes, links);
-		traceState = (_c = samplingResult.traceState) !== null && _c !== void 0 ? _c : traceState;
+		traceState = samplingResult.traceState ?? traceState;
 		const traceFlags = samplingResult.decision === api.SamplingDecision.RECORD_AND_SAMPLED
 			? api.TraceFlags.SAMPLED
 			: api.TraceFlags.NONE;
@@ -671,7 +676,7 @@ class Tracer {
 			ctx = arg3;
 			fn = arg4;
 		}
-		const parentContext = ctx !== null && ctx !== void 0 ? ctx : api.context.active();
+		const parentContext = ctx ?? api.context.active();
 		const span = this.startSpan(name, opts, parentContext);
 		const contextWithSpanSet = api.trace.setSpan(parentContext, span);
 		return api.context.with(contextWithSpanSet, fn, undefined, span);
@@ -750,11 +755,10 @@ var ForceFlushState;
 })(ForceFlushState || (ForceFlushState = {}));
 class BasicTracerProvider {
 	constructor(config = {}) {
-		var _a;
 		this._registeredSpanProcessors = [];
 		this._tracers = new Map();
 		const mergedConfig = merge({}, loadDefaultConfig(), reconfigureLimits(config));
-		this.resource = (_a = mergedConfig.resource) !== null && _a !== void 0 ? _a : Resource.empty();
+		this.resource = mergedConfig.resource ?? Resource.empty();
 		this.resource = Resource.default().merge(this.resource);
 		this._config = Object.assign({}, mergedConfig, {
 			resource: this.resource,
@@ -769,9 +773,9 @@ class BasicTracerProvider {
 		}
 	}
 	getTracer(name, version, options) {
-		const key = `${name}@${version || ''}:${(options === null || options === void 0 ? void 0 : options.schemaUrl) || ''}`;
+		const key = `${name}@${version || ''}:${options?.schemaUrl || ''}`;
 		if (!this._tracers.has(key)) {
-			this._tracers.set(key, new Tracer({ name, version, schemaUrl: options === null || options === void 0 ? void 0 : options.schemaUrl }, this._config, this));
+			this._tracers.set(key, new Tracer({ name, version, schemaUrl: options?.schemaUrl }, this._config, this));
 		}
 		return this._tracers.get(key);
 	}
@@ -842,12 +846,10 @@ class BasicTracerProvider {
 		return this.activeSpanProcessor.shutdown();
 	}
 	_getPropagator(name) {
-		var _a;
-		return (_a = this.constructor._registeredPropagators.get(name)) === null || _a === void 0 ? void 0 : _a();
+		return this.constructor._registeredPropagators.get(name)?.();
 	}
 	_getSpanExporter(name) {
-		var _a;
-		return (_a = this.constructor._registeredExporters.get(name)) === null || _a === void 0 ? void 0 : _a();
+		return this.constructor._registeredExporters.get(name)?.();
 	}
 	_buildPropagatorFromEnv() {
 		const uniquePropagatorNames = Array.from(new Set(getEnv().OTEL_PROPAGATORS));
@@ -902,11 +904,10 @@ class ConsoleSpanExporter {
 		return Promise.resolve();
 	}
 	_exportInfo(span) {
-		var _a;
 		return {
 			traceId: span.spanContext().traceId,
 			parentId: span.parentSpanId,
-			traceState: (_a = span.spanContext().traceState) === null || _a === void 0 ? void 0 : _a.serialize(),
+			traceState: span.spanContext().traceState?.serialize(),
 			name: span.name,
 			id: span.spanContext().spanId,
 			kind: span.kind,
@@ -966,7 +967,6 @@ class SimpleSpanProcessor {
 	}
 	onStart(_span, _parentContext) { }
 	onEnd(span) {
-		var _a, _b;
 		if (this._shutdownOnce.isCalled) {
 			return;
 		}
@@ -976,16 +976,18 @@ class SimpleSpanProcessor {
 		const doExport = () => internal
 			._export(this._exporter, [span])
 			.then((result) => {
-			var _a;
 			if (result.code !== ExportResultCode.SUCCESS) {
-				globalErrorHandler((_a = result.error) !== null && _a !== void 0 ? _a : new Error(`SimpleSpanProcessor: span export failed (status ${result})`));
+				globalErrorHandler(result.error ??
+					new Error(`SimpleSpanProcessor: span export failed (status ${result})`));
 			}
 		})
 			.catch(error => {
 			globalErrorHandler(error);
 		});
 		if (span.resource.asyncAttributesPending) {
-			const exportPromise = (_b = (_a = span.resource).waitForAsyncAttributes) === null || _b === void 0 ? void 0 : _b.call(_a).then(() => {
+			const exportPromise = span.resource
+				.waitForAsyncAttributes?.()
+				.then(() => {
 				if (exportPromise != null) {
 					this._unresolvedExports.delete(exportPromise);
 				}
