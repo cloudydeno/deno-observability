@@ -16,6 +16,7 @@
 
 import { ReadableSpan } from './sdk-trace-base.d.ts';
 import { ResourceMetrics } from './sdk-metrics.d.ts';
+import { ReadableLogRecord } from './sdk-logs.d.ts';
 
 /** Properties of an InstrumentationScope. */
 interface IInstrumentationScope {
@@ -456,8 +457,88 @@ interface ILink {
 	droppedAttributesCount: number;
 }
 
+/** Properties of an ExportLogsServiceRequest. */
+interface IExportLogsServiceRequest {
+	/** ExportLogsServiceRequest resourceLogs */
+	resourceLogs?: IResourceLogs[];
+}
+/** Properties of a ResourceLogs. */
+interface IResourceLogs {
+	/** ResourceLogs resource */
+	resource?: IResource;
+	/** ResourceLogs scopeLogs */
+	scopeLogs: IScopeLogs[];
+	/** ResourceLogs schemaUrl */
+	schemaUrl?: string;
+}
+/** Properties of an ScopeLogs. */
+interface IScopeLogs {
+	/** IScopeLogs scope */
+	scope?: IInstrumentationScope;
+	/** IScopeLogs logRecords */
+	logRecords?: ILogRecord[];
+	/** IScopeLogs schemaUrl */
+	schemaUrl?: string | null;
+}
+/** Properties of a LogRecord. */
+interface ILogRecord {
+	/** LogRecord timeUnixNano */
+	timeUnixNano: number;
+	/** LogRecord observedTimeUnixNano */
+	observedTimeUnixNano: number;
+	/** LogRecord severityNumber */
+	severityNumber?: ESeverityNumber;
+	/** LogRecord severityText */
+	severityText?: string;
+	/** LogRecord body */
+	body?: IAnyValue;
+	/** LogRecord attributes */
+	attributes: IKeyValue[];
+	/** LogRecord droppedAttributesCount */
+	droppedAttributesCount: number;
+	/** LogRecord flags */
+	flags?: number;
+	/** LogRecord traceId */
+	traceId?: string;
+	/** LogRecord spanId */
+	spanId?: string;
+}
+/**
+ * Numerical value of the severity, normalized to values described in Log Data Model.
+ */
+declare enum ESeverityNumber {
+	/** Unspecified. Do NOT use as default */
+	SEVERITY_NUMBER_UNSPECIFIED = 0,
+	SEVERITY_NUMBER_TRACE = 1,
+	SEVERITY_NUMBER_TRACE2 = 2,
+	SEVERITY_NUMBER_TRACE3 = 3,
+	SEVERITY_NUMBER_TRACE4 = 4,
+	SEVERITY_NUMBER_DEBUG = 5,
+	SEVERITY_NUMBER_DEBUG2 = 6,
+	SEVERITY_NUMBER_DEBUG3 = 7,
+	SEVERITY_NUMBER_DEBUG4 = 8,
+	SEVERITY_NUMBER_INFO = 9,
+	SEVERITY_NUMBER_INFO2 = 10,
+	SEVERITY_NUMBER_INFO3 = 11,
+	SEVERITY_NUMBER_INFO4 = 12,
+	SEVERITY_NUMBER_WARN = 13,
+	SEVERITY_NUMBER_WARN2 = 14,
+	SEVERITY_NUMBER_WARN3 = 15,
+	SEVERITY_NUMBER_WARN4 = 16,
+	SEVERITY_NUMBER_ERROR = 17,
+	SEVERITY_NUMBER_ERROR2 = 18,
+	SEVERITY_NUMBER_ERROR3 = 19,
+	SEVERITY_NUMBER_ERROR4 = 20,
+	SEVERITY_NUMBER_FATAL = 21,
+	SEVERITY_NUMBER_FATAL2 = 22,
+	SEVERITY_NUMBER_FATAL3 = 23,
+	SEVERITY_NUMBER_FATAL4 = 24
+}
+
 declare function createExportTraceServiceRequest(spans: ReadableSpan[], useHex?: boolean): IExportTraceServiceRequest;
 
 declare function createExportMetricsServiceRequest(resourceMetrics: ResourceMetrics[]): IExportMetricsServiceRequest;
 
-export { EAggregationTemporality, ESpanKind, EStatusCode, IAnyValue, IArrayValue, IBuckets, IEvent, IExemplar, IExponentialHistogram, IExponentialHistogramDataPoint, IExportMetricsServiceRequest, IExportTraceServiceRequest, IGauge, IHistogram, IHistogramDataPoint, IInstrumentationScope, IKeyValue, IKeyValueList, ILink, IMetric, INumberDataPoint, IResource, IResourceMetrics, IResourceSpans, IScopeMetrics, IScopeSpans, ISpan, IStatus, ISum, ISummary, ISummaryDataPoint, IValueAtQuantile, createExportMetricsServiceRequest, createExportTraceServiceRequest };
+declare function createExportLogsServiceRequest(logRecords: ReadableLogRecord[], useHex?: boolean): IExportLogsServiceRequest;
+
+export { EAggregationTemporality, ESeverityNumber, ESpanKind, EStatusCode, IAnyValue, IArrayValue, IBuckets, IEvent, IExemplar, IExponentialHistogram, IExponentialHistogramDataPoint, IExportLogsServiceRequest, IExportMetricsServiceRequest, IExportTraceServiceRequest, IGauge, IHistogram, IHistogramDataPoint, IInstrumentationScope, IKeyValue, IKeyValueList, ILink, ILogRecord, IMetric, INumberDataPoint, IResource, IResourceLogs, IResourceMetrics, IResourceSpans, IScopeLogs, IScopeMetrics, IScopeSpans, ISpan, IStatus, ISum, ISummary, ISummaryDataPoint, IValueAtQuantile, createExportLogsServiceRequest, createExportMetricsServiceRequest, createExportTraceServiceRequest };
