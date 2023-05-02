@@ -1,29 +1,34 @@
 import { DetectorSync, Resource } from "../opentelemetry/resources.js";
 import { SemanticResourceAttributes } from "../opentelemetry/semantic-conventions.js";
 
+const runtimeResource = new Resource({
+  [SemanticResourceAttributes.PROCESS_RUNTIME_NAME]: 'deno',
+  [SemanticResourceAttributes.PROCESS_RUNTIME_DESCRIPTION]: 'Deno Runtime',
+});
 export class DenoRuntimeDetector implements DetectorSync {
   detect() {
-
     const isDeno = typeof Deno !== 'undefined';
     if (!isDeno) {
       return Resource.empty();
     }
 
-    return new Resource({
-      [SemanticResourceAttributes.PROCESS_RUNTIME_NAME]: 'deno',
-      [SemanticResourceAttributes.PROCESS_RUNTIME_DESCRIPTION]: 'Deno Runtime',
-      [SemanticResourceAttributes.PROCESS_RUNTIME_VERSION]: Deno.version?.deno,
-    });
+    // Deno Deploy does this:
+    if (!Deno.version?.deno) return runtimeResource;
+
+    return runtimeResource.merge(new Resource({
+      [SemanticResourceAttributes.PROCESS_RUNTIME_VERSION]: Deno.version.deno,
+    }));
   }
 }
 
 export class DenoDeployDetector implements DetectorSync {
   detect() {
     // Deno Deploy doesn't have permissions
-    if (Deno.permissions.querySync({
+    const canGet = (Deno.permissions.querySync?.({
       name: 'env',
       variable: 'DENO_DEPLOYMENT_ID',
-    }).state !== 'granted') {
+    }).state ?? 'granted') === 'granted';
+    if (!canGet) {
       return Resource.empty();
     }
 
@@ -43,15 +48,19 @@ export class DenoDeployDetector implements DetectorSync {
   }
 }
 
+const processResource = new Resource({
+  [SemanticResourceAttributes.PROCESS_PID]: Deno.pid,
+  [SemanticResourceAttributes.PROCESS_COMMAND_ARGS]: Deno.args,
+});
 export class DenoProcessDetector implements DetectorSync {
-	detect() {
+  detect() {
     // deno deploy currently lacks querySync, but can read
     const canRead = (Deno.permissions.querySync?.({name: 'read'}).state == 'granted') ?? true;
-		return new Resource({
-			[SemanticResourceAttributes.PROCESS_PID]: Deno.pid,
-			[SemanticResourceAttributes.PROCESS_COMMAND_ARGS]: Deno.args,
-			[SemanticResourceAttributes.PROCESS_EXECUTABLE_PATH]: canRead && Deno.execPath(),
-      [SemanticResourceAttributes.PROCESS_COMMAND]: canRead && Deno.mainModule,
-		});
-	}
+    if (!canRead) return processResource;
+
+    return processResource.merge(new Resource({
+      [SemanticResourceAttributes.PROCESS_EXECUTABLE_PATH]: Deno.execPath(),
+      [SemanticResourceAttributes.PROCESS_COMMAND]: Deno.mainModule,
+    }));
+  }
 }

@@ -528,7 +528,7 @@ const VERSION$1 = "1.12.0";
 const SDK_INFO = {
 	[SemanticResourceAttributes.TELEMETRY_SDK_NAME]: 'opentelemetry',
 	[SemanticResourceAttributes.PROCESS_RUNTIME_NAME]: 'deno',
-	[SemanticResourceAttributes.TELEMETRY_SDK_LANGUAGE]: TelemetrySdkLanguageValues.NODEJS,
+	[SemanticResourceAttributes.TELEMETRY_SDK_LANGUAGE]: 'js',
 	[SemanticResourceAttributes.TELEMETRY_SDK_VERSION]: VERSION$1,
 };
 
