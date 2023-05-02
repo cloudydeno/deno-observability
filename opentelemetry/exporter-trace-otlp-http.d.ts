@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-import { ReadableSpan, SpanExporter } from './sdk-trace-base.js';
-import { OTLPExporterNodeBase, OTLPExporterNodeConfigBase } from './otlp-exporter-base.js';
-import { IExportTraceServiceRequest } from './otlp-transformer.js';
+import { ReadableSpan, SpanExporter } from './sdk-trace-base.d.ts';
+import { OTLPExporterNodeBase, OTLPExporterNodeConfigBase } from './otlp-exporter-base.d.ts';
+import { IExportTraceServiceRequest } from './otlp-transformer.d.ts';
 
 /**
  * Collector Trace Exporter for Node

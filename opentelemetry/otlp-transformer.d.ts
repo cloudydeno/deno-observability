@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-import { ReadableSpan } from './sdk-trace-base.js';
-import { ResourceMetrics } from './sdk-metrics.js';
+import { ReadableSpan } from './sdk-trace-base.d.ts';
+import { ResourceMetrics } from './sdk-metrics.d.ts';
 
 /** Properties of an InstrumentationScope. */
 interface IInstrumentationScope {

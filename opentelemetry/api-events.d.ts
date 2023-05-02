@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { Attributes } from './api.js';
+import { Attributes } from './api.d.ts';
 
 interface Event {
 	/**

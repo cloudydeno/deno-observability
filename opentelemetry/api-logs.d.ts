@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { Attributes, Context } from './api.js';
+import { Attributes, Context } from './api.d.ts';
 
 declare enum SeverityNumber {
 	UNSPECIFIED = 0,

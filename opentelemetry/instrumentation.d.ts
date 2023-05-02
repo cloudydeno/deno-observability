@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { TracerProvider, MeterProvider, DiagLogger, Meter, Tracer } from './api.js';
+import { TracerProvider, MeterProvider, DiagLogger, Meter, Tracer } from './api.d.ts';
 
 /** Interface Instrumentation to apply patch. */
 interface Instrumentation {

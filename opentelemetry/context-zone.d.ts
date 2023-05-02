@@ -14,4 +14,4 @@
  * limitations under the License.
  */
 
-export * from './context-zone-peer-dep.js';
+export * from './context-zone-peer-dep.d.ts';

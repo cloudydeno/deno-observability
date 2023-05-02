@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-import { IResource } from './resources.js';
-import * as logsAPI from './api-logs.js';
-import { SeverityNumber } from './api-logs.js';
-import * as api from './api.js';
-import { HrTime, SpanContext, Attributes, AttributeValue, Context } from './api.js';
-import { InstrumentationScope, ExportResult } from './core.js';
+import { IResource } from './resources.d.ts';
+import * as logsAPI from './api-logs.d.ts';
+import { SeverityNumber } from './api-logs.d.ts';
+import * as api from './api.d.ts';
+import { HrTime, SpanContext, Attributes, AttributeValue, Context } from './api.d.ts';
+import { InstrumentationScope, ExportResult } from './core.d.ts';
 
 interface LoggerProviderConfig {
 	/** Resource associated with trace telemetry  */

@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-import * as _opentelemetry_api from './api.js';
-import { MetricAttributes, Context, HrTime, ValueType, MeterProvider as MeterProvider$1, MeterOptions, Meter } from './api.js';
-import { InstrumentationScope, ExportResult } from './core.js';
-import { IResource } from './resources.js';
+import * as _opentelemetry_api from './api.d.ts';
+import { MetricAttributes, Context, HrTime, ValueType, MeterProvider as MeterProvider$1, MeterOptions, Meter } from './api.d.ts';
+import { InstrumentationScope, ExportResult } from './core.d.ts';
+import { IResource } from './resources.d.ts';
 
 /**
  * AggregationTemporality indicates the way additive quantities are expressed.

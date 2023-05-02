@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { BindOnceFuture, ExportResult } from './core.js';
+import { BindOnceFuture, ExportResult } from './core.d.ts';
 
 /**
  * Interface for handling error

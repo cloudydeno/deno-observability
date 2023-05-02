@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-import { AggregationTemporality, AggregationTemporalitySelector, ResourceMetrics, PushMetricExporter, InstrumentType } from './sdk-metrics.js';
-import { OTLPExporterConfigBase, OTLPExporterBase } from './otlp-exporter-base.js';
-import { ExportResult } from './core.js';
-import { IExportMetricsServiceRequest } from './otlp-transformer.js';
+import { AggregationTemporality, AggregationTemporalitySelector, ResourceMetrics, PushMetricExporter, InstrumentType } from './sdk-metrics.d.ts';
+import { OTLPExporterConfigBase, OTLPExporterBase } from './otlp-exporter-base.d.ts';
+import { ExportResult } from './core.d.ts';
+import { IExportMetricsServiceRequest } from './otlp-transformer.d.ts';
 
 interface OTLPMetricExporterOptions extends OTLPExporterConfigBase {
 	temporalityPreference?: AggregationTemporality;

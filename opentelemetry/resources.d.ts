@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { SpanAttributes } from './api.js';
+import { SpanAttributes } from './api.d.ts';
 
 /**
  * ResourceDetectionConfig provides an interface for configuring resource auto-detection.

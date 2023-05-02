@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { ContextManager, Context } from './api.js';
+import { ContextManager, Context } from './api.d.ts';
 
 declare type Func<T> = (...args: unknown[]) => T;
 /**

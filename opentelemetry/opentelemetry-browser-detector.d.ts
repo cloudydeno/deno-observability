@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { Detector, ResourceDetectionConfig, IResource } from './resources.js';
+import { Detector, ResourceDetectionConfig, IResource } from './resources.d.ts';
 
 /**
  * BrowserDetector will be used to detect the resources related to browser.

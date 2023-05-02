@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-import * as api from './api.js';
-import { SpanAttributes, TraceState, Context, SpanKind, Link, TextMapPropagator, ContextManager, HrTime, SpanContext, SpanStatus, TracerProvider, Span as Span$1, TimeInput, SpanAttributeValue, Exception } from './api.js';
-import { InstrumentationLibrary, ExportResult } from './core.js';
-import { IResource } from './resources.js';
+import * as api from './api.d.ts';
+import { SpanAttributes, TraceState, Context, SpanKind, Link, TextMapPropagator, ContextManager, HrTime, SpanContext, SpanStatus, TracerProvider, Span as Span$1, TimeInput, SpanAttributeValue, Exception } from './api.d.ts';
+import { InstrumentationLibrary, ExportResult } from './core.d.ts';
+import { IResource } from './resources.d.ts';
 
 /** IdGenerator provides an interface for generating Trace Id and Span Id */
 interface IdGenerator {

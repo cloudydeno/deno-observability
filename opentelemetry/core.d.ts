@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-import * as api from './api.js';
-import { TextMapPropagator, Context, TextMapSetter, TextMapGetter, SpanAttributes, SpanAttributeValue, Exception, Baggage, BaggageEntryMetadata, DiagLogLevel, SpanContext, Span, Sampler, SamplingResult, SpanKind, Link } from './api.js';
+import * as api from './api.d.ts';
+import { TextMapPropagator, Context, TextMapSetter, TextMapGetter, SpanAttributes, SpanAttributeValue, Exception, Baggage, BaggageEntryMetadata, DiagLogLevel, SpanContext, Span, Sampler, SamplingResult, SpanKind, Link } from './api.d.ts';
 
 /**
  * Propagates {@link Baggage} through Context format propagation.

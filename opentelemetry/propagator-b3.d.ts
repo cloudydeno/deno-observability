@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { TextMapPropagator, Context, TextMapSetter, TextMapGetter } from './api.js';
+import { TextMapPropagator, Context, TextMapSetter, TextMapGetter } from './api.d.ts';
 
 /** Enumeration of B3 inject encodings */
 declare enum B3InjectEncoding {

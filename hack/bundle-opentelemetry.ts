@@ -121,17 +121,18 @@ export async function buildModuleWithRollup(directory: string, modName: string, 
   // We write the chunks ourself to put them somewhere else
   for (const chunk of [ ...bundle.output, ...tsBundle.output ]) {
 
-    let text = chunk.type == 'chunk' ? chunk.code : `${chunk.source}`
+    let text = chunk.type == 'chunk' ? chunk.code : `${chunk.source}`;
+    const importExtension = chunk.fileName.endsWith('.d.ts') ? '.d.ts' : '.js';
 
-    const patternImportG = new RegExp(/(?:import|export)(?:["'\s]*([\w*${}\n\r\t, ]+)from\s*)?["'\s]["'\s](.*[@\w_-]+)["'\s].*;$/, 'mg');
-    const patternImport = new RegExp(/(?:import|export)(?:["'\s]*([\w*${}\n\r\t, ]+)from\s*)?["'\s]["'\s](.*[@\w_-]+)["'\s].*;$/, 'm');
+    const patternImport = /(?:import|export)(?:["'\s]*([\w*${}\n\r\t, ]+)from\s*)?["'\s]["'\s](.*[@\w_-]+)["'\s].*;$/m;
+    const patternImportG = new RegExp(patternImport, 'mg');
     text = text.replaceAll(patternImportG, matchText => {
       // console.log({matchText})
       let match = matchText.match(patternImport);
       if (!match) throw new Error('bug');
       let newImport = '';
       if (match[2].startsWith('@opentelemetry/')) {
-        newImport = './' + match[2].split('/')[1] + '.js';
+        newImport = './' + match[2].split('/')[1] + importExtension;
       } else if (['path', 'os', 'process', 'fs'].includes(match[2])) {
         // newImport = 'node:'+match[2];
         return '';
