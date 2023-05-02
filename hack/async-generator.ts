@@ -1,9 +1,4 @@
-export { W3CTraceContextPropagator } from "../opentelemetry/core.js";
-
-export { trace, context, type Context } from '../opentelemetry/api.js';
-export { DenoTracerProvider } from './provider.ts';
-
-import { context, type Context } from '../opentelemetry/api.js';
+import { Context, context } from "../opentelemetry/api.js";
 
 export async function* asyncGeneratorWithContext<T, TReturn, TNext>(
   operationContext: Context,

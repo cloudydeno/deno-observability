@@ -1,23 +1,10 @@
 // https://github.com/DataDog/dd-opentelemetry-exporter-js/blob/master/src/datadogPropagator.ts
 
 /*
- * Unless explicitly stated otherwise all files in this repository are licensed
- * under the Apache 2.0 license (see LICENSE).
+ * This file is licensed under the Apache 2.0 license.
  * This product includes software developed at Datadog (https://www.datadoghq.com/).
  * Copyright 2020 Datadog, Inc.
  */
-
-// import {
-//   Context,
-//   trace,
-//   isSpanContextValid,
-//   TextMapGetter,
-//   TextMapPropagator,
-//   TextMapSetter,
-//   TraceFlags,
-//   SpanContext,
-// } from 'npm:@opentelemetry/api';
-// import { TraceState } from 'npm:@opentelemetry/core';
 
 import {
   Context,

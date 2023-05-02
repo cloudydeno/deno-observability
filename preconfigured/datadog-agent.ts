@@ -1,13 +1,11 @@
 import { Resource } from "../opentelemetry/resources.js";
 
-import {
-  DenoFetchInstrumentation,
-  SubProcessInstrumentation,
-} from "../mod.ts";
-import {
-  DatadogPropagator,
-} from "../tracing/propagators/datadog.ts";
+import { DenoFetchInstrumentation } from "../instrumentation/fetch.ts";
+import { SubProcessInstrumentation } from "../instrumentation/subprocess.ts";
+import { registerDenoRuntimeMetrics } from "../instrumentation/deno-runtime.ts";
 import { DenoTelemetrySdk } from "../sdk.ts";
+
+import { DatadogPropagator } from "../otel-platform/propagators/datadog.ts";
 
 /**
  * An observability SDK intended for programs running in
@@ -27,3 +25,5 @@ export const sdk = new DenoTelemetrySdk({
   otlpEndpointBase: Deno.env.get('OTEL_EXPORTER_OTLP_ENDPOINT')
     ?? `http://${Deno.env.get('DD_AGENT_HOST') ?? 'localhost'}:4318`,
 });
+
+registerDenoRuntimeMetrics();

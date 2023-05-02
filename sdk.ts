@@ -33,8 +33,12 @@ import {
   OTLPLogsExporter,
 } from "./otel-platform/otlp-exporters.ts";
 
-diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.INFO); // also can set a level
+diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.INFO); // TODO: level from envvar
 
+/**
+ * A one-stop shop to provide a tracer, a meter, and a logger.
+ * Transmits all signals by OTLP.
+ */
 export class DenoTelemetrySdk {
 
   public readonly resource: Resource;
@@ -65,35 +69,44 @@ export class DenoTelemetrySdk {
       ],
     }).merge(props?.resource ?? null);
 
+
     this.tracer = new BasicTracerProvider({
       resource: this.resource,
       idGenerator: props?.idGenerator,
       sampler: props?.sampler,
     });
+
     this.tracer.register({
       contextManager: new DenoAsyncHooksContextManager().enable(),
       propagator: props?.propagator,
     });
+
     this.tracer.addSpanProcessor(new BatchSpanProcessor(new OTLPTracesExporter({
       resourceBase: props?.otlpEndpointBase,
     })));
+
 
     this.meter = new MeterProvider({
       resource: this.resource,
       views: props?.metricsViews,
     });
     metrics.setGlobalMeterProvider(this.meter);
-    this.meter.addMetricReader(new PeriodicExportingMetricReader({
-      exporter: new OTLPMetricExporterBase(new OTLPMetricsExporter({
-        resourceBase: props?.otlpEndpointBase,
-      })),
-      exportIntervalMillis: props?.metricsExportIntervalMillis ?? 20_000,
-    }));
+
+    // Metrics export on a fixed timer, so let the user disable the requests entirely
+    if (props?.metricsExportIntervalMillis !== 0) {
+      this.meter.addMetricReader(new PeriodicExportingMetricReader({
+        exporter: new OTLPMetricExporterBase(new OTLPMetricsExporter({
+          resourceBase: props?.otlpEndpointBase,
+        })),
+        exportIntervalMillis: props?.metricsExportIntervalMillis ?? 20_000,
+      }));
+    }
 
     this.logger = new LoggerProvider({
       resource: this.resource,
     });
     logs.setGlobalLoggerProvider(this.logger);
+
     this.logger.addLogRecordProcessor(new BatchLogRecordProcessor(new OTLPLogsExporter({
       resourceBase: props?.otlpEndpointBase,
     })));

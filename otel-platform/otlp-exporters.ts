@@ -152,10 +152,7 @@ export class OTLPMetricsExporter extends OTLPFetchExporterBase<
       envKey: 'METRICS',
     });
   }
-
-  convert(metrics: ResourceMetrics[]): IExportMetricsServiceRequest {
-    return createExportMetricsServiceRequest(metrics);
-  }
+  convert = createExportMetricsServiceRequest
 }
 
 export class OTLPLogsExporter extends OTLPFetchExporterBase<
@@ -171,7 +168,7 @@ export class OTLPLogsExporter extends OTLPFetchExporterBase<
   }
 
   convert(logs: ReadableLogRecord[]) {
-    return createExportLogsServiceRequest(logs);
+    return createExportLogsServiceRequest(logs, true);
   }
 }
 // btw, events are event.name and event.domain
