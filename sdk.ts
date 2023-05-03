@@ -32,8 +32,10 @@ import {
   OTLPMetricsExporter,
   OTLPLogsExporter,
 } from "./otel-platform/otlp-exporters.ts";
+import { getEnv } from "./opentelemetry/core.js";
 
-diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.INFO); // TODO: level from envvar
+const env = getEnv();
+diag.setLogger(new DiagConsoleLogger(), env.OTEL_LOG_LEVEL);
 
 /**
  * A one-stop shop to provide a tracer, a meter, and a logger.
@@ -58,6 +60,10 @@ export class DenoTelemetrySdk {
     otlpEndpointBase?: string;
   }) {
 
+    // if (env.OTEL_SDK_DISABLED) {
+    //   return this; // TODO: better?
+    // }
+
     this.resource = detectResourcesSync({
       detectors: props?.detectors ?? [
         new DenoRuntimeDetector(),
@@ -75,7 +81,6 @@ export class DenoTelemetrySdk {
       idGenerator: props?.idGenerator,
       sampler: props?.sampler,
     });
-
     this.tracer.register({
       contextManager: new DenoAsyncHooksContextManager().enable(),
       propagator: props?.propagator,
@@ -118,7 +123,5 @@ export class DenoTelemetrySdk {
         instrumentations: props.instrumentations,
       });
     }
-
-    // registerDenoRuntimeMetrics();
   }
 }

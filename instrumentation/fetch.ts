@@ -71,7 +71,7 @@ export interface FetchInstrumentationConfig extends InstrumentationConfig {
 /**
  * This class represents a fetch plugin for auto instrumentation
  */
-export class DenoFetchInstrumentation extends InstrumentationBase {
+export class FetchInstrumentation extends InstrumentationBase {
   readonly component: string = 'fetch';
   moduleName = this.component;
 

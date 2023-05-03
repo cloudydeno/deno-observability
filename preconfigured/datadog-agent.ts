@@ -1,6 +1,6 @@
 import { Resource } from "../opentelemetry/resources.js";
 
-import { DenoFetchInstrumentation } from "../instrumentation/fetch.ts";
+import { FetchInstrumentation } from "../instrumentation/fetch.ts";
 import { SubProcessInstrumentation } from "../instrumentation/subprocess.ts";
 import { registerDenoRuntimeMetrics } from "../instrumentation/deno-runtime.ts";
 import { DenoTelemetrySdk } from "../sdk.ts";
@@ -18,7 +18,7 @@ export const sdk = new DenoTelemetrySdk({
     'deployment.environment': Deno.env.get('DD_ENV'),
   }),
   instrumentations: [
-    new DenoFetchInstrumentation(),
+    new FetchInstrumentation(),
     new SubProcessInstrumentation(),
   ],
   propagator: new DatadogPropagator(),

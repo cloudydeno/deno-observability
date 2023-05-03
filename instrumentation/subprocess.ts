@@ -1,9 +1,3 @@
-// import {
-//   isWrapped,
-//   InstrumentationBase,
-//   type InstrumentationConfig,
-// } from 'npm:@opentelemetry/instrumentation';
-
 import {
   isWrapped,
   InstrumentationBase,
