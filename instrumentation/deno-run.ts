@@ -4,7 +4,7 @@ import {
   type InstrumentationConfig,
 } from "../opentelemetry/instrumentation.js";
 
-export class SubProcessInstrumentation extends InstrumentationBase {
+export class DenoRunInstrumentation extends InstrumentationBase {
   readonly component: string = 'subprocess';
   moduleName = this.component;
 

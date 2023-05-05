@@ -3,34 +3,34 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
 import { metrics, trace, ValueType } from "./opentelemetry/api.js";
 import { logs } from "./opentelemetry/api-logs.js";
-import { Resource } from "./opentelemetry/resources.js";
 import { SemanticAttributes } from "./opentelemetry/semantic-conventions.js";
 
 import { DenoTelemetrySdk } from './sdk.ts'
 import { httpTracer } from "./instrumentation/http-server.ts";
 
 new DenoTelemetrySdk({
-  resource: new Resource({
+  resourceAttrs: {
     'service.name': 'observability-demo',
     'deployment.environment': 'local',
     'service.version': 'adhoc',
-  }),
+  },
 });
 
+// You could 'get' these APIs from the sdk instance fields,
+// but it's better to decouple your application logic from your loading of the SDK
+
 const logger = logs.getLogger('demo.ts');
-
-const myMeter = metrics.getMeter('my-service-meter');
-const test3 = myMeter.createCounter('test3', {valueType: ValueType.INT})
-const test2 = myMeter.createHistogram('test2', {valueType: ValueType.INT})
-
 logger.emit({
   body: 'im alive',
 });
 
+const myMeter = metrics.getMeter('my-service-meter');
+const test3 = myMeter.createCounter('test3', { valueType: ValueType.INT });
+const test2 = myMeter.createHistogram('test2', { valueType: ValueType.DOUBLE });
+
 async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url);
   console.log(req.method, url.pathname);
-
 
   test3.add(1, {[SemanticAttributes.HTTP_METHOD]: req.method});
   test2.record(50+Math.round(Math.random()*25), {[SemanticAttributes.HTTP_METHOD]: req.method});

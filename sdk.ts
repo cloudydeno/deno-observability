@@ -1,12 +1,11 @@
-import { DiagConsoleLogger, type TextMapPropagator, diag, metrics, DiagLogLevel } from "./opentelemetry/api.js";
+import { DiagConsoleLogger, type TextMapPropagator, diag, metrics, DiagLogLevel, Attributes } from "./opentelemetry/api.js";
 import { logs } from "./opentelemetry/api-logs.js";
 
 import { OTLPMetricExporterBase } from "./opentelemetry/exporter-metrics-otlp-http.js";
 import { type InstrumentationOption, registerInstrumentations } from "./opentelemetry/instrumentation.js";
 
 import {
-  type DetectorSync,
-  type Resource,
+  type DetectorSync, Resource,
   detectResourcesSync,
   envDetectorSync,
   hostDetectorSync,
@@ -52,6 +51,7 @@ export class DenoTelemetrySdk {
   constructor(props?: {
     detectors?: DetectorSync[];
     resource?: Resource;
+    resourceAttrs?: Attributes;
     instrumentations?: InstrumentationOption[];
     propagator?: TextMapPropagator;
     idGenerator?: IdGenerator;
@@ -74,8 +74,13 @@ export class DenoTelemetrySdk {
         osDetectorSync,
         envDetectorSync,
       ],
-    }).merge(props?.resource ?? null);
-
+    });
+    if (props?.resource) {
+      this.resource = this.resource.merge(props.resource);
+    }
+    if (props?.resourceAttrs) {
+      this.resource = this.resource.merge(new Resource(props.resourceAttrs));
+    }
 
     this.tracer = new BasicTracerProvider({
       resource: this.resource,
