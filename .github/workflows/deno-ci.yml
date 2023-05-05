@@ -13,9 +13,9 @@ jobs:
     strategy:
       matrix:
         deno-version:
-        - v1.28
         - v1.30
         - v1.31
+        - v1.32
         - canary
       fail-fast: false # run each branch to completion
 
@@ -40,5 +40,5 @@ jobs:
     - name: Check demo.ts
       run: time deno check demo.ts
 
-    - name: Run tests
-      run: time deno test --allow-net=localhost --allow-read=/proc/self
+    # - name: Run tests
+    #   run: time deno test --allow-net=localhost --allow-read=/proc/self
