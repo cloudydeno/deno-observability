@@ -159,6 +159,11 @@ export async function buildModuleWithRollup(directory: string, modName: string, 
     text = text.replaceAll("declare const enum", "declare enum"); // Cannot access ambient const enums when 'isolatedModules' is enabled.
     text = text.replace("PROCESS_RUNTIME_NAME]: 'node',", "PROCESS_RUNTIME_NAME]: 'deno',");
     text = text.replace("TELEMETRY_SDK_LANGUAGE]: TelemetrySdkLanguageValues.NODEJS,", "TELEMETRY_SDK_LANGUAGE]: 'js',");
+    text = text.replace("normalizeType(platform())", "Deno.build.os");
+    text = text.replace("HOST_ARCH]: normalizeArch(arch()),", "HOST_ARCH]: normalizeArch(Deno.build.arch),");
+    text = text.replace("HOST_NAME]: hostname(),", "HOST_NAME]: Deno.hostname?.(),");
+    text = text.replace("OS_VERSION]: release(),", "OS_VERSION]: Deno.osRelease(),");
+    text = text.replace("fs.readFile(", "Deno.readTextFile(");
     text = text.replaceAll(/^  +/gm, x => '\t\t\t\t\t\t\t\t'.slice(0, Math.floor(x.length / 4)));
 
     await Deno.writeTextFile('opentelemetry/'+chunk.fileName, text);
@@ -199,9 +204,46 @@ await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/otlp-expor
 
 await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-core/src/platform/node/timer-util.ts',
 `export function unrefTimer(timer: number): void {
-  //@ts-expect-error TODO: deno types in tsc
+  // @ts-expect-error TODO: Deno types in tsc
   Deno.unrefTimer?.(timer);
 }`);
+
+await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-resources/src/platform/node/utils.ts',
+`export const normalizeArch = (archString: string) => ({
+  'x64_64': 'amd64',
+  'aarch64': 'arm64',
+})[archString] ?? archString;
+export const normalizeType = (os: string) => os;`);
+
+await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-resources/src/platform/node/machine-id/getMachineId.ts',
+`import { getMachineId as bsdGetId } from './getMachineId-bsd';
+import { getMachineId as darwinGetId } from './getMachineId-darwin';
+import { getMachineId as linuxGetId } from './getMachineId-linux';
+import { getMachineId as unsupportedGetId } from './getMachineId-unsupported';
+import { getMachineId as winGetId } from './getMachineId-win';
+
+// @ts-expect-error TODO: Deno types in tsc
+export const getMachineId = {
+  'freebsd': bsdGetId,
+  'netbsd': bsdGetId,
+  'darwin': darwinGetId,
+  'linux': linuxGetId,
+  'windows': winGetId,
+}[Deno.build.os] ?? unsupportedGetId;
+`);
+
+await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-resources/src/platform/node/machine-id/execAsync.ts',
+`export async function execAsync(command: string) {
+  const [cmd, ...args] = command.replaceAll('"', '').split(' ');
+  // @ts-expect-error TODO: Deno types in tsc
+  const output = await new Deno.Command(cmd, {
+    args,
+    stdout: 'piped',
+  }).output();
+  if (!output.success) throw new Error(\`\${cmd} exited with code \${output.code}\`);
+  return { stdout: new TextDecoder().decode(output.stdout) };
+}
+`);
 
 // TODO: maybe put a deno impl in there?
 await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/otlp-exporter-base/src/platform/index.ts', 'export {};');
@@ -255,7 +297,7 @@ for (const mod of modules) {
   const tsc = new Deno.Command('hack/opentelemetry-js/node_modules/.bin/tsc', {
     args: [
       '--project', mod+'/tsconfig.esnext.json',
-      '--target', 'es2020',
+      '--target', 'es2021',
       '--module', 'es2020',
       // '--lib', TODO: can we provide deno's lib somehow?
     ],

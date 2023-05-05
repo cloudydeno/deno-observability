@@ -1533,7 +1533,7 @@ class HashMap {
 		this._keyMap = new Map();
 	}
 	get(key, hashCode) {
-		hashCode ?? (hashCode = this._hash(key));
+		hashCode ??= this._hash(key);
 		return this._valueMap.get(hashCode);
 	}
 	getOrDefault(key, defaultFactory) {
@@ -1549,14 +1549,14 @@ class HashMap {
 		return val;
 	}
 	set(key, value, hashCode) {
-		hashCode ?? (hashCode = this._hash(key));
+		hashCode ??= this._hash(key);
 		if (!this._keyMap.has(hashCode)) {
 			this._keyMap.set(hashCode, key);
 		}
 		this._valueMap.set(hashCode, value);
 	}
 	has(key, hashCode) {
-		hashCode ?? (hashCode = this._hash(key));
+		hashCode ??= this._hash(key);
 		return this._valueMap.has(hashCode);
 	}
 	*keys() {

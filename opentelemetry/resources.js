@@ -26,28 +26,11 @@ function defaultServiceName() {
 	return `unknown_service:deno`;
 }
 
-const normalizeArch = (nodeArchString) => {
-	switch (nodeArchString) {
-		case 'arm':
-			return 'arm32';
-		case 'ppc':
-			return 'ppc32';
-		case 'x64':
-			return 'amd64';
-		default:
-			return nodeArchString;
-	}
-};
-const normalizeType = (nodePlatform) => {
-	switch (nodePlatform) {
-		case 'sunos':
-			return 'solaris';
-		case 'win32':
-			return 'windows';
-		default:
-			return nodePlatform;
-	}
-};
+const normalizeArch = (archString) => ({
+	'x64_64': 'amd64',
+	'aarch64': 'arm64',
+})[archString] ?? archString;
+const normalizeType = (os) => os;
 
 async function getMachineId() {
 	const paths = ['/etc/machine-id', '/var/lib/dbus/machine-id'];
@@ -66,8 +49,8 @@ async function getMachineId() {
 class HostDetectorSync {
 	detect(_config) {
 		const attributes = {
-			[SemanticResourceAttributes.HOST_NAME]: hostname(),
-			[SemanticResourceAttributes.HOST_ARCH]: normalizeArch(arch()),
+			[SemanticResourceAttributes.HOST_NAME]: Deno.hostname?.(),
+			[SemanticResourceAttributes.HOST_ARCH]: normalizeArch(Deno.build.arch),
 		};
 		return new Resource(attributes, this._getAsyncAttributes());
 	}
@@ -93,8 +76,8 @@ const hostDetector = new HostDetector();
 class OSDetectorSync {
 	detect(_config) {
 		const attributes = {
-			[SemanticResourceAttributes.OS_TYPE]: normalizeType(platform()),
-			[SemanticResourceAttributes.OS_VERSION]: release(),
+			[SemanticResourceAttributes.OS_TYPE]: Deno.build.os,
+			[SemanticResourceAttributes.OS_VERSION]: Deno.osRelease(),
 		};
 		return new Resource(attributes);
 	}
