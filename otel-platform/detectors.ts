@@ -3,7 +3,7 @@ import { SemanticResourceAttributes } from "../opentelemetry/semantic-convention
 
 const runtimeResource = new Resource({
   [SemanticResourceAttributes.PROCESS_RUNTIME_NAME]: 'deno',
-  [SemanticResourceAttributes.PROCESS_RUNTIME_DESCRIPTION]: 'Deno Runtime',
+  // [SemanticResourceAttributes.PROCESS_RUNTIME_DESCRIPTION]: 'Deno Runtime',
 });
 export class DenoRuntimeDetector implements DetectorSync {
   detect() {
@@ -13,7 +13,10 @@ export class DenoRuntimeDetector implements DetectorSync {
     }
 
     // Deno Deploy does this:
-    if (!Deno.version?.deno) return runtimeResource;
+    if (!Deno.version?.deno) return new Resource({
+      [SemanticResourceAttributes.PROCESS_RUNTIME_NAME]: 'deno',
+      [SemanticResourceAttributes.PROCESS_RUNTIME_DESCRIPTION]: 'Deno Deploy hosted runtime',
+    });
 
     return runtimeResource.merge(new Resource({
       [SemanticResourceAttributes.PROCESS_RUNTIME_VERSION]: Deno.version.deno,

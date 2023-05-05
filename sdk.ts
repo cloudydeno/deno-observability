@@ -31,8 +31,9 @@ import {
   OTLPTracesExporter,
   OTLPMetricsExporter,
   OTLPLogsExporter,
-} from "./otel-platform/otlp-exporters.ts";
+} from "./otel-platform/otlp-json-exporters.ts";
 import { getEnv } from "./opentelemetry/core.js";
+import { getDenoAutoInstrumentations } from "./instrumentation/auto.ts";
 
 const env = getEnv();
 diag.setLogger(new DiagConsoleLogger(), env.OTEL_LOG_LEVEL);
@@ -116,12 +117,10 @@ export class DenoTelemetrySdk {
       resourceBase: props?.otlpEndpointBase,
     })));
 
-    if (props?.instrumentations) {
-      registerInstrumentations({
-        tracerProvider: this.tracer,
-        meterProvider: this.meter,
-        instrumentations: props.instrumentations,
-      });
-    }
+    registerInstrumentations({
+      tracerProvider: this.tracer,
+      meterProvider: this.meter,
+      instrumentations: props?.instrumentations ?? getDenoAutoInstrumentations(),
+    });
   }
 }

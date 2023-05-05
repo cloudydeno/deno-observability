@@ -1,3 +1,10 @@
+function decToHex(decStr: string) {
+  return BigInt(decStr).toString(16);
+}
+function hexToDec(hexStr: string) {
+  return BigInt(`0x${hexStr}`).toString(10);
+}
+
 // Copyright 2020 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,7 +27,6 @@ import {
   TextMapSetter,
   TextMapGetter,
 } from '../../opentelemetry/api.js';
-import {decToHex, hexToDec} from "https://esm.sh/hex2dec@1.1.2";
 
 /**
  * This file implements propagation for the Stackdriver Trace v1 Trace Context
@@ -84,7 +90,7 @@ export class CloudPropagator implements TextMapPropagator {
 
     const spanContext = {
       traceId: matches[1],
-      spanId: decToHex(matches[2], {prefix: false})!.padStart(16, '0'),
+      spanId: decToHex(matches[2]).padStart(16, '0'),
       traceFlags:
         isNaN(Number(matches[3])) || matches[3] === '0'
           ? TraceFlags.NONE

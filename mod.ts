@@ -6,12 +6,13 @@ export { httpTracer } from './instrumentation/http-server.ts';
 export { SubProcessInstrumentation } from './instrumentation/subprocess.ts';
 export { FetchInstrumentation } from './instrumentation/fetch.ts';
 export { DenoRuntimeInstrumentation } from './instrumentation/deno-runtime.ts';
+export { getDenoAutoInstrumentations } from './instrumentation/auto.ts';
 
 export {
   OTLPTracesExporter,
   OTLPMetricsExporter,
   OTLPLogsExporter,
-} from "./otel-platform/otlp-exporters.ts";
+} from "./otel-platform/otlp-json-exporters.ts";
 
 export {
   DenoTelemetrySdk,

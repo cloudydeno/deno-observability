@@ -7,9 +7,6 @@ import { Resource } from "./opentelemetry/resources.js";
 import { SemanticAttributes } from "./opentelemetry/semantic-conventions.js";
 
 import { DenoTelemetrySdk } from './sdk.ts'
-import { FetchInstrumentation } from './instrumentation/fetch.ts';
-import { SubProcessInstrumentation } from './instrumentation/subprocess.ts';
-import { DenoRuntimeInstrumentation } from './instrumentation/deno-runtime.ts';
 import { httpTracer } from "./instrumentation/http-server.ts";
 
 new DenoTelemetrySdk({
@@ -18,11 +15,6 @@ new DenoTelemetrySdk({
     'deployment.environment': 'local',
     'service.version': 'adhoc',
   }),
-  instrumentations: [
-    new FetchInstrumentation(),
-    new DenoRuntimeInstrumentation(),
-    new SubProcessInstrumentation(),
-  ],
 });
 
 const logger = logs.getLogger('demo.ts');

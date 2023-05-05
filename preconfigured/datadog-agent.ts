@@ -1,10 +1,6 @@
 import { Resource } from "../opentelemetry/resources.js";
 
-import { FetchInstrumentation } from "../instrumentation/fetch.ts";
-import { SubProcessInstrumentation } from "../instrumentation/subprocess.ts";
-import { registerDenoRuntimeMetrics } from "../instrumentation/deno-runtime.ts";
 import { DenoTelemetrySdk } from "../sdk.ts";
-
 import { DatadogPropagator } from "../otel-platform/propagators/datadog.ts";
 
 /**
@@ -17,13 +13,7 @@ export const sdk = new DenoTelemetrySdk({
     'service.version': Deno.env.get('DD_VERSION'),
     'deployment.environment': Deno.env.get('DD_ENV'),
   }),
-  instrumentations: [
-    new FetchInstrumentation(),
-    new SubProcessInstrumentation(),
-  ],
   propagator: new DatadogPropagator(),
   otlpEndpointBase: Deno.env.get('OTEL_EXPORTER_OTLP_ENDPOINT')
     ?? `http://${Deno.env.get('DD_AGENT_HOST') ?? 'localhost'}:4318`,
 });
-
-registerDenoRuntimeMetrics();
