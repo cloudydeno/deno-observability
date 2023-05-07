@@ -264,7 +264,7 @@ export class DenoKvInstrumentation extends InstrumentationBase {
    * implements enable function
    */
   override async enable() {
-    const AtomicOperation = await Deno.openKv(':memory:').then(x => x.atomic().constructor);
+    const AtomicOperation = await Deno.openKv().then(x => x.atomic().constructor);
 
     if (isWrapped(Deno.Kv.prototype['get'])) {
       this._unwrap(Deno.Kv.prototype, 'get');
