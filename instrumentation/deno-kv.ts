@@ -4,6 +4,10 @@
 // So we just don't know when additional batches are pulled.
 // (I guess we could monitor the number of results and compare to the desired batch size, but, ew)
 
+// Also, Deno KV is --unstable (and probably will be for a bit?)
+// so this file doesn't typecheck without --unstable
+// Should be ok since Deno doesn't typecheck remote modules by default anymore.
+
 import { Span, SpanKind } from "../opentelemetry/api.js";
 import {
   isWrapped,

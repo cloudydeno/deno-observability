@@ -38,7 +38,7 @@ jobs:
         restore-keys: deno-https/v1-
 
     - name: Check demo.ts
-      run: time deno check demo.ts
+      run: time deno check --unstable demo.ts
 
     # - name: Run tests
     #   run: time deno test --allow-net=localhost --allow-read=/proc/self
