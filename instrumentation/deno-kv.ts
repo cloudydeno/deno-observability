@@ -7,6 +7,8 @@
 // Also, Deno KV is --unstable (and probably will be for a bit?)
 // so this file doesn't typecheck without --unstable
 // Should be ok since Deno doesn't typecheck remote modules by default anymore.
+// well, whatever
+// @ts-nocheck
 
 import { Span, SpanKind } from "../opentelemetry/api.js";
 import {
