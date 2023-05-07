@@ -96,20 +96,19 @@ export class DenoTelemetrySdk {
       resourceBase: props?.otlpEndpointBase,
     })));
 
-
     this.meter = new MeterProvider({
       resource: this.resource,
       views: props?.metricsViews,
     });
     metrics.setGlobalMeterProvider(this.meter);
 
-    // Metrics export on a fixed timer, so let the user disable the requests entirely
-    if (props?.metricsExportIntervalMillis !== 0) {
+  // Metrics export on a fixed timer, so make the user opt-in to them
+    if ((props?.metricsExportIntervalMillis ?? 0) > 0) {
       this.meter.addMetricReader(new PeriodicExportingMetricReader({
         exporter: new OTLPMetricExporterBase(new OTLPMetricsExporter({
           resourceBase: props?.otlpEndpointBase,
         })),
-        exportIntervalMillis: props?.metricsExportIntervalMillis ?? 20_000,
+        exportIntervalMillis: props?.metricsExportIntervalMillis,
       }));
     }
 
