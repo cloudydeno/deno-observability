@@ -154,15 +154,13 @@ export async function buildModuleWithRollup(directory: string, modName: string, 
     text = text.replace("import * as shimmer from 'npm:shimmer';", "import shimmer from 'npm:shimmer';");
     // text = text.replace("os.userInfo()", "") // this is ok if it just doesn't work so w/e
     text = text.replace("promises.readFile(path, { encoding: 'utf8' })", "Deno.readTextFile(path)");
-    text = text.replace("import { hostname, arch, platform, release } from 'node:os';",
-      `const hostname = () => Deno.hostname?.(), arch = Deno.build.arch, platform = Deno.build.os, release = () => Deno.osRelease();`);
     text = text.replaceAll("declare const enum", "declare enum"); // Cannot access ambient const enums when 'isolatedModules' is enabled.
     text = text.replace("PROCESS_RUNTIME_NAME]: 'node',", "PROCESS_RUNTIME_NAME]: 'deno',");
     text = text.replace("TELEMETRY_SDK_LANGUAGE]: TelemetrySdkLanguageValues.NODEJS,", "TELEMETRY_SDK_LANGUAGE]: 'js',");
     text = text.replace("normalizeType(platform())", "Deno.build.os");
     text = text.replace("HOST_ARCH]: normalizeArch(arch()),", "HOST_ARCH]: normalizeArch(Deno.build.arch),");
     text = text.replace("HOST_NAME]: hostname(),", "HOST_NAME]: Deno.hostname?.(),");
-    text = text.replace("OS_VERSION]: release(),", "OS_VERSION]: Deno.osRelease(),");
+    text = text.replace("OS_VERSION]: release(),", "OS_VERSION]: Deno.osRelease?.(),");
     text = text.replace("fs.readFile(", "Deno.readTextFile(");
     text = text.replaceAll(/^  +/gm, x => '\t\t\t\t\t\t\t\t'.slice(0, Math.floor(x.length / 4)));
 

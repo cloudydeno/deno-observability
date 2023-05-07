@@ -77,7 +77,7 @@ class OSDetectorSync {
 	detect(_config) {
 		const attributes = {
 			[SemanticResourceAttributes.OS_TYPE]: Deno.build.os,
-			[SemanticResourceAttributes.OS_VERSION]: Deno.osRelease(),
+			[SemanticResourceAttributes.OS_VERSION]: Deno.osRelease?.(),
 		};
 		return new Resource(attributes);
 	}
