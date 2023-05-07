@@ -1,5 +1,8 @@
-// This whole file has type issues and needs revising.
-// @ts-nocheck
+// I don't really like how this came out, but it does give KV visibility ok.
+// The biggest pain point standing is around kv.list() which operates in batches.
+// We can't really hook into the list batch mechanism :(
+// So we just don't know when additional batches are pulled.
+// (I guess we could monitor the number of results and compare to the desired batch size, but, ew)
 
 import { Span, SpanKind } from "../opentelemetry/api.js";
 import {
@@ -13,6 +16,7 @@ const listSpans = new WeakMap<Deno.KvListIterator<unknown>, {span: Span, docCoun
 export class DenoKvInstrumentation extends InstrumentationBase {
   readonly component: string = 'deno-kv';
   moduleName = this.component;
+  atomicOpClass?: typeof Deno.AtomicOperation.constructor;
 
   constructor(config?: InstrumentationConfig) {
     super('deno-kv', '0.1.0', config);
@@ -20,21 +24,39 @@ export class DenoKvInstrumentation extends InstrumentationBase {
 
   init(): void {}
 
+  private _patchAtomic(): (original: typeof Deno.Kv.prototype.atomic) => typeof Deno.Kv.prototype.atomic {
+    return original => {
+      const plugin = this;
+      return function patchAtomic(
+        this: Deno.Kv,
+      ): Deno.AtomicOperation {
+        const op = original.call(this);
+        if (!plugin.atomicOpClass) {
+          plugin.atomicOpClass = op.constructor as typeof Deno.AtomicOperation.constructor;
+          plugin.hookAtomicOpClass();
+        }
+        return op;
+      };
+    };
+  }
+
   private _patchGet(): (original: typeof Deno.Kv.prototype.get) => typeof Deno.Kv.prototype.get {
     return original => {
       const plugin = this;
       return async function patchGet(
         this: Deno.Kv,
         key: Deno.KvKey,
-        opts?: {},
-      ): Promise<Deno.KvEntryMaybe<unknown>> {
+        opts?: {
+          consistency?: Deno.KvConsistencyLevel;
+        },
+      ): Promise<Deno.KvEntryMaybe<any>> {
 
-        const span = plugin.tracer.startSpan(`KV get`, {
+        const span = plugin.tracer.startSpan(`Kv get`, {
           kind: SpanKind.CLIENT,
           attributes: {
             'db.system': 'deno-kv',
             'db.operation': 'get',
-            'deno.kv.key': key,
+            'deno.kv.key': JSON.parse(JSON.stringify(key)),
             'deno.kv.consistency_level': opts?.consistency ?? 'strong',
           },
         });
@@ -42,8 +64,8 @@ export class DenoKvInstrumentation extends InstrumentationBase {
         try {
           const result = await original.call(this, key, opts);
           span.setAttributes({
-            // 'deno.kv.exists': result.value !== 'null',
-            'deno.kv.versionstamp': result.versionstamp,
+            'deno.kv.exists': result.versionstamp != null,
+            'deno.kv.versionstamp': result.versionstamp ?? undefined,
           });
           span.end();
           return result;
@@ -61,18 +83,18 @@ export class DenoKvInstrumentation extends InstrumentationBase {
       const plugin = this;
       return async function patchGetMany(
         this: Deno.Kv,
-        keys: Deno.KvKey[],
+        keys: readonly Deno.KvKey[],
         opts?: {
           consistency?: Deno.KvConsistencyLevel;
         },
-      ): Promise<readonly Deno.KvEntryMaybe<unknown>[]> {
+      ): Promise<any> {
 
-        const span = plugin.tracer.startSpan(`KV getMany`, {
+        const span = plugin.tracer.startSpan(`Kv getMany`, {
           kind: SpanKind.CLIENT,
           attributes: {
             'db.system': 'deno-kv',
             'db.operation': 'getMany',
-            'deno.kv.keys': keys,
+            'deno.kv.keys': JSON.parse(JSON.stringify(keys)),
             'deno.kv.consistency_level': opts?.consistency ?? 'strong',
           },
         });
@@ -80,8 +102,8 @@ export class DenoKvInstrumentation extends InstrumentationBase {
         try {
           const result = await original.call(this, keys, opts);
           span.setAttributes({
-            // 'deno.kv.exists': result.value !== 'null',
-            'deno.kv.versionstamps': result.map(x => x.versionstamp),
+            'deno.kv.keys_exist': result.map(x => x.versionstamp !== null),
+            'deno.kv.versionstamps': result.map(x => x.versionstamp ?? undefined),
           });
           span.end();
           return result;
@@ -101,9 +123,9 @@ export class DenoKvInstrumentation extends InstrumentationBase {
         this: Deno.Kv,
         selector: Deno.KvListSelector,
         opts?: Deno.KvListOptions,
-      ): Deno.KvListIterator<unknown> {
+      ): Deno.KvListIterator<any> {
 
-        const span = plugin.tracer.startSpan(`KV list`, {
+        const span = plugin.tracer.startSpan(`Kv list`, {
           kind: SpanKind.CLIENT,
           attributes: {
             'db.system': 'deno-kv',
@@ -112,7 +134,7 @@ export class DenoKvInstrumentation extends InstrumentationBase {
           },
         });
         for (const [k, v] of Object.entries(selector)) {
-          span.setAttribute(`deno.kv.selector.${k}`, v);
+          span.setAttribute(`deno.kv.selector.${k}`, JSON.parse(JSON.stringify(v)));
         }
         for (const [k, v] of Object.entries(opts ?? {})) {
           if (k == 'consistency') continue;
@@ -141,12 +163,12 @@ export class DenoKvInstrumentation extends InstrumentationBase {
         value: unknown,
       ): Promise<Deno.KvCommitResult> {
 
-        const span = plugin.tracer.startSpan(`KV set`, {
+        const span = plugin.tracer.startSpan(`Kv set`, {
           kind: SpanKind.CLIENT,
           attributes: {
             'db.system': 'deno-kv',
             'db.operation': 'set',
-            'deno.kv.key': key,
+            'deno.kv.key': JSON.parse(JSON.stringify(key)),
           },
         });
 
@@ -174,12 +196,12 @@ export class DenoKvInstrumentation extends InstrumentationBase {
         key: Deno.KvKey,
       ): Promise<void> {
 
-        const span = plugin.tracer.startSpan(`KV delete`, {
+        const span = plugin.tracer.startSpan(`Kv delete`, {
           kind: SpanKind.CLIENT,
           attributes: {
             'db.system': 'deno-kv',
             'db.operation': 'delete',
-            'deno.kv.key': key,
+            'deno.kv.key': JSON.parse(JSON.stringify(key)),
           },
         });
 
@@ -203,7 +225,7 @@ export class DenoKvInstrumentation extends InstrumentationBase {
         this: Deno.AtomicOperation,
       ): Promise<Deno.KvCommitResult | Deno.KvCommitError> {
 
-        const span = plugin.tracer.startSpan(`KV commit`, {
+        const span = plugin.tracer.startSpan(`Kv commit`, {
           kind: SpanKind.CLIENT,
           attributes: {
             'db.system': 'deno-kv',
@@ -233,29 +255,47 @@ export class DenoKvInstrumentation extends InstrumentationBase {
       ): Promise<IteratorResult<Deno.KvEntry<unknown>, undefined>> {
 
         const ref = listSpans.get(this);
-        try {
-          const result = await original.call(this);
-          if (ref) {
-            if (result.done) {
-              ref.span.setAttributes({
-                'deno.kv.returned_keys': ref.docCount as number,
-              });
-              ref.span.end();
-              listSpans.delete(this);
-            } else {
-              if (ref.docCount == 0) {
-                ref.span.addEvent('first-result');
-              }
-              ref.docCount++;
-            }
+        if (ref) {
+          try {
+            const result = await original.call(this);
+            ref.span.end();
+            return result;
+          } catch (err) {
+            ref.span.recordException(err);
+            ref.span.end();
+            throw err;
+          } finally {
+            listSpans.delete(this);
           }
-          return result;
-        } catch (err) {
-          ref?.span.recordException(err);
-          ref?.span.end();
-          listSpans.delete(this);
-          throw err;
+        } else {
+          return original.call(this);
         }
+
+        // this doesn't work (span never ends) if the application does not iterate to completion:
+
+        // try {
+        //   const result = await original.call(this);
+        //   if (ref) {
+        //     if (result.done) {
+        //       ref.span.setAttributes({
+        //         'deno.kv.returned_keys': ref.docCount as number,
+        //       });
+        //       ref.span.end();
+        //       listSpans.delete(this);
+        //     } else {
+        //       if (ref.docCount == 0) {
+        //         ref.span.addEvent('first-result');
+        //       }
+        //       ref.docCount++;
+        //     }
+        //   }
+        //   return result;
+        // } catch (err) {
+        //   ref?.span.recordException(err);
+        //   ref?.span.end();
+        //   listSpans.delete(this);
+        //   throw err;
+        // }
       };
     };
   }
@@ -264,44 +304,41 @@ export class DenoKvInstrumentation extends InstrumentationBase {
    * implements enable function
    */
   override async enable() {
-    const AtomicOperation = await Deno.openKv().then(x => x.atomic().constructor);
-
     if (isWrapped(Deno.Kv.prototype['get'])) {
       this._unwrap(Deno.Kv.prototype, 'get');
-      this._diag.debug('removing previous patch for KV.get');
+      this._diag.debug('removing previous patch for Kv.get');
     }
     this._wrap(Deno.Kv.prototype, 'get', this._patchGet());
 
     if (isWrapped(Deno.Kv.prototype['getMany'])) {
       this._unwrap(Deno.Kv.prototype, 'getMany');
-      this._diag.debug('removing previous patch for KV.getMany');
+      this._diag.debug('removing previous patch for Kv.getMany');
     }
     this._wrap(Deno.Kv.prototype, 'getMany', this._patchGetMany());
 
     if (isWrapped(Deno.Kv.prototype['list'])) {
       this._unwrap(Deno.Kv.prototype, 'list');
-      this._diag.debug('removing previous patch for KV.list');
+      this._diag.debug('removing previous patch for Kv.list');
     }
     this._wrap(Deno.Kv.prototype, 'list', this._patchList());
 
     if (isWrapped(Deno.Kv.prototype['set'])) {
       this._unwrap(Deno.Kv.prototype, 'set');
-      this._diag.debug('removing previous patch for KV.set');
+      this._diag.debug('removing previous patch for Kv.set');
     }
     this._wrap(Deno.Kv.prototype, 'set', this._patchSet());
 
+    if (isWrapped(Deno.Kv.prototype['atomic'])) {
+      this._unwrap(Deno.Kv.prototype, 'atomic');
+      this._diag.debug('removing previous patch for Kv.atomic');
+    }
+    this._wrap(Deno.Kv.prototype, 'atomic', this._patchAtomic());
+
     if (isWrapped(Deno.Kv.prototype['delete'])) {
       this._unwrap(Deno.Kv.prototype, 'delete');
-      this._diag.debug('removing previous patch for KV.delete');
+      this._diag.debug('removing previous patch for Kv.delete');
     }
     this._wrap(Deno.Kv.prototype, 'delete', this._patchDelete());
-
-    if (isWrapped(AtomicOperation.prototype['commit'])) {
-      this._unwrap(AtomicOperation.prototype, 'commit');
-      this._diag.debug('removing previous patch for AtomicOperation.commit');
-    }
-    this._wrap(AtomicOperation.prototype, 'commit', this._patchAtomicCommit());
-
 
     if (isWrapped(Deno.KvListIterator.prototype['next'])) {
       this._unwrap(Deno.KvListIterator.prototype, 'next');
@@ -310,18 +347,32 @@ export class DenoKvInstrumentation extends InstrumentationBase {
     this._wrap(Deno.KvListIterator.prototype, 'next', this._patchListNext())
   }
 
+  hookAtomicOpClass() {
+    if (!this.atomicOpClass) throw new Error('BUG: no atomicOpClass');
+    if (isWrapped(this.atomicOpClass.prototype['commit'])) {
+      this._unwrap(this.atomicOpClass.prototype, 'commit');
+      this._diag.debug('removing previous patch for AtomicOperation.commit');
+    }
+    this._wrap(this.atomicOpClass.prototype, 'commit', this._patchAtomicCommit());
+
+    // Once we have the AtomicOperation prototype we don't need to hook atomic() anymore
+    this._unwrap(Deno.Kv.prototype, 'atomic');
+  }
+
   /**
    * implements unpatch function
    */
   override async disable() {
-    const AtomicOperation = await Deno.openKv(':memory:').then(x => x.atomic().constructor);
-
+    this._unwrap(Deno.Kv.prototype, 'atomic');
     this._unwrap(Deno.Kv.prototype, 'get');
     this._unwrap(Deno.Kv.prototype, 'getMany');
     this._unwrap(Deno.Kv.prototype, 'list');
     this._unwrap(Deno.Kv.prototype, 'set');
     this._unwrap(Deno.Kv.prototype, 'delete');
-    this._unwrap(AtomicOperation.prototype, 'commit');
     this._unwrap(Deno.KvListIterator.prototype, 'next');
+
+    if (this.atomicOpClass) {
+      this._unwrap(this.atomicOpClass.prototype, 'commit');
+    }
   }
 }
