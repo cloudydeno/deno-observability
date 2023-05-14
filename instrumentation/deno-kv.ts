@@ -227,7 +227,7 @@ export class DenoKvInstrumentation extends InstrumentationBase {
   private _patchAtomicCommit(): (original: typeof Deno.AtomicOperation.prototype.commit) => typeof Deno.AtomicOperation.prototype.commit{
     return original => {
       const plugin = this;
-      return function patchCommit(
+      return async function patchCommit(
         this: Deno.AtomicOperation,
       ): Promise<Deno.KvCommitResult | Deno.KvCommitError> {
 
@@ -241,7 +241,7 @@ export class DenoKvInstrumentation extends InstrumentationBase {
         });
 
         try {
-          const result = original.call(this);
+          const result = await original.call(this);
           span.end();
           return result;
         } catch (err) {
