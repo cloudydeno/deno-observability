@@ -901,6 +901,9 @@ class ConsoleSpanExporter {
 	}
 	shutdown() {
 		this._sendSpans([]);
+		return this.forceFlush();
+	}
+	forceFlush() {
 		return Promise.resolve();
 	}
 	_exportInfo(span) {
@@ -946,6 +949,9 @@ class InMemorySpanExporter {
 	shutdown() {
 		this._stopped = true;
 		this._finishedSpans = [];
+		return this.forceFlush();
+	}
+	forceFlush() {
 		return Promise.resolve();
 	}
 	reset() {
@@ -964,6 +970,9 @@ class SimpleSpanProcessor {
 	}
 	async forceFlush() {
 		await Promise.all(Array.from(this._unresolvedExports));
+		if (this._exporter.forceFlush) {
+			await this._exporter.forceFlush();
+		}
 	}
 	onStart(_span, _parentContext) { }
 	onEnd(span) {

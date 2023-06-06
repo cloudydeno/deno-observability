@@ -77,6 +77,10 @@ declare abstract class OTLPExporterBase<T extends OTLPExporterConfigBase, Export
 	*/
 	shutdown(): Promise<void>;
 	/**
+	* Exports any pending spans in the exporter
+	*/
+	forceFlush(): Promise<void>;
+	/**
 	* Called by _shutdownOnce with BindOnceFuture
 	*/
 	private _shutdown;

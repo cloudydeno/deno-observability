@@ -16,9 +16,9 @@
 
 import { IResource } from './resources.d.ts';
 import * as logsAPI from './api-logs.d.ts';
-import { SeverityNumber } from './api-logs.d.ts';
+import { SeverityNumber, LogAttributes } from './api-logs.d.ts';
 import * as api from './api.d.ts';
-import { HrTime, SpanContext, Attributes, AttributeValue, Context } from './api.d.ts';
+import { HrTime, SpanContext, AttributeValue, Context } from './api.d.ts';
 import { InstrumentationScope, ExportResult } from './core.d.ts';
 
 interface LoggerProviderConfig {
@@ -35,8 +35,6 @@ interface LoggerProviderConfig {
 interface LoggerConfig {
 	/** Log Record Limits*/
 	logRecordLimits?: LogRecordLimits;
-	/** include Trace Context */
-	includeTraceContext?: boolean;
 }
 interface LogRecordLimits {
 	/** attributeValueLengthLimit is maximum allowed attribute value size */
@@ -67,13 +65,14 @@ interface BatchLogRecordProcessorBrowserConfig extends BufferConfig {
 
 interface ReadableLogRecord {
 	readonly hrTime: HrTime;
+	readonly hrTimeObserved: HrTime;
 	readonly spanContext?: SpanContext;
 	readonly severityText?: string;
 	readonly severityNumber?: SeverityNumber;
 	readonly body?: string;
 	readonly resource: IResource;
 	readonly instrumentationScope: InstrumentationScope;
-	readonly attributes: Attributes;
+	readonly attributes: LogAttributes;
 }
 
 declare class Logger implements logsAPI.Logger {
@@ -89,10 +88,11 @@ declare class Logger implements logsAPI.Logger {
 
 declare class LogRecord implements ReadableLogRecord {
 	readonly hrTime: api.HrTime;
+	readonly hrTimeObserved: api.HrTime;
 	readonly spanContext?: api.SpanContext;
 	readonly resource: IResource;
 	readonly instrumentationScope: InstrumentationScope;
-	readonly attributes: Attributes;
+	readonly attributes: logsAPI.LogAttributes;
 	private _severityText?;
 	private _severityNumber?;
 	private _body?;
@@ -105,8 +105,8 @@ declare class LogRecord implements ReadableLogRecord {
 	set body(body: string | undefined);
 	get body(): string | undefined;
 	constructor(logger: Logger, logRecord: logsAPI.LogRecord);
-	setAttribute(key: string, value?: AttributeValue): this;
-	setAttributes(attributes: Attributes): this;
+	setAttribute(key: string, value?: LogAttributes | AttributeValue): this;
+	setAttributes(attributes: LogAttributes): this;
 	setBody(body: string): this;
 	setSeverityNumber(severityNumber: logsAPI.SeverityNumber): this;
 	setSeverityText(severityText: string): this;
@@ -291,4 +291,4 @@ declare class BatchLogRecordProcessor extends BatchLogRecordProcessorBase<Buffer
 	protected onShutdown(): void;
 }
 
-export { BatchLogRecordProcessor, BatchLogRecordProcessorBrowserConfig, BufferConfig, ConsoleLogRecordExporter, InMemoryLogRecordExporter, LogRecord, LogRecordExporter, LogRecordLimits, LogRecordProcessor, Logger, LoggerConfig, LoggerProvider, NoopLogRecordProcessor, ReadableLogRecord, SimpleLogRecordProcessor };
+export { BatchLogRecordProcessor, BatchLogRecordProcessorBrowserConfig, BufferConfig, ConsoleLogRecordExporter, InMemoryLogRecordExporter, LogRecord, LogRecordExporter, LogRecordLimits, LogRecordProcessor, Logger, LoggerConfig, LoggerProvider, LoggerProviderConfig, NoopLogRecordProcessor, ReadableLogRecord, SimpleLogRecordProcessor };

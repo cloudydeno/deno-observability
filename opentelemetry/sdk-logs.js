@@ -25,8 +25,10 @@ class LogRecord {
 	constructor(logger, logRecord) {
 		this.attributes = {};
 		this._isReadonly = false;
-		const { timestamp = Date.now(), severityNumber, severityText, body, attributes = {}, context, } = logRecord;
-		this.hrTime = timeInputToHrTime(timestamp);
+		const { timestamp, observedTimestamp, severityNumber, severityText, body, attributes = {}, context, } = logRecord;
+		const now = Date.now();
+		this.hrTime = timeInputToHrTime(timestamp ?? now);
+		this.hrTimeObserved = timeInputToHrTime(observedTimestamp ?? now);
 		if (context) {
 			const spanContext = api.trace.getSpanContext(context);
 			if (spanContext && api.isSpanContextValid(spanContext)) {
@@ -74,6 +76,11 @@ class LogRecord {
 		}
 		if (value === null) {
 			return this;
+		}
+		if (typeof value === 'object' &&
+			!Array.isArray(value) &&
+			Object.keys(value).length > 0) {
+			this.attributes[key] = value;
 		}
 		if (key.length === 0) {
 			api.diag.warn(`Invalid attribute key: ${key}`);
@@ -180,9 +187,7 @@ class Logger {
 		this.resource = _loggerProvider.resource;
 	}
 	emit(logRecord) {
-		const currentContext = this._loggerConfig.includeTraceContext
-			? context.active()
-			: undefined;
+		const currentContext = logRecord.context || context.active();
 		const logRecordInstance = new LogRecord(this, {
 			context: currentContext,
 			...logRecord,
@@ -253,7 +258,6 @@ class LoggerProvider {
 		if (!this._loggers.has(key)) {
 			this._loggers.set(key, new Logger({ name: loggerName, version, schemaUrl: options?.schemaUrl }, {
 				logRecordLimits: this._config.logRecordLimits,
-				includeTraceContext: options?.includeTraceContext,
 			}, this));
 		}
 		return this._loggers.get(key);

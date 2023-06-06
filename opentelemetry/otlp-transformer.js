@@ -352,11 +352,11 @@ function logRecordsToResourceLogs(logRecords, useHex) {
 function toLogRecord(log, useHex) {
 	return {
 		timeUnixNano: hrTimeToNanoseconds(log.hrTime),
-		observedTimeUnixNano: hrTimeToNanoseconds(log.hrTime),
+		observedTimeUnixNano: hrTimeToNanoseconds(log.hrTimeObserved),
 		severityNumber: toSeverityNumber(log.severityNumber),
 		severityText: log.severityText,
 		body: toAnyValue(log.body),
-		attributes: toAttributes(log.attributes),
+		attributes: toLogAttributes(log.attributes),
 		droppedAttributesCount: 0,
 		flags: log.spanContext?.traceFlags,
 		traceId: useHex
@@ -374,6 +374,9 @@ function optionalHexToBase64(str) {
 	if (str === undefined)
 		return undefined;
 	return hexToBase64(str);
+}
+function toLogAttributes(attributes) {
+	return Object.keys(attributes).map(key => toKeyValue(key, attributes[key]));
 }
 
 export { ESpanKind, createExportLogsServiceRequest, createExportMetricsServiceRequest, createExportTraceServiceRequest };

@@ -14,8 +14,12 @@
  * limitations under the License.
  */
 
-import { Attributes, Context } from './api.d.ts';
+import { AttributeValue, Context, Attributes } from './api.d.ts';
 
+declare type LogAttributeValue = AttributeValue | LogAttributes;
+interface LogAttributes {
+	[attributeKey: string]: LogAttributeValue | undefined;
+}
 declare enum SeverityNumber {
 	UNSPECIFIED = 0,
 	TRACE = 1,
@@ -49,6 +53,10 @@ interface LogRecord {
 	*/
 	timestamp?: number;
 	/**
+	* Time when the event was observed by the collection system.
+	*/
+	observedTimestamp?: number;
+	/**
 	* Numerical value of the severity.
 	*/
 	severityNumber?: SeverityNumber;
@@ -63,7 +71,7 @@ interface LogRecord {
 	/**
 	* Attributes that define the log record.
 	*/
-	attributes?: Attributes;
+	attributes?: LogAttributes;
 	/**
 	* The Context associated with the LogRecord.
 	*/
@@ -145,4 +153,4 @@ declare class LogsAPI {
 
 declare const logs: LogsAPI;
 
-export { LogRecord, Logger, LoggerOptions, LoggerProvider, NOOP_LOGGER, NOOP_LOGGER_PROVIDER, NoopLogger, NoopLoggerProvider, SeverityNumber, logs };
+export { LogAttributeValue, LogAttributes, LogRecord, Logger, LoggerOptions, LoggerProvider, NOOP_LOGGER, NOOP_LOGGER_PROVIDER, NoopLogger, NoopLoggerProvider, SeverityNumber, logs };

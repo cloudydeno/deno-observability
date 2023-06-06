@@ -225,6 +225,8 @@ interface SpanExporter {
 	export(spans: ReadableSpan[], resultCallback: (result: ExportResult) => void): void;
 	/** Stops the exporter. */
 	shutdown(): Promise<void>;
+	/** Immediately export all spans */
+	forceFlush?(): Promise<void>;
 }
 
 declare type PROPAGATOR_FACTORY = () => TextMapPropagator;
@@ -519,6 +521,10 @@ declare class ConsoleSpanExporter implements SpanExporter {
 	*/
 	shutdown(): Promise<void>;
 	/**
+	* Exports any pending spans in exporter
+	*/
+	forceFlush(): Promise<void>;
+	/**
 	* converts span info into more readable format
 	* @param span
 	*/
@@ -545,6 +551,10 @@ declare class InMemorySpanExporter implements SpanExporter {
 	protected _stopped: boolean;
 	export(spans: ReadableSpan[], resultCallback: (result: ExportResult) => void): void;
 	shutdown(): Promise<void>;
+	/**
+	* Exports any pending spans in the exporter
+	*/
+	forceFlush(): Promise<void>;
 	reset(): void;
 	getFinishedSpans(): ReadableSpan[];
 }

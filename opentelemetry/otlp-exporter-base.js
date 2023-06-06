@@ -129,11 +129,14 @@ class OTLPExporterBase {
 	shutdown() {
 		return this._shutdownOnce.call();
 	}
+	forceFlush() {
+		return Promise.all(this._sendingPromises).then(() => {
+		});
+	}
 	_shutdown() {
 		diag.debug('shutdown started');
 		this.onShutdown();
-		return Promise.all(this._sendingPromises).then(() => {
-		});
+		return this.forceFlush();
 	}
 }
 
