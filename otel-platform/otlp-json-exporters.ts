@@ -135,16 +135,15 @@ export class OTLPTracesExporter
     });
   }
 
-  convert(spans: ReadableSpan[]): IExportTraceServiceRequest {
+  convert(spans: ReadableSpan[]) {
     return createExportTraceServiceRequest(spans, true);
   }
 }
 
 // usage: new OTLPMetricExporterBase(new OTLPExporterDeno())
-export class OTLPMetricsExporter extends OTLPFetchExporterBase<
-  ResourceMetrics,
-  IExportMetricsServiceRequest
-> {
+export class OTLPMetricsExporter
+  extends OTLPFetchExporterBase<ResourceMetrics, IExportMetricsServiceRequest>
+{
   constructor(config?: ExporterOpts) {
     super({
       resourcePath: 'v1/metrics',
@@ -155,10 +154,10 @@ export class OTLPMetricsExporter extends OTLPFetchExporterBase<
   convert = createExportMetricsServiceRequest
 }
 
-export class OTLPLogsExporter extends OTLPFetchExporterBase<
-  ReadableLogRecord,
-  IExportLogsServiceRequest
-> implements LogRecordExporter {
+export class OTLPLogsExporter
+  extends OTLPFetchExporterBase<ReadableLogRecord, IExportLogsServiceRequest>
+  implements LogRecordExporter
+{
   constructor(config?: ExporterOpts) {
     super({
       resourcePath: 'v1/logs',

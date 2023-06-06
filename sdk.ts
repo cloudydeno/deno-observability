@@ -1,4 +1,4 @@
-import { DiagConsoleLogger, type TextMapPropagator, diag, metrics, DiagLogLevel, Attributes } from "./opentelemetry/api.js";
+import { DiagConsoleLogger, type TextMapPropagator, diag, metrics, Attributes, DiagLogger } from "./opentelemetry/api.js";
 import { logs } from "./opentelemetry/api-logs.js";
 
 import { OTLPMetricExporterBase } from "./opentelemetry/exporter-metrics-otlp-http.js";
@@ -13,9 +13,9 @@ import {
 } from "./opentelemetry/resources.js";
 
 // The SDKs for each signal
-import { BasicTracerProvider, BatchSpanProcessor, type IdGenerator, type Sampler } from "./opentelemetry/sdk-trace-base.js";
+import { BasicTracerProvider, BatchSpanProcessor, SpanExporter, type IdGenerator, type Sampler } from "./opentelemetry/sdk-trace-base.js";
 import { MeterProvider, PeriodicExportingMetricReader, type View } from "./opentelemetry/sdk-metrics.js";
-import { BatchLogRecordProcessor, LoggerProvider } from "./opentelemetry/sdk-logs.js";
+import { BatchLogRecordProcessor, LogRecordExporter, LoggerProvider } from "./opentelemetry/sdk-logs.js";
 
 // Our Deno-specific implementations
 import {
@@ -31,11 +31,9 @@ import {
   OTLPMetricsExporter,
   OTLPLogsExporter,
 } from "./otel-platform/otlp-json-exporters.ts";
+
 import { getEnv } from "./opentelemetry/core.js";
 import { getDenoAutoInstrumentations } from "./instrumentation/auto.ts";
-
-const env = getEnv();
-diag.setLogger(new DiagConsoleLogger(), env.OTEL_LOG_LEVEL);
 
 /**
  * A one-stop shop to provide a tracer, a meter, and a logger.
@@ -49,6 +47,7 @@ export class DenoTelemetrySdk {
   public readonly logger: LoggerProvider;
 
   constructor(props?: {
+    diagLogger?: DiagLogger;
     detectors?: DetectorSync[];
     resource?: Resource;
     resourceAttrs?: Attributes;
@@ -59,11 +58,17 @@ export class DenoTelemetrySdk {
     metricsExportIntervalMillis?: number;
     metricsViews?: View[];
     otlpEndpointBase?: string;
+    tracesExporter?: SpanExporter;
+    // metricsExporter?: ;
+    logsExporter?: LogRecordExporter;
   }) {
 
     // if (env.OTEL_SDK_DISABLED) {
     //   return this; // TODO: better?
     // }
+
+    const env = getEnv();
+    diag.setLogger(props?.diagLogger ?? new DiagConsoleLogger(), env.OTEL_LOG_LEVEL);
 
     this.resource = detectResourcesSync({
       detectors: props?.detectors ?? [
@@ -92,9 +97,10 @@ export class DenoTelemetrySdk {
       propagator: props?.propagator,
     });
 
-    this.tracer.addSpanProcessor(new BatchSpanProcessor(new OTLPTracesExporter({
-      resourceBase: props?.otlpEndpointBase,
-    })));
+    this.tracer.addSpanProcessor(new BatchSpanProcessor(props?.tracesExporter
+      ?? new OTLPTracesExporter({
+        resourceBase: props?.otlpEndpointBase,
+      })));
 
     this.meter = new MeterProvider({
       resource: this.resource,
@@ -102,7 +108,7 @@ export class DenoTelemetrySdk {
     });
     metrics.setGlobalMeterProvider(this.meter);
 
-  // Metrics export on a fixed timer, so make the user opt-in to them
+    // Metrics export on a fixed timer, so make the user opt-in to them
     if ((props?.metricsExportIntervalMillis ?? 0) > 0) {
       this.meter.addMetricReader(new PeriodicExportingMetricReader({
         exporter: new OTLPMetricExporterBase(new OTLPMetricsExporter({
@@ -117,9 +123,10 @@ export class DenoTelemetrySdk {
     });
     logs.setGlobalLoggerProvider(this.logger);
 
-    this.logger.addLogRecordProcessor(new BatchLogRecordProcessor(new OTLPLogsExporter({
-      resourceBase: props?.otlpEndpointBase,
-    })));
+    this.logger.addLogRecordProcessor(new BatchLogRecordProcessor(props?.logsExporter
+      ?? new OTLPLogsExporter({
+        resourceBase: props?.otlpEndpointBase,
+      })));
 
     registerInstrumentations({
       tracerProvider: this.tracer,
