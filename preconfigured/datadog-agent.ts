@@ -14,4 +14,7 @@ export const sdk = new DenoTelemetrySdk({
   propagator: new DatadogPropagator(),
   otlpEndpointBase: Deno.env.get('OTEL_EXPORTER_OTLP_ENDPOINT')
     ?? `http://${Deno.env.get('DD_AGENT_HOST') ?? 'localhost'}:4318`,
+  
+  // When running with an agent, we assume an in-cluster situation where requests are cheap
+  metricsExportIntervalMillis: 20_000,
 });
