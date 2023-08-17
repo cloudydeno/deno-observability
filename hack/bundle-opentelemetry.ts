@@ -5,7 +5,7 @@ import { nodeResolve } from 'npm:@rollup/plugin-node-resolve';
 import commonjs from 'npm:@rollup/plugin-commonjs';
 import sourcemaps from 'npm:rollup-plugin-sourcemaps';
 import cleanup from 'npm:rollup-plugin-cleanup';
-import dts from 'npm:rollup-plugin-dts';
+import dts from 'npm:rollup-plugin-dts@4.2.3';
 // import { terser } from "npm:rollup-plugin-terser";
 
 // import magicString from 'npm:rollup-plugin-magic-string'
@@ -104,12 +104,22 @@ export async function buildModuleWithRollup(directory: string, modName: string, 
     // indent: false,
   }));
 
+  const dtsPlugin = dts();
+  const origOptions = dtsPlugin.outputOptions!;
+  dtsPlugin.outputOptions = function (this: Plugin, ...args) {
+    const opts = origOptions.call(this, ...args)
+    opts.interop = 'esModule'
+    delete opts.namespaceToStringTag
+    opts.generatedCode = { symbols: false, ...opts.generatedCode }
+    return opts
+  }
+
   const tsBundle = await rollup({
     input: directory+'/build/esnext/index.d.ts',
     external,
     plugins: [
       // sourcemaps(), // not obeyed by dts plugin
-      dts(),
+      dtsPlugin,
     ],
   }).then(x => x.generate({
     format: 'es',
