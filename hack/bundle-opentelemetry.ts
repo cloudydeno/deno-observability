@@ -1,5 +1,7 @@
 #!/usr/bin/env -S deno run --allow-run --allow-read --allow-write=. --allow-env
 
+// pass --refresh-yarn to force rerunning yarn on the opentelemetry packages
+
 import { rollup, Plugin } from 'npm:rollup';
 import { nodeResolve } from 'npm:@rollup/plugin-node-resolve';
 import commonjs from 'npm:@rollup/plugin-commonjs';
@@ -270,7 +272,9 @@ await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-resources
   await Deno.readTextFile('hack/opentelemetry-js/packages/opentelemetry-resources/src/platform/node/machine-id/getMachineId-linux.ts'));
 
 async function yarnInstall(directory: string) {
-  if (await Deno.stat(directory+'/node_modules').then(() => true, () => false)) return;
+  if (!Deno.args.includes('--refresh-yarn')) {
+    if (await Deno.stat(directory+'/node_modules').then(() => true, () => false)) return;
+  }
   const yarn = new Deno.Command('yarn', {
     args: ['install', /*'--production',*/ '--ignore-scripts'],
     cwd: directory,
