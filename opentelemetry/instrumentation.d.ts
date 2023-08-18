@@ -148,7 +148,7 @@ declare abstract class InstrumentationBase extends InstrumentationAbstract imple
 	constructor(instrumentationName: string, instrumentationVersion: string, config?: InstrumentationConfig);
 }
 
-declare type InstrumentationOption = typeof InstrumentationBase | typeof InstrumentationBase[] | Instrumentation | Instrumentation[];
+declare type InstrumentationOption = typeof InstrumentationBase | (typeof InstrumentationBase)[] | Instrumentation | Instrumentation[];
 interface AutoLoaderResult {
 	instrumentations: Instrumentation[];
 }

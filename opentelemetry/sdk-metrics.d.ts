@@ -378,10 +378,10 @@ declare class ExponentialHistogramAccumulation implements Accumulation {
 	*/
 	updateByIncrement(value: number, increment: number): void;
 	/**
-	* merge combines data from other into self
-	* @param {ExponentialHistogramAccumulation} other
+	* merge combines data from previous value into self
+	* @param {ExponentialHistogramAccumulation} previous
 	*/
-	merge(other: ExponentialHistogramAccumulation): void;
+	merge(previous: ExponentialHistogramAccumulation): void;
 	/**
 	* diff substracts other from self
 	* @param {ExponentialHistogramAccumulation} other

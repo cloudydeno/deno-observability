@@ -731,26 +731,27 @@ class ExponentialHistogramAccumulation {
 			this._updateBuckets(this._negative, -value, increment);
 		}
 	}
-	merge(other) {
+	merge(previous) {
 		if (this._count === 0) {
-			this._min = other.min;
-			this._max = other.max;
+			this._min = previous.min;
+			this._max = previous.max;
 		}
-		else if (other.count !== 0) {
-			if (other.min < this.min) {
-				this._min = other.min;
+		else if (previous.count !== 0) {
+			if (previous.min < this.min) {
+				this._min = previous.min;
 			}
-			if (other.max > this.max) {
-				this._max = other.max;
+			if (previous.max > this.max) {
+				this._max = previous.max;
 			}
 		}
-		this._sum += other.sum;
-		this._count += other.count;
-		this._zeroCount += other.zeroCount;
-		const minScale = this._minScale(other);
+		this.startTime = previous.startTime;
+		this._sum += previous.sum;
+		this._count += previous.count;
+		this._zeroCount += previous.zeroCount;
+		const minScale = this._minScale(previous);
 		this._downscale(this.scale - minScale);
-		this._mergeBuckets(this.positive, other, other.positive, minScale);
-		this._mergeBuckets(this.negative, other, other.negative, minScale);
+		this._mergeBuckets(this.positive, previous, previous.positive, minScale);
+		this._mergeBuckets(this.negative, previous, previous.negative, minScale);
 	}
 	diff(other) {
 		this._min = Infinity;
@@ -1110,7 +1111,7 @@ class HistogramAggregation extends Aggregation {
 		return HistogramAggregation.DEFAULT_INSTANCE;
 	}
 }
-HistogramAggregation.DEFAULT_INSTANCE = new HistogramAggregator([0, 5, 10, 25, 50, 75, 100, 250, 500, 1000], true);
+HistogramAggregation.DEFAULT_INSTANCE = new HistogramAggregator([0, 5, 10, 25, 50, 75, 100, 250, 500, 750, 1000, 2500, 5000, 7500, 10000], true);
 class ExplicitBucketHistogramAggregation extends Aggregation {
 	constructor(boundaries, _recordMinMax = true) {
 		super();
@@ -1414,10 +1415,17 @@ class SyncInstrument {
 		this._descriptor = _descriptor;
 	}
 	_record(value, attributes = {}, context$1 = context.active()) {
+		if (typeof value !== 'number') {
+			diag.warn(`non-number value provided to metric ${this._descriptor.name}: ${value}`);
+			return;
+		}
 		if (this._descriptor.valueType === ValueType.INT &&
 			!Number.isInteger(value)) {
 			diag.warn(`INT value type cannot accept a floating-point value for ${this._descriptor.name}, ignoring the fractional digits.`);
 			value = Math.trunc(value);
+			if (!Number.isInteger(value)) {
+				return;
+			}
 		}
 		this._writableMetricStorage.record(value, attributes, context$1, millisToHrTime(Date.now()));
 	}
@@ -1880,10 +1888,17 @@ class ObservableResultImpl {
 		this._buffer = new AttributeHashMap();
 	}
 	observe(value, attributes = {}) {
+		if (typeof value !== 'number') {
+			diag.warn(`non-number value provided to metric ${this._descriptor.name}: ${value}`);
+			return;
+		}
 		if (this._descriptor.valueType === ValueType.INT &&
 			!Number.isInteger(value)) {
 			diag.warn(`INT value type cannot accept a floating-point value for ${this._descriptor.name}, ignoring the fractional digits.`);
 			value = Math.trunc(value);
+			if (!Number.isInteger(value)) {
+				return;
+			}
 		}
 		this._buffer.set(attributes, value);
 	}
@@ -1901,10 +1916,17 @@ class BatchObservableResultImpl {
 			map = new AttributeHashMap();
 			this._buffer.set(metric, map);
 		}
+		if (typeof value !== 'number') {
+			diag.warn(`non-number value provided to metric ${metric._descriptor.name}: ${value}`);
+			return;
+		}
 		if (metric._descriptor.valueType === ValueType.INT &&
 			!Number.isInteger(value)) {
 			diag.warn(`INT value type cannot accept a floating-point value for ${metric._descriptor.name}, ignoring the fractional digits.`);
 			value = Math.trunc(value);
+			if (!Number.isInteger(value)) {
+				return;
+			}
 		}
 		map.set(attributes, value);
 	}

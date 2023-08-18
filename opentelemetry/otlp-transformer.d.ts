@@ -24,6 +24,10 @@ interface IInstrumentationScope {
 	name: string;
 	/** InstrumentationScope version */
 	version?: string;
+	/** InstrumentationScope attributes */
+	attributes?: IKeyValue[];
+	/** InstrumentationScope droppedAttributesCount */
+	droppedAttributesCount?: number;
 }
 /** Properties of a KeyValue. */
 interface IKeyValue {
@@ -72,6 +76,16 @@ interface IResource {
 interface IExportMetricsServiceRequest {
 	/** ExportMetricsServiceRequest resourceMetrics */
 	resourceMetrics: IResourceMetrics[];
+}
+interface IExportMetricsServiceResponse {
+	/** ExportMetricsServiceResponse partialSuccess */
+	partialSuccess?: IExportMetricsPartialSuccess;
+}
+interface IExportMetricsPartialSuccess {
+	/** ExportMetricsPartialSuccess rejectedDataPoints */
+	rejectedDataPoints?: number;
+	/** ExportMetricsPartialSuccess errorMessage */
+	errorMessage?: string;
 }
 /** Properties of a ResourceMetrics. */
 interface IResourceMetrics {
@@ -335,6 +349,16 @@ interface IExportTraceServiceRequest {
 	/** ExportTraceServiceRequest resourceSpans */
 	resourceSpans?: IResourceSpans[];
 }
+interface IExportTraceServiceResponse {
+	/** ExportTraceServiceResponse partialSuccess */
+	partialSuccess?: IExportTracePartialSuccess;
+}
+interface IExportTracePartialSuccess {
+	/** ExportLogsServiceResponse rejectedLogRecords */
+	rejectedSpans?: number;
+	/** ExportLogsServiceResponse errorMessage */
+	errorMessage?: string;
+}
 /** Properties of a ResourceSpans. */
 interface IResourceSpans {
 	/** ResourceSpans resource */
@@ -462,6 +486,16 @@ interface IExportLogsServiceRequest {
 	/** ExportLogsServiceRequest resourceLogs */
 	resourceLogs?: IResourceLogs[];
 }
+interface IExportLogsServiceResponse {
+	/** ExportLogsServiceResponse partialSuccess */
+	partialSuccess?: IExportLogsPartialSuccess;
+}
+interface IExportLogsPartialSuccess {
+	/** ExportLogsPartialSuccess rejectedLogRecords */
+	rejectedLogRecords?: number;
+	/** ExportLogsPartialSuccess errorMessage */
+	errorMessage?: string;
+}
 /** Properties of a ResourceLogs. */
 interface IResourceLogs {
 	/** ResourceLogs resource */
@@ -541,4 +575,4 @@ declare function createExportMetricsServiceRequest(resourceMetrics: ResourceMetr
 
 declare function createExportLogsServiceRequest(logRecords: ReadableLogRecord[], useHex?: boolean): IExportLogsServiceRequest;
 
-export { EAggregationTemporality, ESeverityNumber, ESpanKind, EStatusCode, IAnyValue, IArrayValue, IBuckets, IEvent, IExemplar, IExponentialHistogram, IExponentialHistogramDataPoint, IExportLogsServiceRequest, IExportMetricsServiceRequest, IExportTraceServiceRequest, IGauge, IHistogram, IHistogramDataPoint, IInstrumentationScope, IKeyValue, IKeyValueList, ILink, ILogRecord, IMetric, INumberDataPoint, IResource, IResourceLogs, IResourceMetrics, IResourceSpans, IScopeLogs, IScopeMetrics, IScopeSpans, ISpan, IStatus, ISum, ISummary, ISummaryDataPoint, IValueAtQuantile, createExportLogsServiceRequest, createExportMetricsServiceRequest, createExportTraceServiceRequest };
+export { EAggregationTemporality, ESeverityNumber, ESpanKind, EStatusCode, IAnyValue, IArrayValue, IBuckets, IEvent, IExemplar, IExponentialHistogram, IExponentialHistogramDataPoint, IExportLogsPartialSuccess, IExportLogsServiceRequest, IExportLogsServiceResponse, IExportMetricsPartialSuccess, IExportMetricsServiceRequest, IExportMetricsServiceResponse, IExportTracePartialSuccess, IExportTraceServiceRequest, IExportTraceServiceResponse, IGauge, IHistogram, IHistogramDataPoint, IInstrumentationScope, IKeyValue, IKeyValueList, ILink, ILogRecord, IMetric, INumberDataPoint, IResource, IResourceLogs, IResourceMetrics, IResourceSpans, IScopeLogs, IScopeMetrics, IScopeSpans, ISpan, IStatus, ISum, ISummary, ISummaryDataPoint, IValueAtQuantile, createExportLogsServiceRequest, createExportMetricsServiceRequest, createExportTraceServiceRequest };

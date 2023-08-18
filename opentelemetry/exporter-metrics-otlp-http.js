@@ -19,6 +19,13 @@ import { getEnv } from './core.js';
 import { AggregationTemporality, InstrumentType } from './sdk-metrics.js';
 import { diag } from './api.js';
 
+var AggregationTemporalityPreference;
+(function (AggregationTemporalityPreference) {
+	AggregationTemporalityPreference[AggregationTemporalityPreference["DELTA"] = 0] = "DELTA";
+	AggregationTemporalityPreference[AggregationTemporalityPreference["CUMULATIVE"] = 1] = "CUMULATIVE";
+	AggregationTemporalityPreference[AggregationTemporalityPreference["LOWMEMORY"] = 2] = "LOWMEMORY";
+})(AggregationTemporalityPreference || (AggregationTemporalityPreference = {}));
+
 const CumulativeTemporalitySelector = () => AggregationTemporality.CUMULATIVE;
 const DeltaTemporalitySelector = (instrumentType) => {
 	switch (instrumentType) {
@@ -32,6 +39,18 @@ const DeltaTemporalitySelector = (instrumentType) => {
 			return AggregationTemporality.CUMULATIVE;
 	}
 };
+const LowMemoryTemporalitySelector = (instrumentType) => {
+	switch (instrumentType) {
+		case InstrumentType.COUNTER:
+		case InstrumentType.HISTOGRAM:
+			return AggregationTemporality.DELTA;
+		case InstrumentType.UP_DOWN_COUNTER:
+		case InstrumentType.OBSERVABLE_UP_DOWN_COUNTER:
+		case InstrumentType.OBSERVABLE_COUNTER:
+		case InstrumentType.OBSERVABLE_GAUGE:
+			return AggregationTemporality.CUMULATIVE;
+	}
+};
 function chooseTemporalitySelectorFromEnvironment() {
 	const env = getEnv();
 	const configuredTemporality = env.OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE.trim().toLowerCase();
@@ -41,13 +60,19 @@ function chooseTemporalitySelectorFromEnvironment() {
 	if (configuredTemporality === 'delta') {
 		return DeltaTemporalitySelector;
 	}
+	if (configuredTemporality === 'lowmemory') {
+		return LowMemoryTemporalitySelector;
+	}
 	diag.warn(`OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE is set to '${env.OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE}', but only 'cumulative' and 'delta' are allowed. Using default ('cumulative') instead.`);
 	return CumulativeTemporalitySelector;
 }
 function chooseTemporalitySelector(temporalityPreference) {
 	if (temporalityPreference != null) {
-		if (temporalityPreference === AggregationTemporality.DELTA) {
+		if (temporalityPreference === AggregationTemporalityPreference.DELTA) {
 			return DeltaTemporalitySelector;
+		}
+		else if (temporalityPreference === AggregationTemporalityPreference.LOWMEMORY) {
+			return LowMemoryTemporalitySelector;
 		}
 		return CumulativeTemporalitySelector;
 	}
@@ -72,4 +97,4 @@ class OTLPMetricExporterBase {
 	}
 }
 
-export { CumulativeTemporalitySelector, DeltaTemporalitySelector, OTLPMetricExporterBase };
+export { AggregationTemporalityPreference, CumulativeTemporalitySelector, DeltaTemporalitySelector, LowMemoryTemporalitySelector, OTLPMetricExporterBase };

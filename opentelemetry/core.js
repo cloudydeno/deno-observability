@@ -60,11 +60,11 @@ function parsePairKeyValue(entry) {
 	const keyPairPart = valueProps.shift();
 	if (!keyPairPart)
 		return;
-	const keyPair = keyPairPart.split(BAGGAGE_KEY_PAIR_SEPARATOR);
-	if (keyPair.length !== 2)
+	const separatorIndex = keyPairPart.indexOf(BAGGAGE_KEY_PAIR_SEPARATOR);
+	if (separatorIndex <= 0)
 		return;
-	const key = decodeURIComponent(keyPair[0].trim());
-	const value = decodeURIComponent(keyPair[1].trim());
+	const key = decodeURIComponent(keyPairPart.substring(0, separatorIndex).trim());
+	const value = decodeURIComponent(keyPairPart.substring(separatorIndex + 1).trim());
 	let metadata;
 	if (valueProps.length > 0) {
 		metadata = baggageEntryMetadataFromString(valueProps.join(BAGGAGE_PROPERTIES_SEPARATOR));
@@ -523,7 +523,7 @@ function getIdGenerator(bytes) {
 
 const otperformance = performance;
 
-const VERSION$1 = "1.14.0";
+const VERSION$1 = "1.15.2";
 
 const SDK_INFO = {
 	[SemanticResourceAttributes.TELEMETRY_SDK_NAME]: 'opentelemetry',
@@ -598,10 +598,10 @@ function hrTimeToNanoseconds(time) {
 	return time[0] * SECOND_TO_NANOSECONDS + time[1];
 }
 function hrTimeToMilliseconds(time) {
-	return Math.round(time[0] * 1e3 + time[1] / 1e6);
+	return time[0] * 1e3 + time[1] / 1e6;
 }
 function hrTimeToMicroseconds(time) {
-	return Math.round(time[0] * 1e6 + time[1] / 1e3);
+	return time[0] * 1e6 + time[1] / 1e3;
 }
 function isTimeInputHrTime(value) {
 	return (Array.isArray(value) &&

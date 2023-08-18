@@ -281,7 +281,7 @@ declare const envDetectorSync: EnvDetectorSync;
  * does not resolve until all the underlying detectors have resolved, unlike
  * detectResourcesSync.
  *
- * @deprecated use detectResourceSync() instead.
+ * @deprecated use detectResourcesSync() instead.
  * @param config Configuration for resource detection
  */
 declare const detectResources: (config?: ResourceDetectionConfig) => Promise<IResource>;

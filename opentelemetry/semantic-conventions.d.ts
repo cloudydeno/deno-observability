@@ -689,7 +689,7 @@ declare const DbSystemValues: {
 	/** CockroachDB. */
 	readonly COCKROACHDB: "cockroachdb";
 };
-declare type DbSystemValues = typeof DbSystemValues[keyof typeof DbSystemValues];
+declare type DbSystemValues = (typeof DbSystemValues)[keyof typeof DbSystemValues];
 declare const DbCassandraConsistencyLevelValues: {
 	/** all. */
 	readonly ALL: "all";
@@ -714,7 +714,7 @@ declare const DbCassandraConsistencyLevelValues: {
 	/** local_serial. */
 	readonly LOCAL_SERIAL: "local_serial";
 };
-declare type DbCassandraConsistencyLevelValues = typeof DbCassandraConsistencyLevelValues[keyof typeof DbCassandraConsistencyLevelValues];
+declare type DbCassandraConsistencyLevelValues = (typeof DbCassandraConsistencyLevelValues)[keyof typeof DbCassandraConsistencyLevelValues];
 declare const FaasTriggerValues: {
 	/** A response to some data source operation such as a database or filesystem read/write. */
 	readonly DATASOURCE: "datasource";
@@ -727,7 +727,7 @@ declare const FaasTriggerValues: {
 	/** If none of the others apply. */
 	readonly OTHER: "other";
 };
-declare type FaasTriggerValues = typeof FaasTriggerValues[keyof typeof FaasTriggerValues];
+declare type FaasTriggerValues = (typeof FaasTriggerValues)[keyof typeof FaasTriggerValues];
 declare const FaasDocumentOperationValues: {
 	/** When a new object is created. */
 	readonly INSERT: "insert";
@@ -736,7 +736,7 @@ declare const FaasDocumentOperationValues: {
 	/** When an object is deleted. */
 	readonly DELETE: "delete";
 };
-declare type FaasDocumentOperationValues = typeof FaasDocumentOperationValues[keyof typeof FaasDocumentOperationValues];
+declare type FaasDocumentOperationValues = (typeof FaasDocumentOperationValues)[keyof typeof FaasDocumentOperationValues];
 declare const FaasInvokedProviderValues: {
 	/** Alibaba Cloud. */
 	readonly ALIBABA_CLOUD: "alibaba_cloud";
@@ -747,7 +747,7 @@ declare const FaasInvokedProviderValues: {
 	/** Google Cloud Platform. */
 	readonly GCP: "gcp";
 };
-declare type FaasInvokedProviderValues = typeof FaasInvokedProviderValues[keyof typeof FaasInvokedProviderValues];
+declare type FaasInvokedProviderValues = (typeof FaasInvokedProviderValues)[keyof typeof FaasInvokedProviderValues];
 declare const NetTransportValues: {
 	/** ip_tcp. */
 	readonly IP_TCP: "ip_tcp";
@@ -764,7 +764,7 @@ declare const NetTransportValues: {
 	/** Something else (non IP-based). */
 	readonly OTHER: "other";
 };
-declare type NetTransportValues = typeof NetTransportValues[keyof typeof NetTransportValues];
+declare type NetTransportValues = (typeof NetTransportValues)[keyof typeof NetTransportValues];
 declare const NetHostConnectionTypeValues: {
 	/** wifi. */
 	readonly WIFI: "wifi";
@@ -777,7 +777,7 @@ declare const NetHostConnectionTypeValues: {
 	/** unknown. */
 	readonly UNKNOWN: "unknown";
 };
-declare type NetHostConnectionTypeValues = typeof NetHostConnectionTypeValues[keyof typeof NetHostConnectionTypeValues];
+declare type NetHostConnectionTypeValues = (typeof NetHostConnectionTypeValues)[keyof typeof NetHostConnectionTypeValues];
 declare const NetHostConnectionSubtypeValues: {
 	/** GPRS. */
 	readonly GPRS: "gprs";
@@ -822,7 +822,7 @@ declare const NetHostConnectionSubtypeValues: {
 	/** LTE CA. */
 	readonly LTE_CA: "lte_ca";
 };
-declare type NetHostConnectionSubtypeValues = typeof NetHostConnectionSubtypeValues[keyof typeof NetHostConnectionSubtypeValues];
+declare type NetHostConnectionSubtypeValues = (typeof NetHostConnectionSubtypeValues)[keyof typeof NetHostConnectionSubtypeValues];
 declare const HttpFlavorValues: {
 	/** HTTP 1.0. */
 	readonly HTTP_1_0: "1.0";
@@ -835,21 +835,21 @@ declare const HttpFlavorValues: {
 	/** QUIC protocol. */
 	readonly QUIC: "QUIC";
 };
-declare type HttpFlavorValues = typeof HttpFlavorValues[keyof typeof HttpFlavorValues];
+declare type HttpFlavorValues = (typeof HttpFlavorValues)[keyof typeof HttpFlavorValues];
 declare const MessagingDestinationKindValues: {
 	/** A message sent to a queue. */
 	readonly QUEUE: "queue";
 	/** A message sent to a topic. */
 	readonly TOPIC: "topic";
 };
-declare type MessagingDestinationKindValues = typeof MessagingDestinationKindValues[keyof typeof MessagingDestinationKindValues];
+declare type MessagingDestinationKindValues = (typeof MessagingDestinationKindValues)[keyof typeof MessagingDestinationKindValues];
 declare const MessagingOperationValues: {
 	/** receive. */
 	readonly RECEIVE: "receive";
 	/** process. */
 	readonly PROCESS: "process";
 };
-declare type MessagingOperationValues = typeof MessagingOperationValues[keyof typeof MessagingOperationValues];
+declare type MessagingOperationValues = (typeof MessagingOperationValues)[keyof typeof MessagingOperationValues];
 declare const RpcGrpcStatusCodeValues: {
 	/** OK. */
 	readonly OK: 0;
@@ -886,14 +886,14 @@ declare const RpcGrpcStatusCodeValues: {
 	/** UNAUTHENTICATED. */
 	readonly UNAUTHENTICATED: 16;
 };
-declare type RpcGrpcStatusCodeValues = typeof RpcGrpcStatusCodeValues[keyof typeof RpcGrpcStatusCodeValues];
+declare type RpcGrpcStatusCodeValues = (typeof RpcGrpcStatusCodeValues)[keyof typeof RpcGrpcStatusCodeValues];
 declare const MessageTypeValues: {
 	/** sent. */
 	readonly SENT: "SENT";
 	/** received. */
 	readonly RECEIVED: "RECEIVED";
 };
-declare type MessageTypeValues = typeof MessageTypeValues[keyof typeof MessageTypeValues];
+declare type MessageTypeValues = (typeof MessageTypeValues)[keyof typeof MessageTypeValues];
 
 declare const SemanticResourceAttributes: {
 	/**
@@ -1284,7 +1284,7 @@ declare const CloudProviderValues: {
 	/** Google Cloud Platform. */
 	readonly GCP: "gcp";
 };
-declare type CloudProviderValues = typeof CloudProviderValues[keyof typeof CloudProviderValues];
+declare type CloudProviderValues = (typeof CloudProviderValues)[keyof typeof CloudProviderValues];
 declare const CloudPlatformValues: {
 	/** Alibaba Cloud Elastic Compute Service. */
 	readonly ALIBABA_CLOUD_ECS: "alibaba_cloud_ecs";
@@ -1321,14 +1321,14 @@ declare const CloudPlatformValues: {
 	/** Google Cloud App Engine (GAE). */
 	readonly GCP_APP_ENGINE: "gcp_app_engine";
 };
-declare type CloudPlatformValues = typeof CloudPlatformValues[keyof typeof CloudPlatformValues];
+declare type CloudPlatformValues = (typeof CloudPlatformValues)[keyof typeof CloudPlatformValues];
 declare const AwsEcsLaunchtypeValues: {
 	/** ec2. */
 	readonly EC2: "ec2";
 	/** fargate. */
 	readonly FARGATE: "fargate";
 };
-declare type AwsEcsLaunchtypeValues = typeof AwsEcsLaunchtypeValues[keyof typeof AwsEcsLaunchtypeValues];
+declare type AwsEcsLaunchtypeValues = (typeof AwsEcsLaunchtypeValues)[keyof typeof AwsEcsLaunchtypeValues];
 declare const HostArchValues: {
 	/** AMD64. */
 	readonly AMD64: "amd64";
@@ -1345,7 +1345,7 @@ declare const HostArchValues: {
 	/** 32-bit x86. */
 	readonly X86: "x86";
 };
-declare type HostArchValues = typeof HostArchValues[keyof typeof HostArchValues];
+declare type HostArchValues = (typeof HostArchValues)[keyof typeof HostArchValues];
 declare const OsTypeValues: {
 	/** Microsoft Windows. */
 	readonly WINDOWS: "windows";
@@ -1370,7 +1370,7 @@ declare const OsTypeValues: {
 	/** IBM z/OS. */
 	readonly Z_OS: "z_os";
 };
-declare type OsTypeValues = typeof OsTypeValues[keyof typeof OsTypeValues];
+declare type OsTypeValues = (typeof OsTypeValues)[keyof typeof OsTypeValues];
 declare const TelemetrySdkLanguageValues: {
 	/** cpp. */
 	readonly CPP: "cpp";
@@ -1393,6 +1393,6 @@ declare const TelemetrySdkLanguageValues: {
 	/** webjs. */
 	readonly WEBJS: "webjs";
 };
-declare type TelemetrySdkLanguageValues = typeof TelemetrySdkLanguageValues[keyof typeof TelemetrySdkLanguageValues];
+declare type TelemetrySdkLanguageValues = (typeof TelemetrySdkLanguageValues)[keyof typeof TelemetrySdkLanguageValues];
 
 export { AwsEcsLaunchtypeValues, CloudPlatformValues, CloudProviderValues, DbCassandraConsistencyLevelValues, DbSystemValues, FaasDocumentOperationValues, FaasInvokedProviderValues, FaasTriggerValues, HostArchValues, HttpFlavorValues, MessageTypeValues, MessagingDestinationKindValues, MessagingOperationValues, NetHostConnectionSubtypeValues, NetHostConnectionTypeValues, NetTransportValues, OsTypeValues, RpcGrpcStatusCodeValues, SemanticAttributes, SemanticResourceAttributes, TelemetrySdkLanguageValues };

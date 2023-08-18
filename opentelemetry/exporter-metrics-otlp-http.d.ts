@@ -14,20 +14,26 @@
  * limitations under the License.
  */
 
-import { AggregationTemporality, AggregationTemporalitySelector, ResourceMetrics, PushMetricExporter, InstrumentType } from './sdk-metrics.d.ts';
 import { OTLPExporterConfigBase, OTLPExporterBase } from './otlp-exporter-base.d.ts';
+import { AggregationTemporality, AggregationTemporalitySelector, ResourceMetrics, PushMetricExporter, InstrumentType } from './sdk-metrics.d.ts';
 import { ExportResult } from './core.d.ts';
 import { IExportMetricsServiceRequest } from './otlp-transformer.d.ts';
 
 interface OTLPMetricExporterOptions extends OTLPExporterConfigBase {
-	temporalityPreference?: AggregationTemporality;
+	temporalityPreference?: AggregationTemporalityPreference | AggregationTemporality;
+}
+declare enum AggregationTemporalityPreference {
+	DELTA = 0,
+	CUMULATIVE = 1,
+	LOWMEMORY = 2
 }
 
 declare const CumulativeTemporalitySelector: AggregationTemporalitySelector;
 declare const DeltaTemporalitySelector: AggregationTemporalitySelector;
+declare const LowMemoryTemporalitySelector: AggregationTemporalitySelector;
 declare class OTLPMetricExporterBase<T extends OTLPExporterBase<OTLPMetricExporterOptions, ResourceMetrics, IExportMetricsServiceRequest>> implements PushMetricExporter {
 	_otlpExporter: T;
-	protected _aggregationTemporalitySelector: AggregationTemporalitySelector;
+	private _aggregationTemporalitySelector;
 	constructor(exporter: T, config?: OTLPMetricExporterOptions);
 	export(metrics: ResourceMetrics, resultCallback: (result: ExportResult) => void): void;
 	shutdown(): Promise<void>;
@@ -35,4 +41,4 @@ declare class OTLPMetricExporterBase<T extends OTLPExporterBase<OTLPMetricExport
 	selectAggregationTemporality(instrumentType: InstrumentType): AggregationTemporality;
 }
 
-export { CumulativeTemporalitySelector, DeltaTemporalitySelector, OTLPMetricExporterBase, OTLPMetricExporterOptions };
+export { AggregationTemporalityPreference, CumulativeTemporalitySelector, DeltaTemporalitySelector, LowMemoryTemporalitySelector, OTLPMetricExporterBase, OTLPMetricExporterOptions };
