@@ -1,6 +1,4 @@
 #!/usr/bin/env -S deno run --watch --allow-read --allow-sys=hostname,osRelease --allow-env --allow-net --allow-run=uptime,sleep,ping
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-
 import { metrics, trace, ValueType } from "./opentelemetry/api.js";
 import { logs } from "./opentelemetry/api-logs.js";
 import { SemanticAttributes } from "./opentelemetry/semantic-conventions.js";
@@ -114,4 +112,4 @@ async function getData() {
   return body;
 }
 
-await serve(httpTracer(handler));
+Deno.serve(httpTracer(handler));
