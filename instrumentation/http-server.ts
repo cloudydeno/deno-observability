@@ -69,6 +69,13 @@ export function httpTracer(inner: Deno.ServeHandler): Deno.ServeHandler {
           serverSpan.setAttribute('http.status_text', resp.statusText);
         }
 
+        // Don't snoop the response body if it's not present, including for websockets
+        if (resp.body == null) {
+          inflightMetric.add(-1, reqMetricAttrs);
+          serverSpan.end();
+          return resp;
+        }
+
         const respSnoop = snoopStream(resp.body);
         respSnoop.finalSize.then(size => {
           serverSpan.setAttribute(SemanticAttributes.HTTP_RESPONSE_CONTENT_LENGTH_UNCOMPRESSED, size);
@@ -77,7 +84,7 @@ export function httpTracer(inner: Deno.ServeHandler): Deno.ServeHandler {
           serverSpan.end();
         });
 
-        return new Response(respSnoop.newBody, resp)
+        return new Response(respSnoop.newBody, resp);
 
       } catch (err) {
         serverSpan.recordException(err);
