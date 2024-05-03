@@ -427,6 +427,7 @@ function reconfigureLimits(userConfig) {
 class BatchSpanProcessorBase {
 	constructor(_exporter, config) {
 		this._exporter = _exporter;
+		this._isExporting = false;
 		this._finishedSpans = [];
 		this._droppedSpansCount = 0;
 		const env = getEnv();
@@ -549,20 +550,29 @@ class BatchSpanProcessorBase {
 		});
 	}
 	_maybeStartTimer() {
-		if (this._timer !== undefined)
+		if (this._isExporting)
 			return;
-		this._timer = setTimeout(() => {
+		const flush = () => {
+			this._isExporting = true;
 			this._flushOneBatch()
 				.then(() => {
+				this._isExporting = false;
 				if (this._finishedSpans.length > 0) {
 					this._clearTimer();
 					this._maybeStartTimer();
 				}
 			})
 				.catch(e => {
+				this._isExporting = false;
 				globalErrorHandler(e);
 			});
-		}, this._scheduledDelayMillis);
+		};
+		if (this._finishedSpans.length >= this._maxExportBatchSize) {
+			return flush();
+		}
+		if (this._timer !== undefined)
+			return;
+		this._timer = setTimeout(() => flush(), this._scheduledDelayMillis);
 		unrefTimer(this._timer);
 	}
 	_clearTimer() {

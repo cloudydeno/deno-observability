@@ -193,7 +193,7 @@ function isDescriptorCompatibleWith(descriptor, otherDescriptor) {
 		descriptor.type === otherDescriptor.type &&
 		descriptor.valueType === otherDescriptor.valueType);
 }
-const NAME_REGEXP = /^[a-z][a-z0-9_.-]{0,254}$/i;
+const NAME_REGEXP = /^[a-z][a-z0-9_.\-/]{0,254}$/i;
 function isValidName(name) {
 	return name.match(NAME_REGEXP) != null;
 }
@@ -1655,13 +1655,16 @@ class DeltaMetricProcessor {
 }
 
 class TemporalMetricProcessor {
-	constructor(_aggregator) {
+	constructor(_aggregator, collectorHandles) {
 		this._aggregator = _aggregator;
 		this._unreportedAccumulations = new Map();
 		this._reportHistory = new Map();
+		collectorHandles.forEach(handle => {
+			this._unreportedAccumulations.set(handle, []);
+		});
 	}
-	buildMetrics(collector, collectors, instrumentDescriptor, currentAccumulations, collectionTime) {
-		this._stashAccumulations(collectors, currentAccumulations);
+	buildMetrics(collector, instrumentDescriptor, currentAccumulations, collectionTime) {
+		this._stashAccumulations(currentAccumulations);
 		const unreportedAccumulations = this._getMergedUnreportedAccumulations(collector);
 		let result = unreportedAccumulations;
 		let aggregationTemporality;
@@ -1684,18 +1687,23 @@ class TemporalMetricProcessor {
 			collectionTime,
 			aggregationTemporality,
 		});
-		return this._aggregator.toMetricData(instrumentDescriptor, aggregationTemporality, AttributesMapToAccumulationRecords(result),
+		const accumulationRecords = AttributesMapToAccumulationRecords(result);
+		if (accumulationRecords.length === 0) {
+			return undefined;
+		}
+		return this._aggregator.toMetricData(instrumentDescriptor, aggregationTemporality, accumulationRecords,
 		collectionTime);
 	}
-	_stashAccumulations(collectors, currentAccumulation) {
-		collectors.forEach(it => {
-			let stash = this._unreportedAccumulations.get(it);
+	_stashAccumulations(currentAccumulation) {
+		const registeredCollectors = this._unreportedAccumulations.keys();
+		for (const collector of registeredCollectors) {
+			let stash = this._unreportedAccumulations.get(collector);
 			if (stash === undefined) {
 				stash = [];
-				this._unreportedAccumulations.set(it, stash);
+				this._unreportedAccumulations.set(collector, stash);
 			}
 			stash.push(currentAccumulation);
-		});
+		}
 	}
 	_getMergedUnreportedAccumulations(collector) {
 		let result = new AttributeHashMap();
@@ -1740,11 +1748,11 @@ function AttributesMapToAccumulationRecords(map) {
 }
 
 class AsyncMetricStorage extends MetricStorage {
-	constructor(_instrumentDescriptor, aggregator, _attributesProcessor) {
+	constructor(_instrumentDescriptor, aggregator, _attributesProcessor, collectorHandles) {
 		super(_instrumentDescriptor);
 		this._attributesProcessor = _attributesProcessor;
 		this._deltaMetricStorage = new DeltaMetricProcessor(aggregator);
-		this._temporalMetricStorage = new TemporalMetricProcessor(aggregator);
+		this._temporalMetricStorage = new TemporalMetricProcessor(aggregator, collectorHandles);
 	}
 	record(measurements, observationTime) {
 		const processed = new AttributeHashMap();
@@ -1753,9 +1761,9 @@ class AsyncMetricStorage extends MetricStorage {
 		});
 		this._deltaMetricStorage.batchCumulate(processed, observationTime);
 	}
-	collect(collector, collectors, collectionTime) {
+	collect(collector, collectionTime) {
 		const accumulations = this._deltaMetricStorage.collect();
-		return this._temporalMetricStorage.buildMetrics(collector, collectors, this._instrumentDescriptor, accumulations, collectionTime);
+		return this._temporalMetricStorage.buildMetrics(collector, this._instrumentDescriptor, accumulations, collectionTime);
 	}
 }
 
@@ -2056,19 +2064,19 @@ class ObservableRegistry {
 }
 
 class SyncMetricStorage extends MetricStorage {
-	constructor(instrumentDescriptor, aggregator, _attributesProcessor) {
+	constructor(instrumentDescriptor, aggregator, _attributesProcessor, collectorHandles) {
 		super(instrumentDescriptor);
 		this._attributesProcessor = _attributesProcessor;
 		this._deltaMetricStorage = new DeltaMetricProcessor(aggregator);
-		this._temporalMetricStorage = new TemporalMetricProcessor(aggregator);
+		this._temporalMetricStorage = new TemporalMetricProcessor(aggregator, collectorHandles);
 	}
 	record(value, attributes, context, recordTime) {
 		attributes = this._attributesProcessor.process(attributes, context);
 		this._deltaMetricStorage.record(value, attributes, context, recordTime);
 	}
-	collect(collector, collectors, collectionTime) {
+	collect(collector, collectionTime) {
 		const accumulations = this._deltaMetricStorage.collect();
-		return this._temporalMetricStorage.buildMetrics(collector, collectors, this._instrumentDescriptor, accumulations, collectionTime);
+		return this._temporalMetricStorage.buildMetrics(collector, this._instrumentDescriptor, accumulations, collectionTime);
 	}
 }
 
@@ -2118,15 +2126,22 @@ class MeterSharedState {
 	}
 	async collect(collector, collectionTime, options) {
 		const errors = await this.observableRegistry.observe(collectionTime, options?.timeoutMillis);
-		const metricDataList = Array.from(this.metricStorageRegistry.getStorages(collector))
+		const storages = this.metricStorageRegistry.getStorages(collector);
+		if (storages.length === 0) {
+			return null;
+		}
+		const metricDataList = storages
 			.map(metricStorage => {
-			return metricStorage.collect(collector, this._meterProviderSharedState.metricCollectors, collectionTime);
+			return metricStorage.collect(collector, collectionTime);
 		})
 			.filter(isNotNullish);
+		if (metricDataList.length === 0) {
+			return { errors };
+		}
 		return {
 			scopeMetrics: {
 				scope: this._instrumentationScope,
-				metrics: metricDataList.filter(isNotNullish),
+				metrics: metricDataList,
 			},
 			errors,
 		};
@@ -2140,7 +2155,7 @@ class MeterSharedState {
 				return compatibleStorage;
 			}
 			const aggregator = view.aggregation.createAggregator(viewDescriptor);
-			const viewStorage = new MetricStorageType(viewDescriptor, aggregator, view.attributesProcessor);
+			const viewStorage = new MetricStorageType(viewDescriptor, aggregator, view.attributesProcessor, this._meterProviderSharedState.metricCollectors);
 			this.metricStorageRegistry.register(viewStorage);
 			return viewStorage;
 		});
@@ -2152,7 +2167,7 @@ class MeterSharedState {
 					return compatibleStorage;
 				}
 				const aggregator = aggregation.createAggregator(descriptor);
-				const storage = new MetricStorageType(descriptor, aggregator, AttributesProcessor.Noop());
+				const storage = new MetricStorageType(descriptor, aggregator, AttributesProcessor.Noop(), [collector]);
 				this.metricStorageRegistry.registerForCollector(collector, storage);
 				return storage;
 			});
@@ -2194,14 +2209,24 @@ class MetricCollector {
 	}
 	async collect(options) {
 		const collectionTime = millisToHrTime(Date.now());
-		const meterCollectionPromises = Array.from(this._sharedState.meterSharedStates.values()).map(meterSharedState => meterSharedState.collect(this, collectionTime, options));
-		const result = await Promise.all(meterCollectionPromises);
+		const scopeMetrics = [];
+		const errors = [];
+		const meterCollectionPromises = Array.from(this._sharedState.meterSharedStates.values()).map(async (meterSharedState) => {
+			const current = await meterSharedState.collect(this, collectionTime, options);
+			if (current?.scopeMetrics != null) {
+				scopeMetrics.push(current.scopeMetrics);
+			}
+			if (current?.errors != null) {
+				errors.push(...current.errors);
+			}
+		});
+		await Promise.all(meterCollectionPromises);
 		return {
 			resourceMetrics: {
 				resource: this._sharedState.resource,
-				scopeMetrics: result.map(it => it.scopeMetrics),
+				scopeMetrics: scopeMetrics,
 			},
-			errors: FlatMap(result, it => it.errors),
+			errors: errors,
 		};
 	}
 	async forceFlush(options) {
