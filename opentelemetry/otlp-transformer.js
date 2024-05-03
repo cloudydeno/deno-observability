@@ -16,9 +16,104 @@
 /// <reference types="./otlp-transformer.d.ts" />
 
 import * as core from './core.js';
-import { hrTimeToNanoseconds, hexToBase64 } from './core.js';
+import { hexToBase64 } from './core.js';
 import { ValueType } from './api.js';
 import { DataPointType, AggregationTemporality } from './sdk-metrics.js';
+
+const TWO_PWR_32 = (1 << 16) * (1 << 16);
+class UnsignedLong {
+	constructor(low, high) {
+		this.low = low;
+		this.high = high;
+	}
+	static fromU32(value) {
+		return new UnsignedLong(value % TWO_PWR_32 | 0, 0);
+	}
+	multiply(value) {
+		const a48 = this.high >>> 16;
+		const a32 = this.high & 0xffff;
+		const a16 = this.low >>> 16;
+		const a00 = this.low & 0xffff;
+		const b48 = value.high >>> 16;
+		const b32 = value.high & 0xffff;
+		const b16 = value.low >>> 16;
+		const b00 = value.low & 0xffff;
+		let c48 = 0;
+		let c32 = 0;
+		let c16 = 0;
+		let c00 = 0;
+		c00 += a00 * b00;
+		c16 += c00 >>> 16;
+		c00 &= 0xffff;
+		c16 += a16 * b00;
+		c32 += c16 >>> 16;
+		c16 &= 0xffff;
+		c16 += a00 * b16;
+		c32 += c16 >>> 16;
+		c16 &= 0xffff;
+		c32 += a32 * b00;
+		c48 += c32 >>> 16;
+		c32 &= 0xffff;
+		c32 += a16 * b16;
+		c48 += c32 >>> 16;
+		c32 &= 0xffff;
+		c32 += a00 * b32;
+		c48 += c32 >>> 16;
+		c32 &= 0xffff;
+		c48 += a48 * b00 + a32 * b16 + a16 * b32 + a00 * b48;
+		c48 &= 0xffff;
+		return new UnsignedLong((c16 << 16) | c00, (c48 << 16) | c32);
+	}
+	add(value) {
+		const a48 = this.high >>> 16;
+		const a32 = this.high & 0xffff;
+		const a16 = this.low >>> 16;
+		const a00 = this.low & 0xffff;
+		const b48 = value.high >>> 16;
+		const b32 = value.high & 0xffff;
+		const b16 = value.low >>> 16;
+		const b00 = value.low & 0xffff;
+		let c48 = 0;
+		let c32 = 0;
+		let c16 = 0;
+		let c00 = 0;
+		c00 += a00 + b00;
+		c16 += c00 >>> 16;
+		c00 &= 0xffff;
+		c16 += a16 + b16;
+		c32 += c16 >>> 16;
+		c16 &= 0xffff;
+		c32 += a32 + b32;
+		c48 += c32 >>> 16;
+		c32 &= 0xffff;
+		c48 += a48 + b48;
+		c48 &= 0xffff;
+		return new UnsignedLong((c16 << 16) | c00, (c48 << 16) | c32);
+	}
+	static fromString(str) {
+		let result = UnsignedLong.fromU32(0);
+		for (let i = 0; i < str.length; i += 8) {
+			const size = Math.min(8, str.length - i);
+			const value = parseInt(str.substring(i, i + size));
+			if (size < 8) {
+				const power = UnsignedLong.fromU32(Math.pow(10, size));
+				result = result.multiply(power).add(UnsignedLong.fromU32(value));
+			}
+			else {
+				result = result.multiply(UnsignedLong.fromU32(100000000));
+				result = result.add(UnsignedLong.fromU32(value));
+			}
+		}
+		return result;
+	}
+}
+
+const NANOSECONDS = UnsignedLong.fromU32(1000000000);
+function hrTimeToFixed64Nanos(hrTime) {
+	return UnsignedLong.fromU32(hrTime[0])
+		.multiply(NANOSECONDS)
+		.add(UnsignedLong.fromU32(hrTime[1]));
+}
 
 var ESpanKind;
 (function (ESpanKind) {
@@ -78,8 +173,8 @@ function sdkSpanToOtlpSpan(span, useHex) {
 		traceState: ctx.traceState?.serialize(),
 		name: span.name,
 		kind: span.kind == null ? 0 : span.kind + 1,
-		startTimeUnixNano: hrTimeToNanoseconds(span.startTime),
-		endTimeUnixNano: hrTimeToNanoseconds(span.endTime),
+		startTimeUnixNano: hrTimeToFixed64Nanos(span.startTime),
+		endTimeUnixNano: hrTimeToFixed64Nanos(span.endTime),
 		attributes: toAttributes(span.attributes),
 		droppedAttributesCount: span.droppedAttributesCount,
 		events: span.events.map(toOtlpSpanEvent),
@@ -111,7 +206,7 @@ function toOtlpSpanEvent(timedEvent) {
 			? toAttributes(timedEvent.attributes)
 			: [],
 		name: timedEvent.name,
-		timeUnixNano: hrTimeToNanoseconds(timedEvent.time),
+		timeUnixNano: hrTimeToFixed64Nanos(timedEvent.time),
 		droppedAttributesCount: timedEvent.droppedAttributesCount || 0,
 	};
 }
@@ -234,8 +329,8 @@ function toMetric(metricData) {
 function toSingularDataPoint(dataPoint, valueType) {
 	const out = {
 		attributes: toAttributes(dataPoint.attributes),
-		startTimeUnixNano: hrTimeToNanoseconds(dataPoint.startTime),
-		timeUnixNano: hrTimeToNanoseconds(dataPoint.endTime),
+		startTimeUnixNano: hrTimeToFixed64Nanos(dataPoint.startTime),
+		timeUnixNano: hrTimeToFixed64Nanos(dataPoint.endTime),
 	};
 	switch (valueType) {
 		case ValueType.INT:
@@ -263,8 +358,8 @@ function toHistogramDataPoints(metricData) {
 			sum: histogram.sum,
 			min: histogram.min,
 			max: histogram.max,
-			startTimeUnixNano: hrTimeToNanoseconds(dataPoint.startTime),
-			timeUnixNano: hrTimeToNanoseconds(dataPoint.endTime),
+			startTimeUnixNano: hrTimeToFixed64Nanos(dataPoint.startTime),
+			timeUnixNano: hrTimeToFixed64Nanos(dataPoint.endTime),
 		};
 	});
 }
@@ -287,8 +382,8 @@ function toExponentialHistogramDataPoints(metricData) {
 			},
 			scale: histogram.scale,
 			zeroCount: histogram.zeroCount,
-			startTimeUnixNano: hrTimeToNanoseconds(dataPoint.startTime),
-			timeUnixNano: hrTimeToNanoseconds(dataPoint.endTime),
+			startTimeUnixNano: hrTimeToFixed64Nanos(dataPoint.startTime),
+			timeUnixNano: hrTimeToFixed64Nanos(dataPoint.endTime),
 		};
 	});
 }
@@ -351,8 +446,8 @@ function logRecordsToResourceLogs(logRecords, useHex) {
 }
 function toLogRecord(log, useHex) {
 	return {
-		timeUnixNano: hrTimeToNanoseconds(log.hrTime),
-		observedTimeUnixNano: hrTimeToNanoseconds(log.hrTimeObserved),
+		timeUnixNano: hrTimeToFixed64Nanos(log.hrTime),
+		observedTimeUnixNano: hrTimeToFixed64Nanos(log.hrTimeObserved),
 		severityNumber: toSeverityNumber(log.severityNumber),
 		severityText: log.severityText,
 		body: toAnyValue(log.body),
@@ -379,4 +474,4 @@ function toLogAttributes(attributes) {
 	return Object.keys(attributes).map(key => toKeyValue(key, attributes[key]));
 }
 
-export { ESpanKind, createExportLogsServiceRequest, createExportMetricsServiceRequest, createExportTraceServiceRequest };
+export { ESpanKind, UnsignedLong, createExportLogsServiceRequest, createExportMetricsServiceRequest, createExportTraceServiceRequest, hrTimeToFixed64Nanos };

@@ -17,7 +17,7 @@
 
 const _globalThis = typeof globalThis === 'object' ? globalThis : global;
 
-const VERSION = "1.4.1";
+const VERSION = "1.6.0";
 
 const re = /^(\d+)\.(\d+)\.(\d+)(-(.+))?$/;
 function _makeCompatibilityCheck(ownVersion) {

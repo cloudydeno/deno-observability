@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import { HrTime } from './api.d.ts';
 import { ReadableSpan } from './sdk-trace-base.d.ts';
 import { ResourceMetrics } from './sdk-metrics.d.ts';
 import { ReadableLogRecord } from './sdk-logs.d.ts';
@@ -63,6 +64,22 @@ interface IKeyValueList {
 	/** KeyValueList values */
 	values: IKeyValue[];
 }
+interface IFixed64 {
+	low: number;
+	high: number;
+}
+
+declare class UnsignedLong {
+	low: number;
+	high: number;
+	constructor(low: number, high: number);
+	static fromU32(value: number): UnsignedLong;
+	multiply(value: UnsignedLong): UnsignedLong;
+	add(value: UnsignedLong): UnsignedLong;
+	static fromString(str: string): UnsignedLong;
+}
+
+declare function hrTimeToFixed64Nanos(hrTime: HrTime): IFixed64;
 
 /** Properties of a Resource. */
 interface IResource {
@@ -162,9 +179,9 @@ interface INumberDataPoint {
 	/** NumberDataPoint attributes */
 	attributes: IKeyValue[];
 	/** NumberDataPoint startTimeUnixNano */
-	startTimeUnixNano?: number;
+	startTimeUnixNano?: IFixed64 | string;
 	/** NumberDataPoint timeUnixNano */
-	timeUnixNano?: number;
+	timeUnixNano?: IFixed64 | string;
 	/** NumberDataPoint asDouble */
 	asDouble?: number | null;
 	/** NumberDataPoint asInt */
@@ -179,9 +196,9 @@ interface IHistogramDataPoint {
 	/** HistogramDataPoint attributes */
 	attributes?: IKeyValue[];
 	/** HistogramDataPoint startTimeUnixNano */
-	startTimeUnixNano?: number;
+	startTimeUnixNano?: IFixed64 | string;
 	/** HistogramDataPoint timeUnixNano */
-	timeUnixNano?: number;
+	timeUnixNano?: IFixed64 | string;
 	/** HistogramDataPoint count */
 	count?: number;
 	/** HistogramDataPoint sum */
@@ -204,9 +221,9 @@ interface IExponentialHistogramDataPoint {
 	/** ExponentialHistogramDataPoint attributes */
 	attributes?: IKeyValue[];
 	/** ExponentialHistogramDataPoint startTimeUnixNano */
-	startTimeUnixNano?: number;
+	startTimeUnixNano?: IFixed64 | string;
 	/** ExponentialHistogramDataPoint timeUnixNano */
-	timeUnixNano?: number;
+	timeUnixNano?: IFixed64 | string;
 	/** ExponentialHistogramDataPoint count */
 	count?: number;
 	/** ExponentialHistogramDataPoint sum */
@@ -392,9 +409,9 @@ interface ISpan {
 	/** Span kind */
 	kind: ESpanKind;
 	/** Span startTimeUnixNano */
-	startTimeUnixNano: number;
+	startTimeUnixNano: IFixed64;
 	/** Span endTimeUnixNano */
-	endTimeUnixNano: number;
+	endTimeUnixNano: IFixed64;
 	/** Span attributes */
 	attributes: IKeyValue[];
 	/** Span droppedAttributesCount */
@@ -459,7 +476,7 @@ declare enum EStatusCode {
 /** Properties of an Event. */
 interface IEvent {
 	/** Event timeUnixNano */
-	timeUnixNano: number;
+	timeUnixNano: IFixed64;
 	/** Event name */
 	name: string;
 	/** Event attributes */
@@ -517,9 +534,9 @@ interface IScopeLogs {
 /** Properties of a LogRecord. */
 interface ILogRecord {
 	/** LogRecord timeUnixNano */
-	timeUnixNano: number;
+	timeUnixNano: IFixed64;
 	/** LogRecord observedTimeUnixNano */
-	observedTimeUnixNano: number;
+	observedTimeUnixNano: IFixed64;
 	/** LogRecord severityNumber */
 	severityNumber?: ESeverityNumber;
 	/** LogRecord severityText */
@@ -575,4 +592,4 @@ declare function createExportMetricsServiceRequest(resourceMetrics: ResourceMetr
 
 declare function createExportLogsServiceRequest(logRecords: ReadableLogRecord[], useHex?: boolean): IExportLogsServiceRequest;
 
-export { EAggregationTemporality, ESeverityNumber, ESpanKind, EStatusCode, IAnyValue, IArrayValue, IBuckets, IEvent, IExemplar, IExponentialHistogram, IExponentialHistogramDataPoint, IExportLogsPartialSuccess, IExportLogsServiceRequest, IExportLogsServiceResponse, IExportMetricsPartialSuccess, IExportMetricsServiceRequest, IExportMetricsServiceResponse, IExportTracePartialSuccess, IExportTraceServiceRequest, IExportTraceServiceResponse, IGauge, IHistogram, IHistogramDataPoint, IInstrumentationScope, IKeyValue, IKeyValueList, ILink, ILogRecord, IMetric, INumberDataPoint, IResource, IResourceLogs, IResourceMetrics, IResourceSpans, IScopeLogs, IScopeMetrics, IScopeSpans, ISpan, IStatus, ISum, ISummary, ISummaryDataPoint, IValueAtQuantile, createExportLogsServiceRequest, createExportMetricsServiceRequest, createExportTraceServiceRequest };
+export { EAggregationTemporality, ESeverityNumber, ESpanKind, EStatusCode, IAnyValue, IArrayValue, IBuckets, IEvent, IExemplar, IExponentialHistogram, IExponentialHistogramDataPoint, IExportLogsPartialSuccess, IExportLogsServiceRequest, IExportLogsServiceResponse, IExportMetricsPartialSuccess, IExportMetricsServiceRequest, IExportMetricsServiceResponse, IExportTracePartialSuccess, IExportTraceServiceRequest, IExportTraceServiceResponse, IFixed64, IGauge, IHistogram, IHistogramDataPoint, IInstrumentationScope, IKeyValue, IKeyValueList, ILink, ILogRecord, IMetric, INumberDataPoint, IResource, IResourceLogs, IResourceMetrics, IResourceSpans, IScopeLogs, IScopeMetrics, IScopeSpans, ISpan, IStatus, ISum, ISummary, ISummaryDataPoint, IValueAtQuantile, UnsignedLong, createExportLogsServiceRequest, createExportMetricsServiceRequest, createExportTraceServiceRequest, hrTimeToFixed64Nanos };
