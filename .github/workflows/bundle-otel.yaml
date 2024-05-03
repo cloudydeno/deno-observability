@@ -1,4 +1,4 @@
-name: CI
+name: Bundle OpenTelemetry
 
 on:
   push:
@@ -9,7 +9,7 @@ jobs:
 
   bundle:
     runs-on: ubuntu-latest
-    name: Rebundle opentelemetry-js
+    name: Rebundle
 
     steps:
     - name: Checkout source
@@ -39,3 +39,9 @@ jobs:
 
     - name: Build
       run: time hack/bundle-opentelemetry.ts
+
+    - name: Status
+      run: git status
+
+    - name: Check demo.ts
+      run: time deno check --unstable demo.ts
