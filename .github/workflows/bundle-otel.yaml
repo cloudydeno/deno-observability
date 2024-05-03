@@ -35,7 +35,7 @@ jobs:
       uses: actions/setup-node@v3
       with:
         node-version: '22'
-        cache: 'yarn'
+        # cache: 'yarn'
 
     - name: Build
       run: time hack/bundle-opentelemetry.ts
