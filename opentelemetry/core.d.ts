@@ -201,7 +201,7 @@ declare enum ExportResultCode {
 	FAILED = 1
 }
 
-declare const VERSION = "1.17.1";
+declare const VERSION = "1.15.2";
 
 declare type ParsedBaggageKeyValue = {
 	key: string;

@@ -16,7 +16,7 @@
 
 import { IResource } from './resources.d.ts';
 import * as logsAPI from './api-logs.d.ts';
-import { SeverityNumber, LogAttributes, Logger } from './api-logs.d.ts';
+import { SeverityNumber, LogAttributes } from './api-logs.d.ts';
 import * as api from './api.d.ts';
 import { HrTime, SpanContext, AttributeValue, Context } from './api.d.ts';
 import { InstrumentationScope, ExportResult } from './core.d.ts';
@@ -29,6 +29,10 @@ interface LoggerProviderConfig {
 	* The default value is 30000ms
 	*/
 	forceFlushTimeoutMillis?: number;
+	/** Log Record Limits*/
+	logRecordLimits?: LogRecordLimits;
+}
+interface LoggerConfig {
 	/** Log Record Limits*/
 	logRecordLimits?: LogRecordLimits;
 }
@@ -71,14 +75,15 @@ interface ReadableLogRecord {
 	readonly attributes: LogAttributes;
 }
 
-declare class LoggerProviderSharedState {
+declare class Logger implements logsAPI.Logger {
+	readonly instrumentationScope: InstrumentationScope;
+	private _loggerProvider;
 	readonly resource: IResource;
-	readonly forceFlushTimeoutMillis: number;
-	readonly logRecordLimits: Required<LogRecordLimits>;
-	readonly loggers: Map<string, Logger>;
-	activeProcessor: LogRecordProcessor;
-	readonly registeredLogRecordProcessors: LogRecordProcessor[];
-	constructor(resource: IResource, forceFlushTimeoutMillis: number, logRecordLimits: Required<LogRecordLimits>);
+	private readonly _loggerConfig;
+	constructor(instrumentationScope: InstrumentationScope, config: LoggerConfig, _loggerProvider: LoggerProvider);
+	emit(logRecord: logsAPI.LogRecord): void;
+	getLogRecordLimits(): LogRecordLimits;
+	getActiveLogRecordProcessor(): LogRecordProcessor;
 }
 
 declare class LogRecord implements ReadableLogRecord {
@@ -99,18 +104,17 @@ declare class LogRecord implements ReadableLogRecord {
 	get severityNumber(): logsAPI.SeverityNumber | undefined;
 	set body(body: string | undefined);
 	get body(): string | undefined;
-	constructor(_sharedState: LoggerProviderSharedState, instrumentationScope: InstrumentationScope, logRecord: logsAPI.LogRecord);
+	constructor(logger: Logger, logRecord: logsAPI.LogRecord);
 	setAttribute(key: string, value?: LogAttributes | AttributeValue): this;
 	setAttributes(attributes: LogAttributes): this;
 	setBody(body: string): this;
 	setSeverityNumber(severityNumber: logsAPI.SeverityNumber): this;
 	setSeverityText(severityText: string): this;
 	/**
-	* @internal
 	* A LogRecordProcessor may freely modify logRecord for the duration of the OnEmit call.
 	* If logRecord is needed after OnEmit returns (i.e. for asynchronous processing) only reads are permitted.
 	*/
-	_makeReadonly(): void;
+	makeReadonly(): void;
 	private _truncateToSize;
 	private _truncateToLimitUtil;
 	private _isLogRecordReadonly;
@@ -134,9 +138,26 @@ interface LogRecordProcessor {
 	shutdown(): Promise<void>;
 }
 
+/**
+ * Implementation of the {@link LogRecordProcessor} that simply forwards all
+ * received events to a list of {@link LogRecordProcessor}s.
+ */
+declare class MultiLogRecordProcessor implements LogRecordProcessor {
+	readonly processors: LogRecordProcessor[];
+	readonly forceFlushTimeoutMillis: number;
+	constructor(processors: LogRecordProcessor[], forceFlushTimeoutMillis: number);
+	forceFlush(): Promise<void>;
+	onEmit(logRecord: LogRecord): void;
+	shutdown(): Promise<void>;
+}
+
 declare class LoggerProvider implements logsAPI.LoggerProvider {
+	readonly resource: IResource;
+	private readonly _loggers;
+	private _activeProcessor;
+	private readonly _registeredLogRecordProcessors;
+	private readonly _config;
 	private _shutdownOnce;
-	private readonly _sharedState;
 	constructor(config?: LoggerProviderConfig);
 	/**
 	* Get a logger with the configuration of the LoggerProvider.
@@ -160,12 +181,14 @@ declare class LoggerProvider implements logsAPI.LoggerProvider {
 	* Returns a promise which is resolved when all flushes are complete.
 	*/
 	shutdown(): Promise<void>;
+	getActiveLogRecordProcessor(): MultiLogRecordProcessor;
+	getActiveLoggers(): Map<string, Logger>;
 	private _shutdown;
 }
 
 declare class NoopLogRecordProcessor implements LogRecordProcessor {
 	forceFlush(): Promise<void>;
-	onEmit(_logRecord: ReadableLogRecord, _context: Context): void;
+	onEmit(_logRecord: ReadableLogRecord): void;
 	shutdown(): Promise<void>;
 }
 
@@ -268,4 +291,4 @@ declare class BatchLogRecordProcessor extends BatchLogRecordProcessorBase<Buffer
 	protected onShutdown(): void;
 }
 
-export { BatchLogRecordProcessor, BatchLogRecordProcessorBrowserConfig, BufferConfig, ConsoleLogRecordExporter, InMemoryLogRecordExporter, LogRecord, LogRecordExporter, LogRecordLimits, LogRecordProcessor, LoggerProvider, LoggerProviderConfig, NoopLogRecordProcessor, ReadableLogRecord, SimpleLogRecordProcessor };
+export { BatchLogRecordProcessor, BatchLogRecordProcessorBrowserConfig, BufferConfig, ConsoleLogRecordExporter, InMemoryLogRecordExporter, LogRecord, LogRecordExporter, LogRecordLimits, LogRecordProcessor, Logger, LoggerConfig, LoggerProvider, LoggerProviderConfig, NoopLogRecordProcessor, ReadableLogRecord, SimpleLogRecordProcessor };

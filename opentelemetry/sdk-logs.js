@@ -22,7 +22,7 @@ import { Resource } from './resources.js';
 import { timeInputToHrTime, isAttributeValue, getEnv, getEnvWithoutDefaults, DEFAULT_ATTRIBUTE_COUNT_LIMIT, DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT, callWithTimeout, merge, BindOnceFuture, hrTimeToMicroseconds, ExportResultCode, globalErrorHandler, unrefTimer } from './core.js';
 
 class LogRecord {
-	constructor(_sharedState, instrumentationScope, logRecord) {
+	constructor(logger, logRecord) {
 		this.attributes = {};
 		this._isReadonly = false;
 		const { timestamp, observedTimestamp, severityNumber, severityText, body, attributes = {}, context, } = logRecord;
@@ -38,9 +38,9 @@ class LogRecord {
 		this.severityNumber = severityNumber;
 		this.severityText = severityText;
 		this.body = body;
-		this.resource = _sharedState.resource;
-		this.instrumentationScope = instrumentationScope;
-		this._logRecordLimits = _sharedState.logRecordLimits;
+		this.resource = logger.resource;
+		this.instrumentationScope = logger.instrumentationScope;
+		this._logRecordLimits = logger.getLogRecordLimits();
 		this.setAttributes(attributes);
 	}
 	set severityText(severityText) {
@@ -116,11 +116,11 @@ class LogRecord {
 		this.severityText = severityText;
 		return this;
 	}
-	_makeReadonly() {
+	makeReadonly() {
 		this._isReadonly = true;
 	}
 	_truncateToSize(value) {
-		const limit = this._logRecordLimits.attributeValueLengthLimit;
+		const limit = this._logRecordLimits.attributeValueLengthLimit || 0;
 		if (limit <= 0) {
 			api.diag.warn(`Attribute value limit must be positive, got ${limit}`);
 			return value;
@@ -147,22 +147,6 @@ class LogRecord {
 	}
 }
 
-class Logger {
-	constructor(instrumentationScope, _sharedState) {
-		this.instrumentationScope = instrumentationScope;
-		this._sharedState = _sharedState;
-	}
-	emit(logRecord) {
-		const currentContext = logRecord.context || context.active();
-		const logRecordInstance = new LogRecord(this._sharedState, this.instrumentationScope, {
-			context: currentContext,
-			...logRecord,
-		});
-		this._sharedState.activeProcessor.onEmit(logRecordInstance, currentContext);
-		logRecordInstance._makeReadonly();
-	}
-}
-
 function loadDefaultConfig() {
 	return {
 		forceFlushTimeoutMillis: 30000,
@@ -173,18 +157,50 @@ function loadDefaultConfig() {
 		includeTraceContext: true,
 	};
 }
-function reconfigureLimits(logRecordLimits) {
+function reconfigureLimits(userConfig) {
+	const logRecordLimits = Object.assign({}, userConfig.logRecordLimits);
 	const parsedEnvConfig = getEnvWithoutDefaults();
-	return {
-		attributeCountLimit: logRecordLimits.attributeCountLimit ??
+	logRecordLimits.attributeCountLimit =
+		userConfig.logRecordLimits?.attributeCountLimit ??
 			parsedEnvConfig.OTEL_LOGRECORD_ATTRIBUTE_COUNT_LIMIT ??
 			parsedEnvConfig.OTEL_ATTRIBUTE_COUNT_LIMIT ??
-			DEFAULT_ATTRIBUTE_COUNT_LIMIT,
-		attributeValueLengthLimit: logRecordLimits.attributeValueLengthLimit ??
+			DEFAULT_ATTRIBUTE_COUNT_LIMIT;
+	logRecordLimits.attributeValueLengthLimit =
+		userConfig.logRecordLimits?.attributeValueLengthLimit ??
 			parsedEnvConfig.OTEL_LOGRECORD_ATTRIBUTE_VALUE_LENGTH_LIMIT ??
 			parsedEnvConfig.OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT ??
-			DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT,
-	};
+			DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT;
+	return Object.assign({}, userConfig, { logRecordLimits });
+}
+function mergeConfig(userConfig) {
+	const DEFAULT_CONFIG = loadDefaultConfig();
+	const target = Object.assign({}, DEFAULT_CONFIG, userConfig);
+	target.logRecordLimits = Object.assign({}, DEFAULT_CONFIG.logRecordLimits, userConfig.logRecordLimits || {});
+	return target;
+}
+
+class Logger {
+	constructor(instrumentationScope, config, _loggerProvider) {
+		this.instrumentationScope = instrumentationScope;
+		this._loggerProvider = _loggerProvider;
+		this._loggerConfig = mergeConfig(config);
+		this.resource = _loggerProvider.resource;
+	}
+	emit(logRecord) {
+		const currentContext = logRecord.context || context.active();
+		const logRecordInstance = new LogRecord(this, {
+			context: currentContext,
+			...logRecord,
+		});
+		this.getActiveLogRecordProcessor().onEmit(logRecordInstance, currentContext);
+		logRecordInstance.makeReadonly();
+	}
+	getLogRecordLimits() {
+		return this._loggerConfig.logRecordLimits;
+	}
+	getActiveLogRecordProcessor() {
+		return this._loggerProvider.getActiveLogRecordProcessor();
+	}
 }
 
 class MultiLogRecordProcessor {
@@ -196,8 +212,8 @@ class MultiLogRecordProcessor {
 		const timeout = this.forceFlushTimeoutMillis;
 		await Promise.all(this.processors.map(processor => callWithTimeout(processor.forceFlush(), timeout)));
 	}
-	onEmit(logRecord, context) {
-		this.processors.forEach(processors => processors.onEmit(logRecord, context));
+	onEmit(logRecord) {
+		this.processors.forEach(processors => processors.onEmit(logRecord));
 	}
 	async shutdown() {
 		await Promise.all(this.processors.map(processor => processor.shutdown()));
@@ -208,29 +224,26 @@ class NoopLogRecordProcessor {
 	forceFlush() {
 		return Promise.resolve();
 	}
-	onEmit(_logRecord, _context) { }
+	onEmit(_logRecord) { }
 	shutdown() {
 		return Promise.resolve();
-	}
-}
-
-class LoggerProviderSharedState {
-	constructor(resource, forceFlushTimeoutMillis, logRecordLimits) {
-		this.resource = resource;
-		this.forceFlushTimeoutMillis = forceFlushTimeoutMillis;
-		this.logRecordLimits = logRecordLimits;
-		this.loggers = new Map();
-		this.registeredLogRecordProcessors = [];
-		this.activeProcessor = new NoopLogRecordProcessor();
 	}
 }
 
 const DEFAULT_LOGGER_NAME = 'unknown';
 class LoggerProvider {
 	constructor(config = {}) {
-		const { resource = Resource.default(), logRecordLimits, forceFlushTimeoutMillis, } = merge({}, loadDefaultConfig(), config);
-		this._sharedState = new LoggerProviderSharedState(resource, forceFlushTimeoutMillis, reconfigureLimits(logRecordLimits));
+		this._loggers = new Map();
+		this._registeredLogRecordProcessors = [];
+		const { resource = Resource.empty(), logRecordLimits, forceFlushTimeoutMillis, } = merge({}, loadDefaultConfig(), reconfigureLimits(config));
+		this.resource = Resource.default().merge(resource);
+		this._config = {
+			logRecordLimits,
+			resource: this.resource,
+			forceFlushTimeoutMillis,
+		};
 		this._shutdownOnce = new BindOnceFuture(this._shutdown, this);
+		this._activeProcessor = new MultiLogRecordProcessor([new NoopLogRecordProcessor()], forceFlushTimeoutMillis);
 	}
 	getLogger(name, version, options) {
 		if (this._shutdownOnce.isCalled) {
@@ -242,26 +255,28 @@ class LoggerProvider {
 		}
 		const loggerName = name || DEFAULT_LOGGER_NAME;
 		const key = `${loggerName}@${version || ''}:${options?.schemaUrl || ''}`;
-		if (!this._sharedState.loggers.has(key)) {
-			this._sharedState.loggers.set(key, new Logger({ name: loggerName, version, schemaUrl: options?.schemaUrl }, this._sharedState));
+		if (!this._loggers.has(key)) {
+			this._loggers.set(key, new Logger({ name: loggerName, version, schemaUrl: options?.schemaUrl }, {
+				logRecordLimits: this._config.logRecordLimits,
+			}, this));
 		}
-		return this._sharedState.loggers.get(key);
+		return this._loggers.get(key);
 	}
 	addLogRecordProcessor(processor) {
-		if (this._sharedState.registeredLogRecordProcessors.length === 0) {
-			this._sharedState.activeProcessor
+		if (this._registeredLogRecordProcessors.length === 0) {
+			this._activeProcessor
 				.shutdown()
 				.catch(err => diag.error('Error while trying to shutdown current log record processor', err));
 		}
-		this._sharedState.registeredLogRecordProcessors.push(processor);
-		this._sharedState.activeProcessor = new MultiLogRecordProcessor(this._sharedState.registeredLogRecordProcessors, this._sharedState.forceFlushTimeoutMillis);
+		this._registeredLogRecordProcessors.push(processor);
+		this._activeProcessor = new MultiLogRecordProcessor(this._registeredLogRecordProcessors, this._config.forceFlushTimeoutMillis);
 	}
 	forceFlush() {
 		if (this._shutdownOnce.isCalled) {
 			diag.warn('invalid attempt to force flush after LoggerProvider shutdown');
 			return this._shutdownOnce.promise;
 		}
-		return this._sharedState.activeProcessor.forceFlush();
+		return this._activeProcessor.forceFlush();
 	}
 	shutdown() {
 		if (this._shutdownOnce.isCalled) {
@@ -270,8 +285,14 @@ class LoggerProvider {
 		}
 		return this._shutdownOnce.call();
 	}
+	getActiveLogRecordProcessor() {
+		return this._activeProcessor;
+	}
+	getActiveLoggers() {
+		return this._loggers;
+	}
 	_shutdown() {
-		return this._sharedState.activeProcessor.shutdown();
+		return this._activeProcessor.shutdown();
 	}
 }
 
@@ -470,4 +491,4 @@ class BatchLogRecordProcessor extends BatchLogRecordProcessorBase {
 	onShutdown() { }
 }
 
-export { BatchLogRecordProcessor, ConsoleLogRecordExporter, InMemoryLogRecordExporter, LogRecord, LoggerProvider, NoopLogRecordProcessor, SimpleLogRecordProcessor };
+export { BatchLogRecordProcessor, ConsoleLogRecordExporter, InMemoryLogRecordExporter, LogRecord, Logger, LoggerProvider, NoopLogRecordProcessor, SimpleLogRecordProcessor };

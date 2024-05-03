@@ -1,4 +1,4 @@
-#!/usr/bin/env -S deno run --allow-run --allow-read --allow-write=. --allow-env --allow-sys --allow-ffi
+#!/usr/bin/env -S deno run --allow-run --allow-read --allow-write=. --allow-env
 
 // pass --refresh-yarn to force rerunning yarn on the opentelemetry packages
 
