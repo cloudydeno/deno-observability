@@ -9,7 +9,13 @@ import {
   type TextMapGetter,
 } from "../opentelemetry/api.js";
 
-export function httpTracer(inner: Deno.ServeHandler): Deno.ServeHandler {
+export function httpTracer(inner: Deno.ServeHandler, opts?: {
+  extractTraceContext?: boolean;
+}): Deno.ServeHandler {
+
+  // Deno Deploy passes a trace context into the app but doesn't give us its spans
+  // So we disable context extraction by default on Deno Deploy
+  const extractTraceContext = opts?.extractTraceContext ?? !Deno.env.get('DENO_DEPLOYMENT_ID');
 
   // https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/http.md
   const tracer = trace.getTracer('http');
@@ -30,7 +36,10 @@ export function httpTracer(inner: Deno.ServeHandler): Deno.ServeHandler {
     };
     inflightMetric.add(1, reqMetricAttrs);
 
-    const ctx = propagation.extract(ROOT_CONTEXT, req.headers, HeadersGetter);
+    const ctx = extractTraceContext
+      ? propagation.extract(ROOT_CONTEXT, req.headers, HeadersGetter)
+      : ROOT_CONTEXT;
+
     return tracer.startActiveSpan(`${req.method} ${url.pathname}`, {
       kind: SpanKind.SERVER,
       attributes: {
