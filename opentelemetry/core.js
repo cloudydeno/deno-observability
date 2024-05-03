@@ -523,7 +523,7 @@ function getIdGenerator(bytes) {
 
 const otperformance = performance;
 
-const VERSION$1 = "1.16.0";
+const VERSION$1 = "1.17.0";
 
 const SDK_INFO = {
 	[SemanticResourceAttributes.TELEMETRY_SDK_NAME]: 'opentelemetry',

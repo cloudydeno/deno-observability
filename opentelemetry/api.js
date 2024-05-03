@@ -17,7 +17,7 @@
 
 const _globalThis = typeof globalThis === 'object' ? globalThis : global;
 
-const VERSION = "1.5.0";
+const VERSION = "1.6.0";
 
 const re = /^(\d+)\.(\d+)\.(\d+)(-(.+))?$/;
 function _makeCompatibilityCheck(ownVersion) {
@@ -515,7 +515,7 @@ class NonRecordingSpan {
 	isRecording() {
 		return false;
 	}
-	recordException(_exception, _attributesOrStartTime, _time) { }
+	recordException(_exception, _time) { }
 }
 
 const SPAN_KEY = createContextKey('OpenTelemetry Context Key SPAN');
