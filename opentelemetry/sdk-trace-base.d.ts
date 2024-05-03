@@ -330,7 +330,7 @@ declare class Span implements Span$1, ReadableSpan {
 	end(endTime?: TimeInput): void;
 	private _getTime;
 	isRecording(): boolean;
-	recordException(exception: Exception, time?: TimeInput): void;
+	recordException(exception: Exception, attributesOrStartTime?: SpanAttributes | TimeInput, timeStamp?: TimeInput): void;
 	get duration(): HrTime;
 	get ended(): boolean;
 	get droppedAttributesCount(): number;

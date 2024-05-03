@@ -16,7 +16,7 @@
 /// <reference types="./sdk-metrics.d.ts" />
 
 import * as api from './api.js';
-import { ValueType, diag, context, createNoopMeter } from './api.js';
+import { diag, ValueType, context, createNoopMeter } from './api.js';
 import { hrTimeToMicroseconds, millisToHrTime, globalErrorHandler, unrefTimer, internal, ExportResultCode } from './core.js';
 import { Resource } from './resources.js';
 
@@ -126,6 +126,9 @@ function binarySearchLB(arr, value) {
 	}
 	return -1;
 }
+function equalsCaseInsensitive(lhs, rhs) {
+	return lhs.toLowerCase() === rhs.toLowerCase();
+}
 
 var AggregatorKind;
 (function (AggregatorKind) {
@@ -164,6 +167,9 @@ var InstrumentType;
 	InstrumentType["OBSERVABLE_UP_DOWN_COUNTER"] = "OBSERVABLE_UP_DOWN_COUNTER";
 })(InstrumentType || (InstrumentType = {}));
 function createInstrumentDescriptor(name, type, options) {
+	if (!isValidName(name)) {
+		diag.warn(`Invalid metric name: "${name}". The metric name should be a ASCII string with a length no greater than 255 characters.`);
+	}
 	return {
 		name,
 		type,
@@ -182,10 +188,14 @@ function createInstrumentDescriptorWithView(view, instrument) {
 	};
 }
 function isDescriptorCompatibleWith(descriptor, otherDescriptor) {
-	return (descriptor.name === otherDescriptor.name &&
+	return (equalsCaseInsensitive(descriptor.name, otherDescriptor.name) &&
 		descriptor.unit === otherDescriptor.unit &&
 		descriptor.type === otherDescriptor.type &&
 		descriptor.valueType === otherDescriptor.valueType);
+}
+const NAME_REGEXP = /^[a-z][a-z0-9_.-]{0,254}$/i;
+function isValidName(name) {
+	return name.match(NAME_REGEXP) != null;
 }
 
 function createNewEmptyCheckpoint(boundaries) {
@@ -1183,12 +1193,13 @@ class MetricReader {
 		this._aggregationTemporalitySelector =
 			options?.aggregationTemporalitySelector ??
 				DEFAULT_AGGREGATION_TEMPORALITY_SELECTOR;
+		this._metricProducers = options?.metricProducers ?? [];
 	}
 	setMetricProducer(metricProducer) {
-		if (this._metricProducer) {
+		if (this._sdkMetricProducer) {
 			throw new Error('MetricReader can not be bound to a MeterProvider again.');
 		}
-		this._metricProducer = metricProducer;
+		this._sdkMetricProducer = metricProducer;
 		this.onInitialized();
 	}
 	selectAggregation(instrumentType) {
@@ -1200,15 +1211,30 @@ class MetricReader {
 	onInitialized() {
 	}
 	async collect(options) {
-		if (this._metricProducer === undefined) {
+		if (this._sdkMetricProducer === undefined) {
 			throw new Error('MetricReader is not bound to a MetricProducer');
 		}
 		if (this._shutdown) {
 			throw new Error('MetricReader is shutdown');
 		}
-		return this._metricProducer.collect({
-			timeoutMillis: options?.timeoutMillis,
-		});
+		const [sdkCollectionResults, ...additionalCollectionResults] = await Promise.all([
+			this._sdkMetricProducer.collect({
+				timeoutMillis: options?.timeoutMillis,
+			}),
+			...this._metricProducers.map(producer => producer.collect({
+				timeoutMillis: options?.timeoutMillis,
+			})),
+		]);
+		const errors = sdkCollectionResults.errors.concat(FlatMap(additionalCollectionResults, result => result.errors));
+		const resource = sdkCollectionResults.resourceMetrics.resource;
+		const scopeMetrics = sdkCollectionResults.resourceMetrics.scopeMetrics.concat(FlatMap(additionalCollectionResults, result => result.resourceMetrics.scopeMetrics));
+		return {
+			resourceMetrics: {
+				resource,
+				scopeMetrics,
+			},
+			errors,
+		};
 	}
 	async shutdown(options) {
 		if (this._shutdown) {
@@ -1241,6 +1267,7 @@ class PeriodicExportingMetricReader extends MetricReader {
 		super({
 			aggregationSelector: options.exporter.selectAggregation?.bind(options.exporter),
 			aggregationTemporalitySelector: options.exporter.selectAggregationTemporality?.bind(options.exporter),
+			metricProducers: options.metricProducers,
 		});
 		if (options.exportIntervalMillis !== undefined &&
 			options.exportIntervalMillis <= 0) {

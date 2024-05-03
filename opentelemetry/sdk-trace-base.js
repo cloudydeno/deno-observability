@@ -163,7 +163,13 @@ class Span {
 	isRecording() {
 		return this._ended === false;
 	}
-	recordException(exception, time) {
+	recordException(exception, attributesOrStartTime, timeStamp) {
+		if (isTimeInput(attributesOrStartTime)) {
+			if (!isTimeInput(timeStamp)) {
+				timeStamp = attributesOrStartTime;
+			}
+			attributesOrStartTime = undefined;
+		}
 		const attributes = {};
 		if (typeof exception === 'string') {
 			attributes[SemanticAttributes.EXCEPTION_MESSAGE] = exception;
@@ -183,9 +189,12 @@ class Span {
 				attributes[SemanticAttributes.EXCEPTION_STACKTRACE] = exception.stack;
 			}
 		}
+		if (attributesOrStartTime) {
+			Object.assign(attributes, sanitizeAttributes(attributesOrStartTime));
+		}
 		if (attributes[SemanticAttributes.EXCEPTION_TYPE] ||
 			attributes[SemanticAttributes.EXCEPTION_MESSAGE]) {
-			this.addEvent(ExceptionEventName, attributes, time);
+			this.addEvent(ExceptionEventName, attributes, timeStamp);
 		}
 		else {
 			diag.warn(`Failed to record an exception ${exception}`);
