@@ -2,11 +2,11 @@
 
 // pass --refresh-yarn to force rerunning yarn on the opentelemetry packages
 
-import { rollup, Plugin } from 'npm:rollup';
-import { nodeResolve } from 'npm:@rollup/plugin-node-resolve';
-import commonjs from 'npm:@rollup/plugin-commonjs';
-import sourcemaps from 'npm:rollup-plugin-sourcemaps';
-import cleanup from 'npm:rollup-plugin-cleanup';
+import { rollup, Plugin } from 'npm:rollup@4.17.2';
+import { nodeResolve } from 'npm:@rollup/plugin-node-resolve@15.2.3';
+import commonjs from 'npm:@rollup/plugin-commonjs@25.0.7';
+import sourcemaps from 'npm:rollup-plugin-sourcemaps@0.6.3';
+import cleanup from 'npm:rollup-plugin-cleanup@3.2.1';
 import dts from 'npm:rollup-plugin-dts@4.2.3';
 // import { terser } from "npm:rollup-plugin-terser";
 
