@@ -88,6 +88,9 @@ export function httpTracer(inner: Deno.ServeHandler, opts?: {
         const respSnoop = snoopStream(resp.body);
         respSnoop.finalSize.then(size => {
           serverSpan.setAttribute(SemanticAttributes.HTTP_RESPONSE_CONTENT_LENGTH_UNCOMPRESSED, size);
+        }).catch(err => {
+          // NOTE: err can be "resource closed" when the client walks away mid-response.
+          serverSpan.recordException(err);
         }).finally(() => {
           inflightMetric.add(-1, reqMetricAttrs);
           serverSpan.end();
