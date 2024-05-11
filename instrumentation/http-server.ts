@@ -88,6 +88,9 @@ export function httpTracer(inner: Deno.ServeHandler, opts?: {
         const respSnoop = snoopStream(resp.body);
         respSnoop.finalSize.then(size => {
           serverSpan.setAttribute(SemanticAttributes.HTTP_RESPONSE_CONTENT_LENGTH_UNCOMPRESSED, size);
+        }).catch(err => {
+          serverSpan.recordException(err);
+          console.error(`pipeTo failed: ${err.message ?? err}`);
         }).finally(() => {
           inflightMetric.add(-1, reqMetricAttrs);
           serverSpan.end();
