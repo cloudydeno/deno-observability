@@ -2,6 +2,7 @@
 
 // pass --refresh-yarn to force rerunning yarn on the opentelemetry packages
 
+import 'npm:@rollup/rollup-linux-x64-gnu@4.17.2';
 import { rollup, Plugin } from 'npm:rollup@4.17.2';
 import { nodeResolve } from 'npm:@rollup/plugin-node-resolve@15.2.3';
 import commonjs from 'npm:@rollup/plugin-commonjs@25.0.7';
