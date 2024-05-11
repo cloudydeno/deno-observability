@@ -102,6 +102,7 @@ export function httpTracer(inner: Deno.ServeHandler, opts?: {
         serverSpan.recordException(err);
         serverSpan.end();
         inflightMetric.add(-1, reqMetricAttrs);
+        console.error('httpTracer Error:', err);
         throw err;
       } finally {
         durationMetric.record(performance.now() - d0, reqMetricAttrs, ctx);
