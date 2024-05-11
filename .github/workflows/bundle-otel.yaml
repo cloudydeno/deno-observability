@@ -1,0 +1,47 @@
+name: Bundle OpenTelemetry
+
+on:
+  push:
+    branches: [ main ]
+  pull_request: {}
+
+jobs:
+
+  bundle:
+    runs-on: ubuntu-latest
+    name: Rebundle
+
+    steps:
+    - name: Checkout source
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Set up Deno
+      uses: denoland/setup-deno@v1
+      with:
+        deno-version: v1.40
+
+    # "https" cache: code from the Internet
+    # External sources won't change much so we use less precise keys
+    - name: Cache https://
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/deno/deps/https
+        key: deno-https/v1-${{ github.sha }}
+        restore-keys: deno-https/v1-
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '22'
+        # cache: 'yarn'
+
+    - name: Build
+      run: time hack/bundle-opentelemetry.ts
+
+    - name: Status
+      run: git status
+
+    - name: Check demo.ts
+      run: time deno check --unstable demo.ts
