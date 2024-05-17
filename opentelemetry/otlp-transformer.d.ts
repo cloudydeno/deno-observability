@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import { HrTime } from './api.d.ts';
 import { ReadableSpan } from './sdk-trace-base.d.ts';
 import { ResourceMetrics } from './sdk-metrics.d.ts';
 import { ReadableLogRecord } from './sdk-logs.d.ts';
@@ -63,6 +64,31 @@ interface IKeyValueList {
 	/** KeyValueList values */
 	values: IKeyValue[];
 }
+interface LongBits {
+	low: number;
+	high: number;
+}
+declare type Fixed64 = LongBits | string | number;
+interface OtlpEncodingOptions {
+	/** Convert trace and span IDs to hex strings. */
+	useHex?: boolean;
+	/** Convert HrTime to 2 part 64 bit values. */
+	useLongBits?: boolean;
+}
+
+declare function hrTimeToNanos(hrTime: HrTime): bigint;
+declare function toLongBits(value: bigint): LongBits;
+declare function encodeAsLongBits(hrTime: HrTime): LongBits;
+declare function encodeAsString(hrTime: HrTime): string;
+declare type HrTimeEncodeFunction = (hrTime: HrTime) => Fixed64;
+declare type SpanContextEncodeFunction = (spanContext: string) => string;
+declare type OptionalSpanContextEncodeFunction = (spanContext: string | undefined) => string | undefined;
+interface Encoder {
+	encodeHrTime: HrTimeEncodeFunction;
+	encodeSpanContext: SpanContextEncodeFunction;
+	encodeOptionalSpanContext: OptionalSpanContextEncodeFunction;
+}
+declare function getOtlpEncoder(options?: OtlpEncodingOptions): Encoder;
 
 /** Properties of a Resource. */
 interface IResource {
@@ -162,9 +188,9 @@ interface INumberDataPoint {
 	/** NumberDataPoint attributes */
 	attributes: IKeyValue[];
 	/** NumberDataPoint startTimeUnixNano */
-	startTimeUnixNano?: number;
+	startTimeUnixNano?: Fixed64;
 	/** NumberDataPoint timeUnixNano */
-	timeUnixNano?: number;
+	timeUnixNano?: Fixed64;
 	/** NumberDataPoint asDouble */
 	asDouble?: number | null;
 	/** NumberDataPoint asInt */
@@ -179,9 +205,9 @@ interface IHistogramDataPoint {
 	/** HistogramDataPoint attributes */
 	attributes?: IKeyValue[];
 	/** HistogramDataPoint startTimeUnixNano */
-	startTimeUnixNano?: number;
+	startTimeUnixNano?: Fixed64;
 	/** HistogramDataPoint timeUnixNano */
-	timeUnixNano?: number;
+	timeUnixNano?: Fixed64;
 	/** HistogramDataPoint count */
 	count?: number;
 	/** HistogramDataPoint sum */
@@ -204,9 +230,9 @@ interface IExponentialHistogramDataPoint {
 	/** ExponentialHistogramDataPoint attributes */
 	attributes?: IKeyValue[];
 	/** ExponentialHistogramDataPoint startTimeUnixNano */
-	startTimeUnixNano?: number;
+	startTimeUnixNano?: Fixed64;
 	/** ExponentialHistogramDataPoint timeUnixNano */
-	timeUnixNano?: number;
+	timeUnixNano?: Fixed64;
 	/** ExponentialHistogramDataPoint count */
 	count?: number;
 	/** ExponentialHistogramDataPoint sum */
@@ -392,9 +418,9 @@ interface ISpan {
 	/** Span kind */
 	kind: ESpanKind;
 	/** Span startTimeUnixNano */
-	startTimeUnixNano: number;
+	startTimeUnixNano: Fixed64;
 	/** Span endTimeUnixNano */
-	endTimeUnixNano: number;
+	endTimeUnixNano: Fixed64;
 	/** Span attributes */
 	attributes: IKeyValue[];
 	/** Span droppedAttributesCount */
@@ -459,7 +485,7 @@ declare enum EStatusCode {
 /** Properties of an Event. */
 interface IEvent {
 	/** Event timeUnixNano */
-	timeUnixNano: number;
+	timeUnixNano: Fixed64;
 	/** Event name */
 	name: string;
 	/** Event attributes */
@@ -517,9 +543,9 @@ interface IScopeLogs {
 /** Properties of a LogRecord. */
 interface ILogRecord {
 	/** LogRecord timeUnixNano */
-	timeUnixNano: number;
+	timeUnixNano: Fixed64;
 	/** LogRecord observedTimeUnixNano */
-	observedTimeUnixNano: number;
+	observedTimeUnixNano: Fixed64;
 	/** LogRecord severityNumber */
 	severityNumber?: ESeverityNumber;
 	/** LogRecord severityText */
@@ -569,10 +595,10 @@ declare enum ESeverityNumber {
 	SEVERITY_NUMBER_FATAL4 = 24
 }
 
-declare function createExportTraceServiceRequest(spans: ReadableSpan[], useHex?: boolean): IExportTraceServiceRequest;
+declare function createExportTraceServiceRequest(spans: ReadableSpan[], options?: OtlpEncodingOptions): IExportTraceServiceRequest;
 
-declare function createExportMetricsServiceRequest(resourceMetrics: ResourceMetrics[]): IExportMetricsServiceRequest;
+declare function createExportMetricsServiceRequest(resourceMetrics: ResourceMetrics[], options?: OtlpEncodingOptions): IExportMetricsServiceRequest;
 
-declare function createExportLogsServiceRequest(logRecords: ReadableLogRecord[], useHex?: boolean): IExportLogsServiceRequest;
+declare function createExportLogsServiceRequest(logRecords: ReadableLogRecord[], options?: OtlpEncodingOptions): IExportLogsServiceRequest;
 
-export { EAggregationTemporality, ESeverityNumber, ESpanKind, EStatusCode, IAnyValue, IArrayValue, IBuckets, IEvent, IExemplar, IExponentialHistogram, IExponentialHistogramDataPoint, IExportLogsPartialSuccess, IExportLogsServiceRequest, IExportLogsServiceResponse, IExportMetricsPartialSuccess, IExportMetricsServiceRequest, IExportMetricsServiceResponse, IExportTracePartialSuccess, IExportTraceServiceRequest, IExportTraceServiceResponse, IGauge, IHistogram, IHistogramDataPoint, IInstrumentationScope, IKeyValue, IKeyValueList, ILink, ILogRecord, IMetric, INumberDataPoint, IResource, IResourceLogs, IResourceMetrics, IResourceSpans, IScopeLogs, IScopeMetrics, IScopeSpans, ISpan, IStatus, ISum, ISummary, ISummaryDataPoint, IValueAtQuantile, createExportLogsServiceRequest, createExportMetricsServiceRequest, createExportTraceServiceRequest };
+export { EAggregationTemporality, ESeverityNumber, ESpanKind, EStatusCode, Encoder, Fixed64, HrTimeEncodeFunction, IAnyValue, IArrayValue, IBuckets, IEvent, IExemplar, IExponentialHistogram, IExponentialHistogramDataPoint, IExportLogsPartialSuccess, IExportLogsServiceRequest, IExportLogsServiceResponse, IExportMetricsPartialSuccess, IExportMetricsServiceRequest, IExportMetricsServiceResponse, IExportTracePartialSuccess, IExportTraceServiceRequest, IExportTraceServiceResponse, IGauge, IHistogram, IHistogramDataPoint, IInstrumentationScope, IKeyValue, IKeyValueList, ILink, ILogRecord, IMetric, INumberDataPoint, IResource, IResourceLogs, IResourceMetrics, IResourceSpans, IScopeLogs, IScopeMetrics, IScopeSpans, ISpan, IStatus, ISum, ISummary, ISummaryDataPoint, IValueAtQuantile, LongBits, OptionalSpanContextEncodeFunction, OtlpEncodingOptions, SpanContextEncodeFunction, createExportLogsServiceRequest, createExportMetricsServiceRequest, createExportTraceServiceRequest, encodeAsLongBits, encodeAsString, getOtlpEncoder, hrTimeToNanos, toLongBits };

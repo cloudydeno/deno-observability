@@ -206,6 +206,13 @@ const modules = [
   'hack/opentelemetry-js/experimental/packages/sdk-logs',
 ];
 
+await new Deno.Command('rm', {
+  args: ['-r', 'hack/opentelemetry-js/experimental/packages/opentelemetry-exporter-metrics-otlp-http/src/platform'],
+  stdin: 'null',
+  stdout: 'inherit',
+  stderr: 'inherit',
+}).output();
+
 // use runtime's performance instead of node's
 await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-core/src/platform/node/performance.ts', 'export const otperformance = performance;');
 
@@ -213,7 +220,8 @@ await Deno.writeTextFile('hack/opentelemetry-js/packages/sdk-metrics/test/index-
 await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/otlp-exporter-base/test/browser/index-webpack.ts', '');
 
 await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-core/src/platform/node/timer-util.ts',
-`export function unrefTimer(timer: number): void {
+`// Typescript seems to think that setTimeout will return a "Timeout" like in NodeJS
+export function unrefTimer(timer: any): void {
   // @ts-expect-error TODO: Deno types in tsc
   Deno.unrefTimer?.(timer);
 }`);
@@ -257,7 +265,7 @@ await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-resources
 
 // TODO: maybe put a deno impl in there?
 await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/otlp-exporter-base/src/platform/index.ts', 'export {};');
-await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/opentelemetry-exporter-metrics-otlp-http/src/platform/index.ts', 'export {};');
+await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/opentelemetry-exporter-metrics-otlp-http/src/platform.ts', 'export {};');
 await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/opentelemetry-instrumentation/src/platform/index.ts', `export * from './browser';`);
 
 await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-core/src/platform/node/RandomIdGenerator.ts',
@@ -271,24 +279,90 @@ await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-sdk-trace
 await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-resources/src/platform/node/machine-id/getMachineId.ts',
   await Deno.readTextFile('hack/opentelemetry-js/packages/opentelemetry-resources/src/platform/node/machine-id/getMachineId-linux.ts'));
 
-async function yarnInstall(directory: string) {
-  if (!Deno.args.includes('--refresh-yarn')) {
-    if (await Deno.stat(directory+'/node_modules').then(() => true, () => false)) return;
-  }
-  const yarn = new Deno.Command('yarn', {
+// tsconfig doesn't allow module/target overrides in build mode, so we patch
+await Deno.writeTextFile('hack/opentelemetry-js/tsconfig.base.esnext.json',
+  await Deno.readTextFile('hack/opentelemetry-js/tsconfig.base.esnext.json').then(text => text
+    .replace('esnext', 'es2020') // module
+    .replace('es2017', 'es2021'))); // target
+await Deno.writeTextFile('hack/opentelemetry-js/tsconfig.base.json',
+  await Deno.readTextFile('hack/opentelemetry-js/tsconfig.base.json').then(text => text
+    .replace('es2017', 'es2021'))); // target
+
+// create tsconfig project with the subset of modules we care about
+await Deno.writeTextFile('hack/opentelemetry-js/tsconfig.esnext.deno.json', JSON.stringify({
+  "extends": "./tsconfig.base.esnext.json",
+  "files": [],
+  "references": [
+    { "path": "api/tsconfig.esnext.json" },
+    { "path": "experimental/packages/api-events/tsconfig.esnext.json" },
+    { "path": "experimental/packages/api-logs/tsconfig.esnext.json" },
+    // { "path": "experimental/packages/exporter-logs-otlp-http/tsconfig.esnext.json" },
+    // { "path": "experimental/packages/exporter-logs-otlp-proto/tsconfig.esnext.json" },
+    // { "path": "experimental/packages/exporter-trace-otlp-http/tsconfig.esnext.json" },
+    // { "path": "experimental/packages/exporter-trace-otlp-proto/tsconfig.esnext.json" },
+    // { "path": "experimental/packages/opentelemetry-browser-detector/tsconfig.esnext.json" },
+    { "path": "experimental/packages/opentelemetry-exporter-metrics-otlp-http/tsconfig.esnext.json" },
+    // { "path": "experimental/packages/opentelemetry-exporter-metrics-otlp-proto/tsconfig.esnext.json" },
+    { "path": "experimental/packages/opentelemetry-instrumentation/tsconfig.esnext.json" },
+    // { "path": "experimental/packages/opentelemetry-instrumentation-fetch/tsconfig.esnext.json" },
+    // { "path": "experimental/packages/opentelemetry-instrumentation-xml-http-request/tsconfig.esnext.json" },
+    { "path": "experimental/packages/otlp-exporter-base/tsconfig.esnext.json" },
+    // { "path": "experimental/packages/otlp-proto-exporter-base/tsconfig.esnext.json" },
+    { "path": "experimental/packages/otlp-transformer/tsconfig.esnext.json" },
+    { "path": "experimental/packages/sdk-logs/tsconfig.esnext.json" },
+    // { "path": "packages/opentelemetry-context-zone/tsconfig.esnext.json" },
+    // { "path": "packages/opentelemetry-context-zone-peer-dep/tsconfig.esnext.json" },
+    { "path": "packages/opentelemetry-core/tsconfig.esnext.json" },
+    // { "path": "packages/opentelemetry-exporter-zipkin/tsconfig.esnext.json" },
+    { "path": "packages/opentelemetry-propagator-b3/tsconfig.esnext.json" },
+    { "path": "packages/opentelemetry-propagator-jaeger/tsconfig.esnext.json" },
+    { "path": "packages/opentelemetry-resources/tsconfig.esnext.json" },
+    { "path": "packages/opentelemetry-sdk-trace-base/tsconfig.esnext.json" },
+    // { "path": "packages/opentelemetry-sdk-trace-web/tsconfig.esnext.json" },
+    { "path": "packages/opentelemetry-semantic-conventions/tsconfig.esnext.json" },
+    // { "path": "packages/propagator-aws-xray/tsconfig.esnext.json" },
+    { "path": "packages/sdk-metrics/tsconfig.esnext.json" },
+  ],
+}, null, 2));
+
+async function npmInstall(directory: string) {
+  // if (!Deno.args.includes('--refresh-yarn')) {
+  //   if (await Deno.stat(directory+'/node_modules').then(() => true, () => false)) return;
+  // }
+  const npm = new Deno.Command('npm', {
     args: ['install', /*'--production',*/ '--ignore-scripts'],
     cwd: directory,
     stdout: 'inherit',
     stderr: 'inherit',
   });
-  const yarnOut = await yarn.output();
-  // if (yarnOut.stdout.byteLength > 0) {
-  //   console.log(new TextDecoder().decode(yarnOut.stdout));
+  const npmOut = await npm.output();
+  // if (npmOut.stdout.byteLength > 0) {
+  //   console.log(new TextDecoder().decode(npmOut.stdout));
   // }
-  if (!yarnOut.success) throw new Error(`yarn failed on ${directory}`);
+  if (!npmOut.success) throw new Error(`npm failed on ${directory}`);
 }
 
-await yarnInstall('hack/opentelemetry-js');
+await npmInstall('hack/opentelemetry-js');
+
+for (const mod of modules) {
+  const {
+    version,
+  } = JSON.parse(await Deno.readTextFile(mod+'/package.json'));
+  await Deno.writeTextFile(mod+'/src/version.ts', `export const VERSION = ${JSON.stringify(version)};`);
+}
+
+const tsc = new Deno.Command('hack/opentelemetry-js/node_modules/.bin/tsc', {
+  args: [
+    '--build', 'hack/opentelemetry-js/tsconfig.esnext.deno.json',
+    // '--project', mod+'/tsconfig.esnext.json',
+    // '--target', 'es2021',
+    // '--module', 'es2020',
+    // '--lib', TODO: can we provide deno's lib somehow?
+  ],
+});
+const tscOut = await tsc.output();
+console.log(new TextDecoder().decode(tscOut.stdout));
+if (!tscOut.success) throw new Error(`TSC failed :(`);
 
 // import ts from "npm:typescript";
 
@@ -298,25 +372,11 @@ for (const mod of modules) {
   console.log();
 
   const {
-    name, version,
-    dependencies, peerDependencies,
+    name,
+    dependencies,
+    peerDependencies,
   } = JSON.parse(await Deno.readTextFile(mod+'/package.json'));
   const modName = name.split('/')[1];
-  await Deno.writeTextFile(mod+'/src/version.ts', `export const VERSION = ${JSON.stringify(version)};`);
-
-  await yarnInstall(mod);
-
-  const tsc = new Deno.Command('hack/opentelemetry-js/node_modules/.bin/tsc', {
-    args: [
-      '--project', mod+'/tsconfig.esnext.json',
-      '--target', 'es2021',
-      '--module', 'es2020',
-      // '--lib', TODO: can we provide deno's lib somehow?
-    ],
-  });
-  const tscOut = await tsc.output();
-  console.log(new TextDecoder().decode(tscOut.stdout));
-  if (!tscOut.success) throw new Error(`TSC failed on ${mod}`);
 
   await buildModuleWithRollup(mod, modName, [
     ...Object.keys(dependencies ?? {}),

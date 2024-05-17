@@ -866,6 +866,17 @@ interface BatchObservableResult<AttributesTypes extends MetricAttributes = Metri
 }
 
 /**
+ * Advisory options influencing aggregation configuration parameters.
+ * @experimental
+ */
+interface MetricAdvice {
+	/**
+	* Hint the explicit bucket boundaries for SDK if the metric is been
+	* aggregated with a HistogramAggregator.
+	*/
+	explicitBucketBoundaries?: number[];
+}
+/**
  * Options needed for metric creation
  */
 interface MetricOptions {
@@ -884,6 +895,11 @@ interface MetricOptions {
 	* @default {@link ValueType.DOUBLE}
 	*/
 	valueType?: ValueType;
+	/**
+	* The advice influencing aggregation configuration parameters.
+	* @experimental
+	*/
+	advice?: MetricAdvice;
 }
 /** The Type of value. It describes how the data is reported. */
 declare enum ValueType {
@@ -1475,4 +1491,4 @@ declare const _default: {
 };
 //# sourceMappingURL=index.d.ts.map
 
-export { AttributeValue, Attributes, Baggage, BaggageEntry, BaggageEntryMetadata, BatchObservableCallback, BatchObservableResult, ComponentLoggerOptions, Context, ContextAPI, ContextManager, Counter, DiagAPI, DiagConsoleLogger, DiagLogFunction, DiagLogLevel, DiagLogger, DiagLoggerOptions, Exception, Histogram, HrTime, INVALID_SPANID, INVALID_SPAN_CONTEXT, INVALID_TRACEID, Link, Meter, MeterOptions, MeterProvider, MetricAttributeValue, MetricAttributes, MetricOptions, MetricsAPI, Observable, ObservableCallback, ObservableCounter, ObservableGauge, ObservableResult, ObservableUpDownCounter, PropagationAPI, ProxyTracer, ProxyTracerProvider, ROOT_CONTEXT, Sampler, SamplingDecision, SamplingResult, Span, SpanAttributeValue, SpanAttributes, SpanContext, SpanKind, SpanOptions, SpanStatus, SpanStatusCode, TextMapGetter, TextMapPropagator, TextMapSetter, TimeInput, TraceAPI, TraceFlags, TraceState, Tracer, TracerDelegator, TracerOptions, TracerProvider, UpDownCounter, ValueType, baggageEntryMetadataFromString, context, createContextKey, createNoopMeter, createTraceState, _default as default, defaultTextMapGetter, defaultTextMapSetter, diag, isSpanContextValid, isValidSpanId, isValidTraceId, metrics, propagation, trace };
+export { AttributeValue, Attributes, Baggage, BaggageEntry, BaggageEntryMetadata, BatchObservableCallback, BatchObservableResult, ComponentLoggerOptions, Context, ContextAPI, ContextManager, Counter, DiagAPI, DiagConsoleLogger, DiagLogFunction, DiagLogLevel, DiagLogger, DiagLoggerOptions, Exception, Histogram, HrTime, INVALID_SPANID, INVALID_SPAN_CONTEXT, INVALID_TRACEID, Link, Meter, MeterOptions, MeterProvider, MetricAdvice, MetricAttributeValue, MetricAttributes, MetricOptions, MetricsAPI, Observable, ObservableCallback, ObservableCounter, ObservableGauge, ObservableResult, ObservableUpDownCounter, PropagationAPI, ProxyTracer, ProxyTracerProvider, ROOT_CONTEXT, Sampler, SamplingDecision, SamplingResult, Span, SpanAttributeValue, SpanAttributes, SpanContext, SpanKind, SpanOptions, SpanStatus, SpanStatusCode, TextMapGetter, TextMapPropagator, TextMapSetter, TimeInput, TraceAPI, TraceFlags, TraceState, Tracer, TracerDelegator, TracerOptions, TracerProvider, UpDownCounter, ValueType, baggageEntryMetadataFromString, context, createContextKey, createNoopMeter, createTraceState, _default as default, defaultTextMapGetter, defaultTextMapSetter, diag, isSpanContextValid, isValidSpanId, isValidTraceId, metrics, propagation, trace };

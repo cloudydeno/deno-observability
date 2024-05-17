@@ -201,8 +201,6 @@ declare enum ExportResultCode {
 	FAILED = 1
 }
 
-declare const VERSION = "1.15.2";
-
 declare type ParsedBaggageKeyValue = {
 	key: string;
 	value: string;
@@ -364,7 +362,7 @@ declare const SDK_INFO: {
 	[x: string]: string;
 };
 
-declare function unrefTimer(timer: number): void;
+declare function unrefTimer(timer: any): void;
 
 /** Configuration object for composite propagator */
 interface CompositePropagatorConfig {
@@ -593,6 +591,8 @@ declare class BindOnceFuture<R, This = unknown, T extends (this: This, ...args: 
 	get promise(): Promise<R>;
 	call(...args: Parameters<T>): Promise<R>;
 }
+
+declare const VERSION = "1.18.0";
 
 interface Exporter<T> {
 	export(arg: T, resultCallback: (result: ExportResult) => void): void;

@@ -79,11 +79,11 @@ abstract class OTLPFetchExporterBase<
   }
 
   onInit(): void {
-    window.addEventListener('unload', this.shutdown);
+    globalThis.addEventListener('unload', this.shutdown);
   }
 
   onShutdown(): void {
-    window.removeEventListener('unload', this.shutdown);
+    globalThis.removeEventListener('unload', this.shutdown);
   }
 
   send(

@@ -15,17 +15,9 @@
  */
 
 import * as _opentelemetry_api from './api.d.ts';
-import { MetricAttributes, Context, HrTime, ValueType, MeterProvider as MeterProvider$1, MeterOptions, Meter } from './api.d.ts';
+import { MetricAttributes, Context, HrTime, ValueType, MetricAdvice, MeterProvider as MeterProvider$1, MeterOptions, Meter } from './api.d.ts';
 import { InstrumentationScope, ExportResult } from './core.d.ts';
 import { IResource } from './resources.d.ts';
-
-/**
- * AggregationTemporality indicates the way additive quantities are expressed.
- */
-declare enum AggregationTemporality {
-	DELTA = 0,
-	CUMULATIVE = 1
-}
 
 /**
  * The {@link AttributesProcessor} is responsible for customizing which
@@ -84,6 +76,14 @@ declare class MeterSelector {
 	getSchemaUrlFilter(): Predicate;
 }
 
+/**
+ * AggregationTemporality indicates the way additive quantities are expressed.
+ */
+declare enum AggregationTemporality {
+	DELTA = 0,
+	CUMULATIVE = 1
+}
+
 declare type Maybe<T> = T | undefined;
 /**
  * Error that is thrown on timeouts.
@@ -92,13 +92,119 @@ declare class TimeoutError extends Error {
 	constructor(message?: string);
 }
 
+/** The kind of aggregator. */
+declare enum AggregatorKind {
+	DROP = 0,
+	SUM = 1,
+	LAST_VALUE = 2,
+	HISTOGRAM = 3,
+	EXPONENTIAL_HISTOGRAM = 4
+}
+/** DataPoint value type for SumAggregation. */
+declare type Sum = number;
+/** DataPoint value type for LastValueAggregation. */
+declare type LastValue = number;
+/** DataPoint value type for HistogramAggregation. */
+interface Histogram {
+	/**
+	* Buckets are implemented using two different arrays:
+	*  - boundaries: contains every finite bucket boundary, which are inclusive lower bounds
+	*  - counts: contains event counts for each bucket
+	*
+	* Note that we'll always have n+1 buckets, where n is the number of boundaries.
+	* This is because we need to count events that are below the lowest boundary.
+	*
+	* Example: if we measure the values: [5, 30, 5, 40, 5, 15, 15, 15, 25]
+	*  with the boundaries [ 10, 20, 30 ], we will have the following state:
+	*
+	* buckets: {
+	*	boundaries: [10, 20, 30],
+	*	counts: [3, 3, 1, 2],
+	* }
+	*/
+	buckets: {
+		boundaries: number[];
+		counts: number[];
+	};
+	sum?: number;
+	count: number;
+	min?: number;
+	max?: number;
+}
+/** DataPoint value type for ExponentialHistogramAggregation. */
+interface ExponentialHistogram {
+	count: number;
+	sum?: number;
+	scale: number;
+	zeroCount: number;
+	positive: {
+		offset: number;
+		bucketCounts: number[];
+	};
+	negative: {
+		offset: number;
+		bucketCounts: number[];
+	};
+	min?: number;
+	max?: number;
+}
+/**
+ * An Aggregator accumulation state.
+ */
+interface Accumulation {
+	setStartTime(startTime: HrTime): void;
+	record(value: number): void;
+}
+declare type AccumulationRecord<T> = [MetricAttributes, T];
+/**
+ * Base interface for aggregators. Aggregators are responsible for holding
+ * aggregated values and taking a snapshot of these values upon export.
+ */
+interface Aggregator<T> {
+	/** The kind of the aggregator. */
+	kind: AggregatorKind;
+	/**
+	* Create a clean state of accumulation.
+	*/
+	createAccumulation(startTime: HrTime): T;
+	/**
+	* Returns the result of the merge of the given accumulations.
+	*
+	* This should always assume that the accumulations do not overlap and merge together for a new
+	* cumulative report.
+	*
+	* @param previous the previously captured accumulation
+	* @param delta the newly captured (delta) accumulation
+	* @returns the result of the merge of the given accumulations
+	*/
+	merge(previous: T, delta: T): T;
+	/**
+	* Returns a new DELTA aggregation by comparing two cumulative measurements.
+	*
+	* @param previous the previously captured accumulation
+	* @param current the newly captured (cumulative) accumulation
+	* @returns The resulting delta accumulation
+	*/
+	diff(previous: T, current: T): T;
+	/**
+	* Returns the {@link MetricData} that this {@link Aggregator} will produce.
+	*
+	* @param descriptor the metric descriptor.
+	* @param aggregationTemporality the temporality of the resulting {@link MetricData}
+	* @param accumulationByAttributes the array of attributes and accumulation pairs.
+	* @param endTime the end time of the metric data.
+	* @return the {@link MetricData} that this {@link Aggregator} will produce.
+	*/
+	toMetricData(descriptor: MetricDescriptor, aggregationTemporality: AggregationTemporality, accumulationByAttributes: AccumulationRecord<T>[], endTime: HrTime): Maybe<MetricData>;
+}
+
 /** Basic aggregator for None which keeps no recorded value. */
 declare class DropAggregator implements Aggregator<undefined> {
 	kind: AggregatorKind.DROP;
 	createAccumulation(): undefined;
 	merge(_previous: undefined, _delta: undefined): undefined;
 	diff(_previous: undefined, _current: undefined): undefined;
-	toMetricData(_descriptor: InstrumentDescriptor, _aggregationTemporality: AggregationTemporality, _accumulationByAttributes: AccumulationRecord<undefined>[], _endTime: HrTime): Maybe<MetricData>;
+	toMetricData(_descriptor: MetricDescriptor, _aggregationTemporality: AggregationTemporality, _accumulationByAttributes: AccumulationRecord<undefined>[], _endTime: HrTime): Maybe<MetricData>;
 }
 
 /**
@@ -151,7 +257,7 @@ declare class HistogramAggregator implements Aggregator<HistogramAccumulation> {
 	* Returns a new DELTA aggregation by comparing two cumulative measurements.
 	*/
 	diff(previous: HistogramAccumulation, current: HistogramAccumulation): HistogramAccumulation;
-	toMetricData(descriptor: InstrumentDescriptor, aggregationTemporality: AggregationTemporality, accumulationByAttributes: AccumulationRecord<HistogramAccumulation>[], endTime: HrTime): Maybe<HistogramMetricData>;
+	toMetricData(descriptor: MetricDescriptor, aggregationTemporality: AggregationTemporality, accumulationByAttributes: AccumulationRecord<HistogramAccumulation>[], endTime: HrTime): Maybe<HistogramMetricData>;
 }
 
 declare class Buckets {
@@ -462,7 +568,7 @@ declare class ExponentialHistogramAggregator implements Aggregator<ExponentialHi
 	* Returns a new DELTA aggregation by comparing two cumulative measurements.
 	*/
 	diff(previous: ExponentialHistogramAccumulation, current: ExponentialHistogramAccumulation): ExponentialHistogramAccumulation;
-	toMetricData(descriptor: InstrumentDescriptor, aggregationTemporality: AggregationTemporality, accumulationByAttributes: AccumulationRecord<ExponentialHistogramAccumulation>[], endTime: HrTime): Maybe<ExponentialHistogramMetricData>;
+	toMetricData(descriptor: MetricDescriptor, aggregationTemporality: AggregationTemporality, accumulationByAttributes: AccumulationRecord<ExponentialHistogramAccumulation>[], endTime: HrTime): Maybe<ExponentialHistogramMetricData>;
 }
 
 declare class LastValueAccumulation implements Accumulation {
@@ -491,7 +597,7 @@ declare class LastValueAggregator implements Aggregator<LastValueAccumulation> {
 	* the newly captured (delta) accumulation for LastValueAggregator.
 	*/
 	diff(previous: LastValueAccumulation, current: LastValueAccumulation): LastValueAccumulation;
-	toMetricData(descriptor: InstrumentDescriptor, aggregationTemporality: AggregationTemporality, accumulationByAttributes: AccumulationRecord<LastValueAccumulation>[], endTime: HrTime): Maybe<GaugeMetricData>;
+	toMetricData(descriptor: MetricDescriptor, aggregationTemporality: AggregationTemporality, accumulationByAttributes: AccumulationRecord<LastValueAccumulation>[], endTime: HrTime): Maybe<GaugeMetricData>;
 }
 
 declare class SumAccumulation implements Accumulation {
@@ -518,7 +624,7 @@ declare class SumAggregator implements Aggregator<SumAccumulation> {
 	* Returns a new DELTA aggregation by comparing two cumulative measurements.
 	*/
 	diff(previous: SumAccumulation, current: SumAccumulation): SumAccumulation;
-	toMetricData(descriptor: InstrumentDescriptor, aggregationTemporality: AggregationTemporality, accumulationByAttributes: AccumulationRecord<SumAccumulation>[], endTime: HrTime): Maybe<SumMetricData>;
+	toMetricData(descriptor: MetricDescriptor, aggregationTemporality: AggregationTemporality, accumulationByAttributes: AccumulationRecord<SumAccumulation>[], endTime: HrTime): Maybe<SumMetricData>;
 }
 
 /**
@@ -527,7 +633,7 @@ declare class SumAggregator implements Aggregator<SumAccumulation> {
  * Aggregation provides a set of built-in aggregations via static methods.
  */
 declare abstract class Aggregation {
-	abstract createAggregator(instrument: InstrumentDescriptor): Aggregator<Maybe<Accumulation>>;
+	abstract createAggregator(instrument: InstrumentDescriptor$1): Aggregator<Maybe<Accumulation>>;
 	static Drop(): Aggregation;
 	static Sum(): Aggregation;
 	static LastValue(): Aggregation;
@@ -540,7 +646,7 @@ declare abstract class Aggregation {
  */
 declare class DropAggregation extends Aggregation {
 	private static DEFAULT_INSTANCE;
-	createAggregator(_instrument: InstrumentDescriptor): DropAggregator;
+	createAggregator(_instrument: InstrumentDescriptor$1): DropAggregator;
 }
 /**
  * The default sum aggregation.
@@ -548,21 +654,21 @@ declare class DropAggregation extends Aggregation {
 declare class SumAggregation extends Aggregation {
 	private static MONOTONIC_INSTANCE;
 	private static NON_MONOTONIC_INSTANCE;
-	createAggregator(instrument: InstrumentDescriptor): SumAggregator;
+	createAggregator(instrument: InstrumentDescriptor$1): SumAggregator;
 }
 /**
  * The default last value aggregation.
  */
 declare class LastValueAggregation extends Aggregation {
 	private static DEFAULT_INSTANCE;
-	createAggregator(_instrument: InstrumentDescriptor): LastValueAggregator;
+	createAggregator(_instrument: InstrumentDescriptor$1): LastValueAggregator;
 }
 /**
  * The default histogram aggregation.
  */
 declare class HistogramAggregation extends Aggregation {
 	private static DEFAULT_INSTANCE;
-	createAggregator(_instrument: InstrumentDescriptor): HistogramAggregator;
+	createAggregator(_instrument: InstrumentDescriptor$1): HistogramAggregator;
 }
 /**
  * The explicit bucket histogram aggregation.
@@ -575,20 +681,20 @@ declare class ExplicitBucketHistogramAggregation extends Aggregation {
 	* @param _recordMinMax If set to true, min and max will be recorded. Otherwise, min and max will not be recorded.
 	*/
 	constructor(boundaries: number[], _recordMinMax?: boolean);
-	createAggregator(_instrument: InstrumentDescriptor): HistogramAggregator;
+	createAggregator(_instrument: InstrumentDescriptor$1): HistogramAggregator;
 }
 declare class ExponentialHistogramAggregation extends Aggregation {
 	private readonly _maxSize;
 	private readonly _recordMinMax;
 	constructor(_maxSize?: number, _recordMinMax?: boolean);
-	createAggregator(_instrument: InstrumentDescriptor): ExponentialHistogramAggregator;
+	createAggregator(_instrument: InstrumentDescriptor$1): ExponentialHistogramAggregator;
 }
 /**
  * The default aggregation.
  */
 declare class DefaultAggregation extends Aggregation {
 	private _resolve;
-	createAggregator(instrument: InstrumentDescriptor): Aggregator<Maybe<Accumulation>>;
+	createAggregator(instrument: InstrumentDescriptor$1): Aggregator<Maybe<Accumulation>>;
 }
 
 declare type ViewOptions = {
@@ -760,21 +866,39 @@ declare enum InstrumentType {
 	OBSERVABLE_UP_DOWN_COUNTER = "OBSERVABLE_UP_DOWN_COUNTER"
 }
 /**
- * An interface describing the instrument.
+ * An internal interface describing the instrument.
+ *
+ * This is intentionally distinguished from the public MetricDescriptor (a.k.a. InstrumentDescriptor)
+ * which may not contains internal fields like metric advice.
  */
-interface InstrumentDescriptor {
+interface InstrumentDescriptor$1 {
 	readonly name: string;
 	readonly description: string;
 	readonly unit: string;
 	readonly type: InstrumentType;
 	readonly valueType: ValueType;
+	/**
+	* @experimental
+	*/
+	readonly advice: MetricAdvice;
 }
 
+interface MetricDescriptor {
+	readonly name: string;
+	readonly description: string;
+	readonly unit: string;
+	/**
+	* @deprecated exporter should avoid depending on the type of the instrument
+	* as their resulting aggregator can be re-mapped with views.
+	*/
+	readonly type: InstrumentType;
+	readonly valueType: ValueType;
+}
 /**
  * Basic metric data fields.
  */
 interface BaseMetricData {
-	readonly descriptor: InstrumentDescriptor;
+	readonly descriptor: MetricDescriptor;
 	readonly aggregationTemporality: AggregationTemporality;
 	/**
 	* DataPointType of the metric instrument.
@@ -890,112 +1014,6 @@ interface DataPoint<T> {
 	readonly value: T;
 }
 
-/** The kind of aggregator. */
-declare enum AggregatorKind {
-	DROP = 0,
-	SUM = 1,
-	LAST_VALUE = 2,
-	HISTOGRAM = 3,
-	EXPONENTIAL_HISTOGRAM = 4
-}
-/** DataPoint value type for SumAggregation. */
-declare type Sum = number;
-/** DataPoint value type for LastValueAggregation. */
-declare type LastValue = number;
-/** DataPoint value type for HistogramAggregation. */
-interface Histogram {
-	/**
-	* Buckets are implemented using two different arrays:
-	*  - boundaries: contains every finite bucket boundary, which are inclusive lower bounds
-	*  - counts: contains event counts for each bucket
-	*
-	* Note that we'll always have n+1 buckets, where n is the number of boundaries.
-	* This is because we need to count events that are below the lowest boundary.
-	*
-	* Example: if we measure the values: [5, 30, 5, 40, 5, 15, 15, 15, 25]
-	*  with the boundaries [ 10, 20, 30 ], we will have the following state:
-	*
-	* buckets: {
-	*	boundaries: [10, 20, 30],
-	*	counts: [3, 3, 1, 2],
-	* }
-	*/
-	buckets: {
-		boundaries: number[];
-		counts: number[];
-	};
-	sum?: number;
-	count: number;
-	min?: number;
-	max?: number;
-}
-/** DataPoint value type for ExponentialHistogramAggregation. */
-interface ExponentialHistogram {
-	count: number;
-	sum?: number;
-	scale: number;
-	zeroCount: number;
-	positive: {
-		offset: number;
-		bucketCounts: number[];
-	};
-	negative: {
-		offset: number;
-		bucketCounts: number[];
-	};
-	min?: number;
-	max?: number;
-}
-/**
- * An Aggregator accumulation state.
- */
-interface Accumulation {
-	setStartTime(startTime: HrTime): void;
-	record(value: number): void;
-}
-declare type AccumulationRecord<T> = [MetricAttributes, T];
-/**
- * Base interface for aggregators. Aggregators are responsible for holding
- * aggregated values and taking a snapshot of these values upon export.
- */
-interface Aggregator<T> {
-	/** The kind of the aggregator. */
-	kind: AggregatorKind;
-	/**
-	* Create a clean state of accumulation.
-	*/
-	createAccumulation(startTime: HrTime): T;
-	/**
-	* Returns the result of the merge of the given accumulations.
-	*
-	* This should always assume that the accumulations do not overlap and merge together for a new
-	* cumulative report.
-	*
-	* @param previous the previously captured accumulation
-	* @param delta the newly captured (delta) accumulation
-	* @returns the result of the merge of the given accumulations
-	*/
-	merge(previous: T, delta: T): T;
-	/**
-	* Returns a new DELTA aggregation by comparing two cumulative measurements.
-	*
-	* @param previous the previously captured accumulation
-	* @param current the newly captured (cumulative) accumulation
-	* @returns The resulting delta accumulation
-	*/
-	diff(previous: T, current: T): T;
-	/**
-	* Returns the {@link MetricData} that this {@link Aggregator} will produce.
-	*
-	* @param descriptor the metric instrument descriptor.
-	* @param aggregationTemporality the temporality of the resulting {@link MetricData}
-	* @param accumulationByAttributes the array of attributes and accumulation pairs.
-	* @param endTime the end time of the metric data.
-	* @return the {@link MetricData} that this {@link Aggregator} will produce.
-	*/
-	toMetricData(descriptor: InstrumentDescriptor, aggregationTemporality: AggregationTemporality, accumulationByAttributes: AccumulationRecord<T>[], endTime: HrTime): Maybe<MetricData>;
-}
-
 /**
  * Aggregation selector based on metric instrument types.
  */
@@ -1082,6 +1100,13 @@ interface MetricReaderOptions {
 	* not configured, cumulative is used for all instruments.
 	*/
 	aggregationTemporalitySelector?: AggregationTemporalitySelector;
+	/**
+	* **Note, this option is experimental**. Additional MetricProducers to use as a source of
+	* aggregated metric data in addition to the SDK's metric data. The resource returned by
+	* these MetricProducers is ignored; the SDK's resource will be used instead.
+	* @experimental
+	*/
+	metricProducers?: MetricProducer[];
 }
 /**
  * A registered reader of metrics that, when linked to a {@link MetricProducer}, offers global
@@ -1089,13 +1114,19 @@ interface MetricReaderOptions {
  */
 declare abstract class MetricReader {
 	private _shutdown;
-	private _metricProducer?;
+	private _metricProducers;
+	private _sdkMetricProducer?;
 	private readonly _aggregationTemporalitySelector;
 	private readonly _aggregationSelector;
 	constructor(options?: MetricReaderOptions);
 	/**
-	* Set the {@link MetricProducer} used by this instance.
+	* Set the {@link MetricProducer} used by this instance. **This should only be called by the
+	* SDK and should be considered internal.**
 	*
+	* To add additional {@link MetricProducer}s to a {@link MetricReader}, pass them to the
+	* constructor as {@link MetricReaderOptions.metricProducers}.
+	*
+	* @internal
 	* @param metricProducer
 	*/
 	setMetricProducer(metricProducer: MetricProducer): void;
@@ -1163,6 +1194,13 @@ declare type PeriodicExportingMetricReaderOptions = {
 	* Milliseconds for the async observable callback to timeout.
 	*/
 	exportTimeoutMillis?: number;
+	/**
+	* **Note, this option is experimental**. Additional MetricProducers to use as a source of
+	* aggregated metric data in addition to the SDK's metric data. The resource returned by
+	* these MetricProducers is ignored; the SDK's resource will be used instead.
+	* @experimental
+	*/
+	metricProducers?: MetricProducer[];
 };
 /**
  * {@link MetricReader} which collects metrics based on a user-configurable time interval, and passes the metrics to
@@ -1261,4 +1299,9 @@ declare class MeterProvider implements MeterProvider$1 {
 	forceFlush(options?: ForceFlushOptions): Promise<void>;
 }
 
-export { Aggregation, AggregationSelector, AggregationTemporality, AggregationTemporalitySelector, CollectionResult, ConsoleMetricExporter, DataPoint, DataPointType, DefaultAggregation, DropAggregation, ExplicitBucketHistogramAggregation, ExponentialHistogram, ExponentialHistogramAggregation, ExponentialHistogramMetricData, GaugeMetricData, Histogram, HistogramAggregation, HistogramMetricData, InMemoryMetricExporter, InstrumentDescriptor, InstrumentType, LastValue, LastValueAggregation, MeterProvider, MeterProviderOptions, MetricData, MetricReader, MetricReaderOptions, PeriodicExportingMetricReader, PeriodicExportingMetricReaderOptions, PushMetricExporter, ResourceMetrics, ScopeMetrics, Sum, SumAggregation, SumMetricData, TimeoutError, View, ViewOptions };
+/**
+ * @deprecated Use {@link MetricDescriptor} instead.
+ */
+declare type InstrumentDescriptor = MetricDescriptor;
+
+export { Aggregation, AggregationSelector, AggregationTemporality, AggregationTemporalitySelector, CollectionResult, ConsoleMetricExporter, DataPoint, DataPointType, DefaultAggregation, DropAggregation, ExplicitBucketHistogramAggregation, ExponentialHistogram, ExponentialHistogramAggregation, ExponentialHistogramMetricData, GaugeMetricData, Histogram, HistogramAggregation, HistogramMetricData, InMemoryMetricExporter, InstrumentDescriptor, InstrumentType, LastValue, LastValueAggregation, MeterProvider, MeterProviderOptions, MetricCollectOptions, MetricData, MetricDescriptor, MetricProducer, MetricReader, MetricReaderOptions, PeriodicExportingMetricReader, PeriodicExportingMetricReaderOptions, PushMetricExporter, ResourceMetrics, ScopeMetrics, Sum, SumAggregation, SumMetricData, TimeoutError, View, ViewOptions };

@@ -16,7 +16,7 @@
 /// <reference types="./sdk-metrics.d.ts" />
 
 import * as api from './api.js';
-import { ValueType, diag, context, createNoopMeter } from './api.js';
+import { diag, ValueType, context, createNoopMeter } from './api.js';
 import { hrTimeToMicroseconds, millisToHrTime, globalErrorHandler, unrefTimer, internal, ExportResultCode } from './core.js';
 import { Resource } from './resources.js';
 
@@ -126,6 +126,9 @@ function binarySearchLB(arr, value) {
 	}
 	return -1;
 }
+function equalsCaseInsensitive(lhs, rhs) {
+	return lhs.toLowerCase() === rhs.toLowerCase();
+}
 
 var AggregatorKind;
 (function (AggregatorKind) {
@@ -164,12 +167,16 @@ var InstrumentType;
 	InstrumentType["OBSERVABLE_UP_DOWN_COUNTER"] = "OBSERVABLE_UP_DOWN_COUNTER";
 })(InstrumentType || (InstrumentType = {}));
 function createInstrumentDescriptor(name, type, options) {
+	if (!isValidName(name)) {
+		diag.warn(`Invalid metric name: "${name}". The metric name should be a ASCII string with a length no greater than 255 characters.`);
+	}
 	return {
 		name,
 		type,
 		description: options?.description ?? '',
 		unit: options?.unit ?? '',
 		valueType: options?.valueType ?? ValueType.DOUBLE,
+		advice: options?.advice ?? {},
 	};
 }
 function createInstrumentDescriptorWithView(view, instrument) {
@@ -179,13 +186,18 @@ function createInstrumentDescriptorWithView(view, instrument) {
 		type: instrument.type,
 		unit: instrument.unit,
 		valueType: instrument.valueType,
+		advice: instrument.advice,
 	};
 }
 function isDescriptorCompatibleWith(descriptor, otherDescriptor) {
-	return (descriptor.name === otherDescriptor.name &&
+	return (equalsCaseInsensitive(descriptor.name, otherDescriptor.name) &&
 		descriptor.unit === otherDescriptor.unit &&
 		descriptor.type === otherDescriptor.type &&
 		descriptor.valueType === otherDescriptor.valueType);
+}
+const NAME_REGEXP = /^[a-z][a-z0-9_.\-/]{0,254}$/i;
+function isValidName(name) {
+	return name.match(NAME_REGEXP) != null;
 }
 
 function createNewEmptyCheckpoint(boundaries) {
@@ -1155,6 +1167,9 @@ class DefaultAggregation extends Aggregation {
 				return LAST_VALUE_AGGREGATION;
 			}
 			case InstrumentType.HISTOGRAM: {
+				if (instrument.advice.explicitBucketBoundaries) {
+					return new ExplicitBucketHistogramAggregation(instrument.advice.explicitBucketBoundaries);
+				}
 				return HISTOGRAM_AGGREGATION;
 			}
 		}
@@ -1183,12 +1198,13 @@ class MetricReader {
 		this._aggregationTemporalitySelector =
 			options?.aggregationTemporalitySelector ??
 				DEFAULT_AGGREGATION_TEMPORALITY_SELECTOR;
+		this._metricProducers = options?.metricProducers ?? [];
 	}
 	setMetricProducer(metricProducer) {
-		if (this._metricProducer) {
+		if (this._sdkMetricProducer) {
 			throw new Error('MetricReader can not be bound to a MeterProvider again.');
 		}
-		this._metricProducer = metricProducer;
+		this._sdkMetricProducer = metricProducer;
 		this.onInitialized();
 	}
 	selectAggregation(instrumentType) {
@@ -1200,15 +1216,30 @@ class MetricReader {
 	onInitialized() {
 	}
 	async collect(options) {
-		if (this._metricProducer === undefined) {
+		if (this._sdkMetricProducer === undefined) {
 			throw new Error('MetricReader is not bound to a MetricProducer');
 		}
 		if (this._shutdown) {
 			throw new Error('MetricReader is shutdown');
 		}
-		return this._metricProducer.collect({
-			timeoutMillis: options?.timeoutMillis,
-		});
+		const [sdkCollectionResults, ...additionalCollectionResults] = await Promise.all([
+			this._sdkMetricProducer.collect({
+				timeoutMillis: options?.timeoutMillis,
+			}),
+			...this._metricProducers.map(producer => producer.collect({
+				timeoutMillis: options?.timeoutMillis,
+			})),
+		]);
+		const errors = sdkCollectionResults.errors.concat(FlatMap(additionalCollectionResults, result => result.errors));
+		const resource = sdkCollectionResults.resourceMetrics.resource;
+		const scopeMetrics = sdkCollectionResults.resourceMetrics.scopeMetrics.concat(FlatMap(additionalCollectionResults, result => result.resourceMetrics.scopeMetrics));
+		return {
+			resourceMetrics: {
+				resource,
+				scopeMetrics,
+			},
+			errors,
+		};
 	}
 	async shutdown(options) {
 		if (this._shutdown) {
@@ -1241,6 +1272,7 @@ class PeriodicExportingMetricReader extends MetricReader {
 		super({
 			aggregationSelector: options.exporter.selectAggregation?.bind(options.exporter),
 			aggregationTemporalitySelector: options.exporter.selectAggregationTemporality?.bind(options.exporter),
+			metricProducers: options.metricProducers,
 		});
 		if (options.exportIntervalMillis !== undefined &&
 			options.exportIntervalMillis <= 0) {
@@ -1530,6 +1562,7 @@ class MetricStorage {
 			description: description,
 			valueType: this._instrumentDescriptor.valueType,
 			unit: this._instrumentDescriptor.unit,
+			advice: this._instrumentDescriptor.advice,
 		});
 	}
 }
@@ -1628,13 +1661,16 @@ class DeltaMetricProcessor {
 }
 
 class TemporalMetricProcessor {
-	constructor(_aggregator) {
+	constructor(_aggregator, collectorHandles) {
 		this._aggregator = _aggregator;
 		this._unreportedAccumulations = new Map();
 		this._reportHistory = new Map();
+		collectorHandles.forEach(handle => {
+			this._unreportedAccumulations.set(handle, []);
+		});
 	}
-	buildMetrics(collector, collectors, instrumentDescriptor, currentAccumulations, collectionTime) {
-		this._stashAccumulations(collectors, currentAccumulations);
+	buildMetrics(collector, instrumentDescriptor, currentAccumulations, collectionTime) {
+		this._stashAccumulations(currentAccumulations);
 		const unreportedAccumulations = this._getMergedUnreportedAccumulations(collector);
 		let result = unreportedAccumulations;
 		let aggregationTemporality;
@@ -1657,18 +1693,23 @@ class TemporalMetricProcessor {
 			collectionTime,
 			aggregationTemporality,
 		});
-		return this._aggregator.toMetricData(instrumentDescriptor, aggregationTemporality, AttributesMapToAccumulationRecords(result),
+		const accumulationRecords = AttributesMapToAccumulationRecords(result);
+		if (accumulationRecords.length === 0) {
+			return undefined;
+		}
+		return this._aggregator.toMetricData(instrumentDescriptor, aggregationTemporality, accumulationRecords,
 		collectionTime);
 	}
-	_stashAccumulations(collectors, currentAccumulation) {
-		collectors.forEach(it => {
-			let stash = this._unreportedAccumulations.get(it);
+	_stashAccumulations(currentAccumulation) {
+		const registeredCollectors = this._unreportedAccumulations.keys();
+		for (const collector of registeredCollectors) {
+			let stash = this._unreportedAccumulations.get(collector);
 			if (stash === undefined) {
 				stash = [];
-				this._unreportedAccumulations.set(it, stash);
+				this._unreportedAccumulations.set(collector, stash);
 			}
 			stash.push(currentAccumulation);
-		});
+		}
 	}
 	_getMergedUnreportedAccumulations(collector) {
 		let result = new AttributeHashMap();
@@ -1713,11 +1754,11 @@ function AttributesMapToAccumulationRecords(map) {
 }
 
 class AsyncMetricStorage extends MetricStorage {
-	constructor(_instrumentDescriptor, aggregator, _attributesProcessor) {
+	constructor(_instrumentDescriptor, aggregator, _attributesProcessor, collectorHandles) {
 		super(_instrumentDescriptor);
 		this._attributesProcessor = _attributesProcessor;
 		this._deltaMetricStorage = new DeltaMetricProcessor(aggregator);
-		this._temporalMetricStorage = new TemporalMetricProcessor(aggregator);
+		this._temporalMetricStorage = new TemporalMetricProcessor(aggregator, collectorHandles);
 	}
 	record(measurements, observationTime) {
 		const processed = new AttributeHashMap();
@@ -1726,9 +1767,9 @@ class AsyncMetricStorage extends MetricStorage {
 		});
 		this._deltaMetricStorage.batchCumulate(processed, observationTime);
 	}
-	collect(collector, collectors, collectionTime) {
+	collect(collector, collectionTime) {
 		const accumulations = this._deltaMetricStorage.collect();
-		return this._temporalMetricStorage.buildMetrics(collector, collectors, this._instrumentDescriptor, accumulations, collectionTime);
+		return this._temporalMetricStorage.buildMetrics(collector, this._instrumentDescriptor, accumulations, collectionTime);
 	}
 }
 
@@ -1883,18 +1924,18 @@ class MultiMetricStorage {
 }
 
 class ObservableResultImpl {
-	constructor(_descriptor) {
-		this._descriptor = _descriptor;
+	constructor(_instrumentName, _valueType) {
+		this._instrumentName = _instrumentName;
+		this._valueType = _valueType;
 		this._buffer = new AttributeHashMap();
 	}
 	observe(value, attributes = {}) {
 		if (typeof value !== 'number') {
-			diag.warn(`non-number value provided to metric ${this._descriptor.name}: ${value}`);
+			diag.warn(`non-number value provided to metric ${this._instrumentName}: ${value}`);
 			return;
 		}
-		if (this._descriptor.valueType === ValueType.INT &&
-			!Number.isInteger(value)) {
-			diag.warn(`INT value type cannot accept a floating-point value for ${this._descriptor.name}, ignoring the fractional digits.`);
+		if (this._valueType === ValueType.INT && !Number.isInteger(value)) {
+			diag.warn(`INT value type cannot accept a floating-point value for ${this._instrumentName}, ignoring the fractional digits.`);
 			value = Math.trunc(value);
 			if (!Number.isInteger(value)) {
 				return;
@@ -1985,7 +2026,7 @@ class ObservableRegistry {
 	}
 	_observeCallbacks(observationTime, timeoutMillis) {
 		return this._callbacks.map(async ({ callback, instrument }) => {
-			const observableResult = new ObservableResultImpl(instrument._descriptor);
+			const observableResult = new ObservableResultImpl(instrument._descriptor.name, instrument._descriptor.valueType);
 			let callPromise = Promise.resolve(callback(observableResult));
 			if (timeoutMillis != null) {
 				callPromise = callWithTimeout(callPromise, timeoutMillis);
@@ -2029,19 +2070,19 @@ class ObservableRegistry {
 }
 
 class SyncMetricStorage extends MetricStorage {
-	constructor(instrumentDescriptor, aggregator, _attributesProcessor) {
+	constructor(instrumentDescriptor, aggregator, _attributesProcessor, collectorHandles) {
 		super(instrumentDescriptor);
 		this._attributesProcessor = _attributesProcessor;
 		this._deltaMetricStorage = new DeltaMetricProcessor(aggregator);
-		this._temporalMetricStorage = new TemporalMetricProcessor(aggregator);
+		this._temporalMetricStorage = new TemporalMetricProcessor(aggregator, collectorHandles);
 	}
 	record(value, attributes, context, recordTime) {
 		attributes = this._attributesProcessor.process(attributes, context);
 		this._deltaMetricStorage.record(value, attributes, context, recordTime);
 	}
-	collect(collector, collectors, collectionTime) {
+	collect(collector, collectionTime) {
 		const accumulations = this._deltaMetricStorage.collect();
-		return this._temporalMetricStorage.buildMetrics(collector, collectors, this._instrumentDescriptor, accumulations, collectionTime);
+		return this._temporalMetricStorage.buildMetrics(collector, this._instrumentDescriptor, accumulations, collectionTime);
 	}
 }
 
@@ -2091,15 +2132,22 @@ class MeterSharedState {
 	}
 	async collect(collector, collectionTime, options) {
 		const errors = await this.observableRegistry.observe(collectionTime, options?.timeoutMillis);
-		const metricDataList = Array.from(this.metricStorageRegistry.getStorages(collector))
+		const storages = this.metricStorageRegistry.getStorages(collector);
+		if (storages.length === 0) {
+			return null;
+		}
+		const metricDataList = storages
 			.map(metricStorage => {
-			return metricStorage.collect(collector, this._meterProviderSharedState.metricCollectors, collectionTime);
+			return metricStorage.collect(collector, collectionTime);
 		})
 			.filter(isNotNullish);
+		if (metricDataList.length === 0) {
+			return { errors };
+		}
 		return {
 			scopeMetrics: {
 				scope: this._instrumentationScope,
-				metrics: metricDataList.filter(isNotNullish),
+				metrics: metricDataList,
 			},
 			errors,
 		};
@@ -2113,7 +2161,7 @@ class MeterSharedState {
 				return compatibleStorage;
 			}
 			const aggregator = view.aggregation.createAggregator(viewDescriptor);
-			const viewStorage = new MetricStorageType(viewDescriptor, aggregator, view.attributesProcessor);
+			const viewStorage = new MetricStorageType(viewDescriptor, aggregator, view.attributesProcessor, this._meterProviderSharedState.metricCollectors);
 			this.metricStorageRegistry.register(viewStorage);
 			return viewStorage;
 		});
@@ -2125,7 +2173,7 @@ class MeterSharedState {
 					return compatibleStorage;
 				}
 				const aggregator = aggregation.createAggregator(descriptor);
-				const storage = new MetricStorageType(descriptor, aggregator, AttributesProcessor.Noop());
+				const storage = new MetricStorageType(descriptor, aggregator, AttributesProcessor.Noop(), [collector]);
 				this.metricStorageRegistry.registerForCollector(collector, storage);
 				return storage;
 			});
@@ -2167,14 +2215,24 @@ class MetricCollector {
 	}
 	async collect(options) {
 		const collectionTime = millisToHrTime(Date.now());
-		const meterCollectionPromises = Array.from(this._sharedState.meterSharedStates.values()).map(meterSharedState => meterSharedState.collect(this, collectionTime, options));
-		const result = await Promise.all(meterCollectionPromises);
+		const scopeMetrics = [];
+		const errors = [];
+		const meterCollectionPromises = Array.from(this._sharedState.meterSharedStates.values()).map(async (meterSharedState) => {
+			const current = await meterSharedState.collect(this, collectionTime, options);
+			if (current?.scopeMetrics != null) {
+				scopeMetrics.push(current.scopeMetrics);
+			}
+			if (current?.errors != null) {
+				errors.push(...current.errors);
+			}
+		});
+		await Promise.all(meterCollectionPromises);
 		return {
 			resourceMetrics: {
 				resource: this._sharedState.resource,
-				scopeMetrics: result.map(it => it.scopeMetrics),
+				scopeMetrics: scopeMetrics,
 			},
-			errors: FlatMap(result, it => it.errors),
+			errors: errors,
 		};
 	}
 	async forceFlush(options) {
