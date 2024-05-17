@@ -256,7 +256,7 @@ for (const mod of packagePaths) {
 
 console.error(`Running tsc build...`);
 {
-  const tsc = new Deno.Command('hack/opentelemetry-js/node_modules/.bin/tsc', {
+  const tsc = new Deno.Command('node_modules/.bin/tsc', {
     args: [ '--build', 'tsconfig.esnext.deno.json' ],
     cwd: 'hack/opentelemetry-js',
     stdout: 'inherit',
