@@ -136,13 +136,13 @@ function getDefaultDetectors(): DetectorSync[] {
     Object.keys(denoDeployDetector.detect().attributes).length
       ? [denoDeployDetector]
       : [
-          new DenoRuntimeDetector(),
           new DenoProcessDetector(),
           hostDetectorSync,
           osDetectorSync,
         ];
 
   return [
+    new DenoRuntimeDetector(),
     ...runtimeDetectors,
     envDetectorSync,
   ];
