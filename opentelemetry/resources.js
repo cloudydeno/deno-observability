@@ -16,11 +16,12 @@
 /// <reference types="./resources.d.ts" />
 
 import { diag } from './api.js';
-import { SemanticResourceAttributes } from './semantic-conventions.js';
+import { SemanticResourceAttributes, SEMRESATTRS_SERVICE_INSTANCE_ID, SEMRESATTRS_SERVICE_NAME, SEMRESATTRS_TELEMETRY_SDK_LANGUAGE, SEMRESATTRS_TELEMETRY_SDK_NAME, SEMRESATTRS_TELEMETRY_SDK_VERSION } from './semantic-conventions.js';
 import { SDK_INFO, getEnv } from './core.js';
 
 
 
+import { randomUUID } from 'crypto';
 
 function defaultServiceName() {
 	return `unknown_service:deno`;
@@ -128,6 +129,16 @@ class ProcessDetector {
 }
 const processDetector = new ProcessDetector();
 
+class ServiceInstanceIdDetectorSync {
+	detect(_config) {
+		const attributes = {
+			[SEMRESATTRS_SERVICE_INSTANCE_ID]: randomUUID(),
+		};
+		return new Resource(attributes);
+	}
+}
+const serviceInstanceIdDetectorSync = new ServiceInstanceIdDetectorSync();
+
 class Resource {
 	constructor(
 	attributes, asyncAttributesPromise) {
@@ -149,10 +160,10 @@ class Resource {
 	}
 	static default() {
 		return new Resource({
-			[SemanticResourceAttributes.SERVICE_NAME]: defaultServiceName(),
-			[SemanticResourceAttributes.TELEMETRY_SDK_LANGUAGE]: SDK_INFO[SemanticResourceAttributes.TELEMETRY_SDK_LANGUAGE],
-			[SemanticResourceAttributes.TELEMETRY_SDK_NAME]: SDK_INFO[SemanticResourceAttributes.TELEMETRY_SDK_NAME],
-			[SemanticResourceAttributes.TELEMETRY_SDK_VERSION]: SDK_INFO[SemanticResourceAttributes.TELEMETRY_SDK_VERSION],
+			[SEMRESATTRS_SERVICE_NAME]: defaultServiceName(),
+			[SEMRESATTRS_TELEMETRY_SDK_LANGUAGE]: SDK_INFO[SEMRESATTRS_TELEMETRY_SDK_LANGUAGE],
+			[SEMRESATTRS_TELEMETRY_SDK_NAME]: SDK_INFO[SEMRESATTRS_TELEMETRY_SDK_NAME],
+			[SEMRESATTRS_TELEMETRY_SDK_VERSION]: SDK_INFO[SEMRESATTRS_TELEMETRY_SDK_VERSION],
 		});
 	}
 	get attributes() {
@@ -227,7 +238,7 @@ class EnvDetectorSync {
 			}
 		}
 		if (serviceName) {
-			attributes[SemanticResourceAttributes.SERVICE_NAME] = serviceName;
+			attributes[SEMRESATTRS_SERVICE_NAME] = serviceName;
 		}
 		return new Resource(attributes);
 	}
@@ -281,7 +292,9 @@ const envDetector = new EnvDetector();
 
 class BrowserDetectorSync {
 	detect(config) {
-		const isBrowser = typeof navigator !== 'undefined';
+		const isBrowser = typeof navigator !== 'undefined' &&
+			global.process?.versions?.node === undefined &&
+			global.Bun?.version === undefined;
 		if (!isBrowser) {
 			return Resource.empty();
 		}
@@ -372,4 +385,4 @@ const logResources = (resources) => {
 	});
 };
 
-export { Resource, browserDetector, browserDetectorSync, defaultServiceName, detectResources, detectResourcesSync, envDetector, envDetectorSync, hostDetector, hostDetectorSync, osDetector, osDetectorSync, processDetector, processDetectorSync };
+export { Resource, browserDetector, browserDetectorSync, defaultServiceName, detectResources, detectResourcesSync, envDetector, envDetectorSync, hostDetector, hostDetectorSync, osDetector, osDetectorSync, processDetector, processDetectorSync, serviceInstanceIdDetectorSync };

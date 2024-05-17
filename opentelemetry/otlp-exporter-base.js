@@ -26,7 +26,7 @@ function parseHeaders(partialHeaders = {}) {
 			headers[key] = String(value);
 		}
 		else {
-			diag.warn(`Header "${key}" has wrong value and will be ignored`);
+			diag.warn(`Header "${key}" has invalid value (${value}) and will be ignored`);
 		}
 	});
 	return headers;
@@ -88,7 +88,7 @@ class OTLPExporterBase {
 		this._concurrencyLimit =
 			typeof config.concurrencyLimit === 'number'
 				? config.concurrencyLimit
-				: Infinity;
+				: 30;
 		this.timeoutMillis = configureExporterTimeout(config.timeoutMillis);
 		this.onInit(config);
 	}

@@ -138,15 +138,6 @@ declare class HostDetector implements Detector {
 declare const hostDetector: HostDetector;
 
 /**
- * OSDetector detects the resources related to the operating system (OS) on
- * which the process represented by this resource is running.
- */
-declare class OSDetector implements Detector {
-	detect(_config?: ResourceDetectionConfig): Promise<IResource>;
-}
-declare const osDetector: OSDetector;
-
-/**
  * HostDetectorSync detects the resources related to the host current process is
  * running on. Currently only non-cloud-based attributes are included.
  */
@@ -155,6 +146,15 @@ declare class HostDetectorSync implements DetectorSync {
 	private _getAsyncAttributes;
 }
 declare const hostDetectorSync: HostDetectorSync;
+
+/**
+ * OSDetector detects the resources related to the operating system (OS) on
+ * which the process represented by this resource is running.
+ */
+declare class OSDetector implements Detector {
+	detect(_config?: ResourceDetectionConfig): Promise<IResource>;
+}
+declare const osDetector: OSDetector;
 
 /**
  * OSDetectorSync detects the resources related to the operating system (OS) on
@@ -182,6 +182,17 @@ declare class ProcessDetectorSync implements DetectorSync {
 	detect(_config?: ResourceDetectionConfig): IResource;
 }
 declare const processDetectorSync: ProcessDetectorSync;
+
+/**
+ * ServiceInstanceIdDetectorSync detects the resources related to the service instance ID.
+ */
+declare class ServiceInstanceIdDetectorSync implements DetectorSync {
+	detect(_config?: ResourceDetectionConfig): Resource;
+}
+/**
+ * @experimental
+ */
+declare const serviceInstanceIdDetectorSync: ServiceInstanceIdDetectorSync;
 
 /**
  * BrowserDetector will be used to detect the resources related to browser.
@@ -248,10 +259,10 @@ declare class EnvDetectorSync implements DetectorSync {
 	* OTEL_RESOURCE_ATTRIBUTES: A comma-separated list of attributes describing
 	* the source in more detail, e.g. “key1=val1,key2=val2”. Domain names and
 	* paths are accepted as attribute keys. Values may be quoted or unquoted in
-	* general. If a value contains whitespaces, =, or " characters, it must
+	* general. If a value contains whitespace, =, or " characters, it must
 	* always be quoted.
 	*
-	* @param rawEnvAttributes The resource attributes as a comma-seperated list
+	* @param rawEnvAttributes The resource attributes as a comma-separated list
 	* of key/value pairs.
 	* @returns The sanitized resource attributes.
 	*/
@@ -292,4 +303,4 @@ declare const detectResources: (config?: ResourceDetectionConfig) => Promise<IRe
  */
 declare const detectResourcesSync: (config?: ResourceDetectionConfig) => IResource;
 
-export { Detector, DetectorSync, IResource, Resource, ResourceAttributes, ResourceDetectionConfig, browserDetector, browserDetectorSync, defaultServiceName, detectResources, detectResourcesSync, envDetector, envDetectorSync, hostDetector, hostDetectorSync, osDetector, osDetectorSync, processDetector, processDetectorSync };
+export { Detector, DetectorSync, IResource, Resource, ResourceAttributes, ResourceDetectionConfig, browserDetector, browserDetectorSync, defaultServiceName, detectResources, detectResourcesSync, envDetector, envDetectorSync, hostDetector, hostDetectorSync, osDetector, osDetectorSync, processDetector, processDetectorSync, serviceInstanceIdDetectorSync };

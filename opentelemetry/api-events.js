@@ -24,16 +24,16 @@ function makeGetter(requiredVersion, instance, fallback) {
 }
 const API_BACKWARDS_COMPATIBILITY_VERSION = 1;
 
-class NoopEventEmitter {
+class NoopEventLogger {
 	emit(_event) { }
 }
 
-class NoopEventEmitterProvider {
-	getEventEmitter(_name, _domain, _version, _options) {
-		return new NoopEventEmitter();
+class NoopEventLoggerProvider {
+	getEventLogger(_name, _version, _options) {
+		return new NoopEventLogger();
 	}
 }
-const NOOP_EVENT_EMITTER_PROVIDER = new NoopEventEmitterProvider();
+const NOOP_EVENT_LOGGER_PROVIDER = new NoopEventLoggerProvider();
 
 class EventsAPI {
 	constructor() { }
@@ -43,19 +43,19 @@ class EventsAPI {
 		}
 		return this._instance;
 	}
-	setGlobalEventEmitterProvider(provider) {
+	setGlobalEventLoggerProvider(provider) {
 		if (_global[GLOBAL_EVENTS_API_KEY]) {
-			return this.getEventEmitterProvider();
+			return this.getEventLoggerProvider();
 		}
-		_global[GLOBAL_EVENTS_API_KEY] = makeGetter(API_BACKWARDS_COMPATIBILITY_VERSION, provider, NOOP_EVENT_EMITTER_PROVIDER);
+		_global[GLOBAL_EVENTS_API_KEY] = makeGetter(API_BACKWARDS_COMPATIBILITY_VERSION, provider, NOOP_EVENT_LOGGER_PROVIDER);
 		return provider;
 	}
-	getEventEmitterProvider() {
+	getEventLoggerProvider() {
 		return (_global[GLOBAL_EVENTS_API_KEY]?.(API_BACKWARDS_COMPATIBILITY_VERSION) ??
-			NOOP_EVENT_EMITTER_PROVIDER);
+			NOOP_EVENT_LOGGER_PROVIDER);
 	}
-	getEventEmitter(name, domain, version, options) {
-		return this.getEventEmitterProvider().getEventEmitter(name, domain, version, options);
+	getEventLogger(name, version, options) {
+		return this.getEventLoggerProvider().getEventLogger(name, version, options);
 	}
 	disable() {
 		delete _global[GLOBAL_EVENTS_API_KEY];

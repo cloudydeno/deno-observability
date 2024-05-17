@@ -15,12 +15,12 @@
  */
 /// <reference types="./otlp-transformer.d.ts" />
 
-import { hexToBase64, hrTimeToNanoseconds } from './core.js';
+import { hexToBinary, hrTimeToNanoseconds } from './core.js';
 import { ValueType } from './api.js';
 import { DataPointType, AggregationTemporality } from './sdk-metrics.js';
 
-const NANOSECONDS = BigInt(1000000000);
 function hrTimeToNanos(hrTime) {
+	const NANOSECONDS = BigInt(1000000000);
 	return BigInt(hrTime[0]) * NANOSECONDS + BigInt(hrTime[1]);
 }
 function toLongBits(value) {
@@ -40,15 +40,15 @@ const encodeTimestamp = typeof BigInt !== 'undefined' ? encodeAsString : hrTimeT
 function identity(value) {
 	return value;
 }
-function optionalHexToBase64(str) {
+function optionalHexToBinary(str) {
 	if (str === undefined)
 		return undefined;
-	return hexToBase64(str);
+	return hexToBinary(str);
 }
 const DEFAULT_ENCODER = {
 	encodeHrTime: encodeAsLongBits,
-	encodeSpanContext: hexToBase64,
-	encodeOptionalSpanContext: optionalHexToBase64,
+	encodeSpanContext: hexToBinary,
+	encodeOptionalSpanContext: optionalHexToBinary,
 };
 function getOtlpEncoder(options) {
 	if (options === undefined) {
@@ -58,8 +58,8 @@ function getOtlpEncoder(options) {
 	const useHex = options.useHex ?? false;
 	return {
 		encodeHrTime: useLongBits ? encodeAsLongBits : encodeTimestamp,
-		encodeSpanContext: useHex ? identity : hexToBase64,
-		encodeOptionalSpanContext: useHex ? identity : optionalHexToBase64,
+		encodeSpanContext: useHex ? identity : hexToBinary,
+		encodeOptionalSpanContext: useHex ? identity : optionalHexToBinary,
 	};
 }
 
@@ -73,6 +73,12 @@ var ESpanKind;
 	ESpanKind[ESpanKind["SPAN_KIND_CONSUMER"] = 5] = "SPAN_KIND_CONSUMER";
 })(ESpanKind || (ESpanKind = {}));
 
+function createInstrumentationScope(scope) {
+	return {
+		name: scope.name,
+		version: scope.version,
+	};
+}
 function toAttributes(attributes) {
 	return Object.keys(attributes).map(key => toKeyValue(key, attributes[key]));
 }
@@ -150,6 +156,13 @@ function toOtlpSpanEvent(timedEvent, encoder) {
 	};
 }
 
+function createResource(resource) {
+	return {
+		attributes: toAttributes(resource.attributes),
+		droppedAttributesCount: 0,
+	};
+}
+
 function createExportTraceServiceRequest(spans, options) {
 	const encoder = getOtlpEncoder(options);
 	return {
@@ -187,21 +200,17 @@ function spanRecordsToResourceSpans(readableSpans, encoder) {
 		while (!ilmEntry.done) {
 			const scopeSpans = ilmEntry.value;
 			if (scopeSpans.length > 0) {
-				const { name, version, schemaUrl } = scopeSpans[0].instrumentationLibrary;
 				const spans = scopeSpans.map(readableSpan => sdkSpanToOtlpSpan(readableSpan, encoder));
 				scopeResourceSpans.push({
-					scope: { name, version },
+					scope: createInstrumentationScope(scopeSpans[0].instrumentationLibrary),
 					spans: spans,
-					schemaUrl: schemaUrl,
+					schemaUrl: scopeSpans[0].instrumentationLibrary.schemaUrl,
 				});
 			}
 			ilmEntry = ilmIterator.next();
 		}
 		const transformedSpans = {
-			resource: {
-				attributes: toAttributes(resource.attributes),
-				droppedAttributesCount: 0,
-			},
+			resource: createResource(resource),
 			scopeSpans: scopeResourceSpans,
 			schemaUrl: undefined,
 		};
@@ -214,20 +223,14 @@ function spanRecordsToResourceSpans(readableSpans, encoder) {
 function toResourceMetrics(resourceMetrics, options) {
 	const encoder = getOtlpEncoder(options);
 	return {
-		resource: {
-			attributes: toAttributes(resourceMetrics.resource.attributes),
-			droppedAttributesCount: 0,
-		},
+		resource: createResource(resourceMetrics.resource),
 		schemaUrl: undefined,
 		scopeMetrics: toScopeMetrics(resourceMetrics.scopeMetrics, encoder),
 	};
 }
 function toScopeMetrics(scopeMetrics, encoder) {
 	return Array.from(scopeMetrics.map(metrics => ({
-		scope: {
-			name: metrics.scope.name,
-			version: metrics.scope.version,
-		},
+		scope: createInstrumentationScope(metrics.scope),
 		metrics: metrics.metrics.map(metricData => toMetric(metricData, encoder)),
 		schemaUrl: metrics.scope.schemaUrl,
 	})));
@@ -371,16 +374,12 @@ function createResourceMap(logRecords) {
 function logRecordsToResourceLogs(logRecords, encoder) {
 	const resourceMap = createResourceMap(logRecords);
 	return Array.from(resourceMap, ([resource, ismMap]) => ({
-		resource: {
-			attributes: toAttributes(resource.attributes),
-			droppedAttributesCount: 0,
-		},
+		resource: createResource(resource),
 		scopeLogs: Array.from(ismMap, ([, scopeLogs]) => {
-			const { instrumentationScope: { name, version, schemaUrl }, } = scopeLogs[0];
 			return {
-				scope: { name, version },
+				scope: createInstrumentationScope(scopeLogs[0].instrumentationScope),
 				logRecords: scopeLogs.map(log => toLogRecord(log, encoder)),
-				schemaUrl,
+				schemaUrl: scopeLogs[0].instrumentationScope.schemaUrl,
 			};
 		}),
 		schemaUrl: undefined,
@@ -394,7 +393,7 @@ function toLogRecord(log, encoder) {
 		severityText: log.severityText,
 		body: toAnyValue(log.body),
 		attributes: toLogAttributes(log.attributes),
-		droppedAttributesCount: 0,
+		droppedAttributesCount: log.droppedAttributesCount,
 		flags: log.spanContext?.traceFlags,
 		traceId: encoder.encodeOptionalSpanContext(log.spanContext?.traceId),
 		spanId: encoder.encodeOptionalSpanContext(log.spanContext?.spanId),

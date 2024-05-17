@@ -160,6 +160,7 @@ class DropAggregator {
 var InstrumentType;
 (function (InstrumentType) {
 	InstrumentType["COUNTER"] = "COUNTER";
+	InstrumentType["GAUGE"] = "GAUGE";
 	InstrumentType["HISTOGRAM"] = "HISTOGRAM";
 	InstrumentType["UP_DOWN_COUNTER"] = "UP_DOWN_COUNTER";
 	InstrumentType["OBSERVABLE_COUNTER"] = "OBSERVABLE_COUNTER";
@@ -223,6 +224,9 @@ class HistogramAccumulation {
 		this._current = _current;
 	}
 	record(value) {
+		if (Number.isNaN(value)) {
+			return;
+		}
 		this._current.count += 1;
 		this._current.sum += value;
 		if (this._recordMinMax) {
@@ -315,7 +319,8 @@ class HistogramAggregator {
 			dataPointType: DataPointType.HISTOGRAM,
 			dataPoints: accumulationByAttributes.map(([attributes, accumulation]) => {
 				const pointValue = accumulation.toPointValue();
-				const allowsNegativeValues = descriptor.type === InstrumentType.UP_DOWN_COUNTER ||
+				const allowsNegativeValues = descriptor.type === InstrumentType.GAUGE ||
+					descriptor.type === InstrumentType.UP_DOWN_COUNTER ||
 					descriptor.type === InstrumentType.OBSERVABLE_GAUGE ||
 					descriptor.type === InstrumentType.OBSERVABLE_UP_DOWN_COUNTER;
 				return {
@@ -724,6 +729,9 @@ class ExponentialHistogramAccumulation {
 		return this._negative;
 	}
 	updateByIncrement(value, increment) {
+		if (Number.isNaN(value)) {
+			return;
+		}
 		if (value > this._max) {
 			this._max = value;
 		}
@@ -811,6 +819,9 @@ class ExponentialHistogramAccumulation {
 	_incrementIndexBy(buckets, index, increment) {
 		if (increment === 0) {
 			return;
+		}
+		if (buckets.length === 0) {
+			buckets.indexStart = buckets.indexEnd = buckets.indexBase = index;
 		}
 		if (index < buckets.indexStart) {
 			const span = buckets.indexEnd - index;
@@ -924,7 +935,8 @@ class ExponentialHistogramAggregator {
 			dataPointType: DataPointType.EXPONENTIAL_HISTOGRAM,
 			dataPoints: accumulationByAttributes.map(([attributes, accumulation]) => {
 				const pointValue = accumulation.toPointValue();
-				const allowsNegativeValues = descriptor.type === InstrumentType.UP_DOWN_COUNTER ||
+				const allowsNegativeValues = descriptor.type === InstrumentType.GAUGE ||
+					descriptor.type === InstrumentType.UP_DOWN_COUNTER ||
 					descriptor.type === InstrumentType.OBSERVABLE_GAUGE ||
 					descriptor.type === InstrumentType.OBSERVABLE_UP_DOWN_COUNTER;
 				return {
@@ -1128,8 +1140,8 @@ class ExplicitBucketHistogramAggregation extends Aggregation {
 	constructor(boundaries, _recordMinMax = true) {
 		super();
 		this._recordMinMax = _recordMinMax;
-		if (boundaries === undefined || boundaries.length === 0) {
-			throw new Error('HistogramAggregator should be created with boundaries.');
+		if (boundaries == null) {
+			throw new Error('ExplicitBucketHistogramAggregation should be created with explicit boundaries, if a single bucket histogram is required, please pass an empty array');
 		}
 		boundaries = boundaries.concat();
 		boundaries = boundaries.sort((a, b) => a - b);
@@ -1163,6 +1175,7 @@ class DefaultAggregation extends Aggregation {
 			case InstrumentType.OBSERVABLE_UP_DOWN_COUNTER: {
 				return SUM_AGGREGATION;
 			}
+			case InstrumentType.GAUGE:
 			case InstrumentType.OBSERVABLE_GAUGE: {
 				return LAST_VALUE_AGGREGATION;
 			}
@@ -1405,7 +1418,7 @@ class ConsoleMetricExporter {
 					descriptor: metric.descriptor,
 					dataPointType: metric.dataPointType,
 					dataPoints: metric.dataPoints,
-				});
+				}, { depth: null });
 			}
 		}
 		done({ code: ExportResultCode.SUCCESS });
@@ -1476,6 +1489,11 @@ class CounterInstrument extends SyncInstrument {
 		this._record(value, attributes, ctx);
 	}
 }
+class GaugeInstrument extends SyncInstrument {
+	record(value, attributes, ctx) {
+		this._record(value, attributes, ctx);
+	}
+}
 class HistogramInstrument extends SyncInstrument {
 	record(value, attributes, ctx) {
 		if (value < 0) {
@@ -1511,6 +1529,11 @@ function isObservableInstrument(it) {
 class Meter {
 	constructor(_meterSharedState) {
 		this._meterSharedState = _meterSharedState;
+	}
+	createGauge(name, options) {
+		const descriptor = createInstrumentDescriptor(name, InstrumentType.GAUGE, options);
+		const storage = this._meterSharedState.registerMetricStorage(descriptor);
+		return new GaugeInstrument(storage, descriptor);
 	}
 	createHistogram(name, options) {
 		const descriptor = createInstrumentDescriptor(name, InstrumentType.HISTOGRAM, options);
@@ -2257,6 +2280,11 @@ class MeterProvider {
 		if (options?.views != null && options.views.length > 0) {
 			for (const view of options.views) {
 				this._sharedState.viewRegistry.addView(view);
+			}
+		}
+		if (options?.readers != null && options.readers.length > 0) {
+			for (const metricReader of options.readers) {
+				this.addMetricReader(metricReader);
 			}
 		}
 	}

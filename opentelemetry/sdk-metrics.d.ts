@@ -15,7 +15,7 @@
  */
 
 import * as _opentelemetry_api from './api.d.ts';
-import { MetricAttributes, Context, HrTime, ValueType, MetricAdvice, MeterProvider as MeterProvider$1, MeterOptions, Meter } from './api.d.ts';
+import { MetricAttributes, Context, HrTime, ValueType, MeterProvider as MeterProvider$1, MeterOptions, Meter } from './api.d.ts';
 import { InstrumentationScope, ExportResult } from './core.d.ts';
 import { IResource } from './resources.d.ts';
 
@@ -463,11 +463,11 @@ declare class ExponentialHistogramAccumulation implements Accumulation {
 	*/
 	get zeroCount(): number;
 	/**
-	* @returns {Number} The scale used by thie accumulation
+	* @returns {Number} The scale used by this accumulation
 	*/
 	get scale(): number;
 	/**
-	* positive holds the postive values
+	* positive holds the positive values
 	* @returns {Buckets}
 	*/
 	get positive(): Buckets;
@@ -477,7 +477,7 @@ declare class ExponentialHistogramAccumulation implements Accumulation {
 	*/
 	get negative(): Buckets;
 	/**
-	* uppdateByIncr supports updating a histogram with a non-negative
+	* updateByIncr supports updating a histogram with a non-negative
 	* increment.
 	* @param value
 	* @param increment
@@ -489,7 +489,7 @@ declare class ExponentialHistogramAccumulation implements Accumulation {
 	*/
 	merge(previous: ExponentialHistogramAccumulation): void;
 	/**
-	* diff substracts other from self
+	* diff subtracts other from self
 	* @param {ExponentialHistogramAccumulation} other
 	*/
 	diff(other: ExponentialHistogramAccumulation): void;
@@ -546,7 +546,7 @@ declare class ExponentialHistogramAccumulation implements Accumulation {
 	private _diffBuckets;
 }
 /**
- * Aggregator for ExponentialHistogramAccumlations
+ * Aggregator for ExponentialHistogramAccumulations
  */
 declare class ExponentialHistogramAggregator implements Aggregator<ExponentialHistogramAccumulation> {
 	readonly _maxSize: number;
@@ -859,6 +859,7 @@ declare class View {
  */
 declare enum InstrumentType {
 	COUNTER = "COUNTER",
+	GAUGE = "GAUGE",
 	HISTOGRAM = "HISTOGRAM",
 	UP_DOWN_COUNTER = "UP_DOWN_COUNTER",
 	OBSERVABLE_COUNTER = "OBSERVABLE_COUNTER",
@@ -879,8 +880,17 @@ interface InstrumentDescriptor$1 {
 	readonly valueType: ValueType;
 	/**
 	* @experimental
+	*
+	* This is intentionally not using the API's type as it's only available from @opentelemetry/api 1.7.0 and up.
+	* In SDK 2.0 we'll be able to bump the minimum API version and remove this workaround.
 	*/
-	readonly advice: MetricAdvice;
+	readonly advice: {
+		/**
+		* Hint the explicit bucket boundaries for SDK if the metric has been
+		* aggregated with a HistogramAggregator.
+		*/
+		explicitBucketBoundaries?: number[];
+	};
 }
 
 interface MetricDescriptor {
@@ -1265,6 +1275,7 @@ interface MeterProviderOptions {
 	/** Resource associated with metric telemetry  */
 	resource?: IResource;
 	views?: View[];
+	readers?: MetricReader[];
 }
 /**
  * This class implements the {@link MeterProvider} interface.
@@ -1281,7 +1292,13 @@ declare class MeterProvider implements MeterProvider$1 {
 	* Register a {@link MetricReader} to the meter provider. After the
 	* registration, the MetricReader can start metrics collection.
 	*
+	* <p> NOTE: {@link MetricReader} instances MUST be added before creating any instruments.
+	* A {@link MetricReader} instance registered later may receive no or incomplete metric data.
+	*
 	* @param metricReader the metric reader to be registered.
+	*
+	* @deprecated This method will be removed in SDK 2.0. Please use
+	* {@link MeterProviderOptions.readers} via the {@link MeterProvider} constructor instead
 	*/
 	addMetricReader(metricReader: MetricReader): void;
 	/**

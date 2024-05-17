@@ -313,7 +313,8 @@ declare class Span implements Span$1, ReadableSpan {
 	*
 	* @deprecated calling Span constructor directly is not supported. Please use tracer.startSpan.
 	* */
-	constructor(parentTracer: Tracer, context: Context, spanName: string, spanContext: SpanContext, kind: SpanKind, parentSpanId?: string, links?: Link[], startTime?: TimeInput, _deprecatedClock?: unknown);
+	constructor(parentTracer: Tracer, context: Context, spanName: string, spanContext: SpanContext, kind: SpanKind, parentSpanId?: string, links?: Link[], startTime?: TimeInput, _deprecatedClock?: unknown, // keeping this argument even though it is unused to ensure backwards compatibility
+	attributes?: SpanAttributes);
 	spanContext(): SpanContext;
 	setAttribute(key: string, value?: SpanAttributeValue): this;
 	setAttributes(attributes: SpanAttributes): this;
@@ -340,7 +341,7 @@ declare class Span implements Span$1, ReadableSpan {
 	private _truncateToLimitUtil;
 	/**
 	* If the given attribute value is of type string and has more characters than given {@code attributeValueLengthLimit} then
-	* return string with trucated to {@code attributeValueLengthLimit} characters
+	* return string with truncated to {@code attributeValueLengthLimit} characters
 	*
 	* If the given attribute value is array of strings then
 	* return new array of strings with each element truncated to {@code attributeValueLengthLimit} characters

@@ -81,8 +81,8 @@ declare function toLongBits(value: bigint): LongBits;
 declare function encodeAsLongBits(hrTime: HrTime): LongBits;
 declare function encodeAsString(hrTime: HrTime): string;
 declare type HrTimeEncodeFunction = (hrTime: HrTime) => Fixed64;
-declare type SpanContextEncodeFunction = (spanContext: string) => string;
-declare type OptionalSpanContextEncodeFunction = (spanContext: string | undefined) => string | undefined;
+declare type SpanContextEncodeFunction = (spanContext: string) => string | Uint8Array;
+declare type OptionalSpanContextEncodeFunction = (spanContext: string | undefined) => string | Uint8Array | undefined;
 interface Encoder {
 	encodeHrTime: HrTimeEncodeFunction;
 	encodeSpanContext: SpanContextEncodeFunction;
@@ -296,9 +296,9 @@ interface IExemplar {
 	/** Exemplar asInt */
 	asInt?: number;
 	/** Exemplar spanId */
-	spanId?: string;
+	spanId?: string | Uint8Array;
 	/** Exemplar traceId */
-	traceId?: string;
+	traceId?: string | Uint8Array;
 }
 /**
  * AggregationTemporality defines how a metric aggregator reports aggregated
@@ -406,13 +406,13 @@ interface IScopeSpans {
 /** Properties of a Span. */
 interface ISpan {
 	/** Span traceId */
-	traceId: string;
+	traceId: string | Uint8Array;
 	/** Span spanId */
-	spanId: string;
+	spanId: string | Uint8Array;
 	/** Span traceState */
 	traceState?: string | null;
 	/** Span parentSpanId */
-	parentSpanId?: string;
+	parentSpanId?: string | Uint8Array;
 	/** Span name */
 	name: string;
 	/** Span kind */
@@ -496,9 +496,9 @@ interface IEvent {
 /** Properties of a Link. */
 interface ILink {
 	/** Link traceId */
-	traceId: string;
+	traceId: string | Uint8Array;
 	/** Link spanId */
-	spanId: string;
+	spanId: string | Uint8Array;
 	/** Link traceState */
 	traceState?: string;
 	/** Link attributes */
@@ -559,9 +559,9 @@ interface ILogRecord {
 	/** LogRecord flags */
 	flags?: number;
 	/** LogRecord traceId */
-	traceId?: string;
+	traceId?: string | Uint8Array;
 	/** LogRecord spanId */
-	spanId?: string;
+	spanId?: string | Uint8Array;
 }
 /**
  * Numerical value of the severity, normalized to values described in Log Data Model.
