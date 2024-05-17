@@ -1,4 +1,5 @@
 // copy of https://github.com/open-telemetry/opentelemetry-js/blob/ecb5ebe86eebc5a1880041b2523adf5f6d022282/experimental/packages/opentelemetry-instrumentation-fetch/src/fetch.ts
+// but with some fixes and improvements for backend use
 /*
  * Copyright The OpenTelemetry Authors
  *
@@ -34,15 +35,32 @@ export enum AttributeNames {
   HTTP_STATUS_TEXT = 'http.status_text',
 }
 
+import * as core from "../opentelemetry/core.js";
 import {
   isWrapped,
   InstrumentationBase,
   InstrumentationConfig,
   safeExecuteInTheMiddle,
 } from "../opentelemetry/instrumentation.js";
-import * as core from "../opentelemetry/core.js";
-import { SemanticAttributes } from "../opentelemetry/semantic-conventions.js";
-import { Context, context, HrTime, propagation, Span, SpanKind, SpanStatusCode, trace } from "../opentelemetry/api.js";
+import {
+  SEMATTRS_HTTP_HOST,
+  SEMATTRS_HTTP_METHOD,
+  SEMATTRS_HTTP_ROUTE,
+  SEMATTRS_HTTP_SCHEME,
+  SEMATTRS_HTTP_STATUS_CODE,
+  SEMATTRS_HTTP_URL,
+  SEMATTRS_HTTP_USER_AGENT,
+} from "../opentelemetry/semantic-conventions.js";
+import {
+  context,
+  Context,
+  HrTime,
+  propagation,
+  Span,
+  SpanKind,
+  SpanStatusCode,
+  trace,
+} from "../opentelemetry/api.js";
 
 export interface FetchCustomAttributeFunction {
   (
@@ -95,17 +113,17 @@ export class FetchInstrumentation extends InstrumentationBase {
     response: FetchResponse
   ): void {
     const parsedUrl = new URL(response.url);
-    span.setAttribute(SemanticAttributes.HTTP_STATUS_CODE, response.status);
+    span.setAttribute(SEMATTRS_HTTP_STATUS_CODE, response.status);
     if (response.statusText != null) {
       span.setAttribute(AttributeNames.HTTP_STATUS_TEXT, response.statusText);
     }
-    span.setAttribute(SemanticAttributes.HTTP_HOST, parsedUrl.host);
-    span.setAttribute(SemanticAttributes.HTTP_ROUTE, parsedUrl.hostname); // Datadog likes having this
+    span.setAttribute(SEMATTRS_HTTP_HOST, parsedUrl.host);
+    span.setAttribute(SEMATTRS_HTTP_ROUTE, parsedUrl.hostname); // Datadog likes having this
     span.setAttribute(
-      SemanticAttributes.HTTP_SCHEME,
+      SEMATTRS_HTTP_SCHEME,
       parsedUrl.protocol.replace(':', '')
     );
-    span.setAttribute(SemanticAttributes.HTTP_USER_AGENT, navigator.userAgent);
+    span.setAttribute(SEMATTRS_HTTP_USER_AGENT, navigator.userAgent);
 
     if (response.status >= 500) {
       span.setStatus({
@@ -155,8 +173,8 @@ export class FetchInstrumentation extends InstrumentationBase {
       kind: SpanKind.CLIENT,
       attributes: {
         [AttributeNames.COMPONENT]: this.moduleName,
-        [SemanticAttributes.HTTP_METHOD]: method,
-        [SemanticAttributes.HTTP_URL]: url,
+        [SEMATTRS_HTTP_METHOD]: method,
+        [SEMATTRS_HTTP_URL]: url,
       },
     });
   }
