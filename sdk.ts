@@ -71,14 +71,7 @@ export class DenoTelemetrySdk {
     diag.setLogger(props?.diagLogger ?? new DiagConsoleLogger(), env.OTEL_LOG_LEVEL);
 
     this.resource = detectResourcesSync({
-      detectors: props?.detectors ?? [
-        new DenoRuntimeDetector(),
-        new DenoDeployDetector(),
-        new DenoProcessDetector(),
-        hostDetectorSync,
-        osDetectorSync,
-        envDetectorSync,
-      ],
+      detectors: props?.detectors ?? getDefaultDetectors(),
     });
     if (props?.resource) {
       this.resource = this.resource.merge(props.resource);
@@ -105,18 +98,17 @@ export class DenoTelemetrySdk {
     this.meter = new MeterProvider({
       resource: this.resource,
       views: props?.metricsViews,
+      // Metrics export on a fixed timer, so make the user opt-in to them
+      readers: ((props?.metricsExportIntervalMillis ?? 0) > 0) ? [
+        new PeriodicExportingMetricReader({
+          exporter: new OTLPMetricExporterBase(new OTLPMetricsExporter({
+            resourceBase: props?.otlpEndpointBase,
+          })),
+          exportIntervalMillis: props?.metricsExportIntervalMillis,
+        })
+      ] : [],
     });
     metrics.setGlobalMeterProvider(this.meter);
-
-    // Metrics export on a fixed timer, so make the user opt-in to them
-    if ((props?.metricsExportIntervalMillis ?? 0) > 0) {
-      this.meter.addMetricReader(new PeriodicExportingMetricReader({
-        exporter: new OTLPMetricExporterBase(new OTLPMetricsExporter({
-          resourceBase: props?.otlpEndpointBase,
-        })),
-        exportIntervalMillis: props?.metricsExportIntervalMillis,
-      }));
-    }
 
     this.logger = new LoggerProvider({
       resource: this.resource,
@@ -131,7 +123,27 @@ export class DenoTelemetrySdk {
     registerInstrumentations({
       tracerProvider: this.tracer,
       meterProvider: this.meter,
+      loggerProvider: this.logger,
       instrumentations: props?.instrumentations ?? getDenoAutoInstrumentations(),
     });
   }
+}
+
+function getDefaultDetectors(): DetectorSync[] {
+  // We first check for Deno Deploy then decide what we want to detect based on that
+  const denoDeployDetector = new DenoDeployDetector();
+  const runtimeDetectors =
+    Object.keys(denoDeployDetector.detect().attributes).length
+      ? [denoDeployDetector]
+      : [
+          new DenoRuntimeDetector(),
+          new DenoProcessDetector(),
+          hostDetectorSync,
+          osDetectorSync,
+        ];
+
+  return [
+    ...runtimeDetectors,
+    envDetectorSync,
+  ];
 }

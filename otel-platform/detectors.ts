@@ -1,9 +1,22 @@
 import { DetectorSync, Resource } from "../opentelemetry/resources.js";
-import { SemanticResourceAttributes } from "../opentelemetry/semantic-conventions.js";
+import {
+  SEMRESATTRS_CLOUD_PLATFORM,
+  SEMRESATTRS_CLOUD_PROVIDER,
+  SEMRESATTRS_CLOUD_REGION,
+  SEMRESATTRS_DEPLOYMENT_ENVIRONMENT,
+  SEMRESATTRS_FAAS_VERSION,
+  SEMRESATTRS_PROCESS_COMMAND,
+  SEMRESATTRS_PROCESS_COMMAND_ARGS,
+  SEMRESATTRS_PROCESS_EXECUTABLE_PATH,
+  SEMRESATTRS_PROCESS_PID,
+  SEMRESATTRS_PROCESS_RUNTIME_DESCRIPTION,
+  SEMRESATTRS_PROCESS_RUNTIME_NAME,
+  SEMRESATTRS_PROCESS_RUNTIME_VERSION,
+} from "../opentelemetry/semantic-conventions.js";
 
 const runtimeResource = new Resource({
-  [SemanticResourceAttributes.PROCESS_RUNTIME_NAME]: 'deno',
-  // [SemanticResourceAttributes.PROCESS_RUNTIME_DESCRIPTION]: 'Deno Runtime',
+  [SEMRESATTRS_PROCESS_RUNTIME_NAME]: 'deno',
+  // [SEMRESATTRS_PROCESS_RUNTIME_DESCRIPTION]: 'Deno Runtime',
 });
 export class DenoRuntimeDetector implements DetectorSync {
   detect() {
@@ -13,13 +26,14 @@ export class DenoRuntimeDetector implements DetectorSync {
     }
 
     // Deno Deploy does this:
-    if (!Deno.version?.deno) return new Resource({
-      [SemanticResourceAttributes.PROCESS_RUNTIME_NAME]: 'deno',
-      [SemanticResourceAttributes.PROCESS_RUNTIME_DESCRIPTION]: 'Deno Deploy hosted runtime',
-    });
+    if (!Deno.version?.deno) {
+      return runtimeResource.merge(new Resource({
+        [SEMRESATTRS_PROCESS_RUNTIME_DESCRIPTION]: 'Deno Deploy hosted runtime',
+      }));
+    }
 
     return runtimeResource.merge(new Resource({
-      [SemanticResourceAttributes.PROCESS_RUNTIME_VERSION]: Deno.version.deno,
+      [SEMRESATTRS_PROCESS_RUNTIME_VERSION]: Deno.version.deno,
     }));
   }
 }
@@ -42,18 +56,18 @@ export class DenoDeployDetector implements DetectorSync {
     }
 
     return new Resource({
-      [SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT]: 'production', // TODO: main branch or not?
-      [SemanticResourceAttributes.FAAS_VERSION]: deployVersion,
-      [SemanticResourceAttributes.CLOUD_REGION]: deployRegion,
-      [SemanticResourceAttributes.CLOUD_PROVIDER]: 'deno',
-      [SemanticResourceAttributes.CLOUD_PLATFORM]: 'deno_deploy',
+      [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]: 'production', // TODO: main branch or not?
+      [SEMRESATTRS_FAAS_VERSION]: deployVersion,
+      [SEMRESATTRS_CLOUD_REGION]: deployRegion,
+      [SEMRESATTRS_CLOUD_PROVIDER]: 'deno',
+      [SEMRESATTRS_CLOUD_PLATFORM]: 'deno_deploy',
     });
   }
 }
 
 const processResource = new Resource({
-  [SemanticResourceAttributes.PROCESS_PID]: Deno.pid,
-  [SemanticResourceAttributes.PROCESS_COMMAND_ARGS]: Deno.args,
+  [SEMRESATTRS_PROCESS_PID]: Deno.pid,
+  [SEMRESATTRS_PROCESS_COMMAND_ARGS]: Deno.args,
 });
 export class DenoProcessDetector implements DetectorSync {
   detect() {
@@ -62,8 +76,8 @@ export class DenoProcessDetector implements DetectorSync {
     if (!canRead) return processResource;
 
     return processResource.merge(new Resource({
-      [SemanticResourceAttributes.PROCESS_EXECUTABLE_PATH]: Deno.execPath(),
-      [SemanticResourceAttributes.PROCESS_COMMAND]: Deno.mainModule,
+      [SEMRESATTRS_PROCESS_EXECUTABLE_PATH]: Deno.execPath(),
+      [SEMRESATTRS_PROCESS_COMMAND]: Deno.mainModule,
     }));
   }
 }
