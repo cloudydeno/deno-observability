@@ -19,11 +19,12 @@ import * as api from './api.js';
 import { diag, context } from './api.js';
 import { NOOP_LOGGER } from './api-logs.js';
 import { Resource } from './resources.js';
-import { timeInputToHrTime, isAttributeValue, getEnv, getEnvWithoutDefaults, DEFAULT_ATTRIBUTE_COUNT_LIMIT, DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT, callWithTimeout, merge, BindOnceFuture, hrTimeToMicroseconds, ExportResultCode, globalErrorHandler, unrefTimer } from './core.js';
+import { timeInputToHrTime, isAttributeValue, getEnv, getEnvWithoutDefaults, DEFAULT_ATTRIBUTE_COUNT_LIMIT, DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT, callWithTimeout, merge, BindOnceFuture, hrTimeToMicroseconds, ExportResultCode, globalErrorHandler, internal, unrefTimer } from './core.js';
 
 class LogRecord {
 	constructor(_sharedState, instrumentationScope, logRecord) {
 		this.attributes = {};
+		this.totalAttributesCount = 0;
 		this._isReadonly = false;
 		const { timestamp, observedTimestamp, severityNumber, severityText, body, attributes = {}, context, } = logRecord;
 		const now = Date.now();
@@ -70,6 +71,9 @@ class LogRecord {
 	get body() {
 		return this._body;
 	}
+	get droppedAttributesCount() {
+		return this.totalAttributesCount - Object.keys(this.attributes).length;
+	}
 	setAttribute(key, value) {
 		if (this._isLogRecordReadonly()) {
 			return this;
@@ -77,25 +81,32 @@ class LogRecord {
 		if (value === null) {
 			return this;
 		}
-		if (typeof value === 'object' &&
-			!Array.isArray(value) &&
-			Object.keys(value).length > 0) {
-			this.attributes[key] = value;
-		}
 		if (key.length === 0) {
 			api.diag.warn(`Invalid attribute key: ${key}`);
 			return this;
 		}
-		if (!isAttributeValue(value)) {
+		if (!isAttributeValue(value) &&
+			!(typeof value === 'object' &&
+				!Array.isArray(value) &&
+				Object.keys(value).length > 0)) {
 			api.diag.warn(`Invalid attribute value set for key: ${key}`);
 			return this;
 		}
+		this.totalAttributesCount += 1;
 		if (Object.keys(this.attributes).length >=
 			this._logRecordLimits.attributeCountLimit &&
 			!Object.prototype.hasOwnProperty.call(this.attributes, key)) {
+			if (this.droppedAttributesCount === 1) {
+				api.diag.warn('Dropping extra attributes.');
+			}
 			return this;
 		}
-		this.attributes[key] = this._truncateToSize(value);
+		if (isAttributeValue(value)) {
+			this.attributes[key] = this._truncateToSize(value);
+		}
+		else {
+			this.attributes[key] = value;
+		}
 		return this;
 	}
 	setAttributes(attributes) {
@@ -228,8 +239,9 @@ class LoggerProviderSharedState {
 const DEFAULT_LOGGER_NAME = 'unknown';
 class LoggerProvider {
 	constructor(config = {}) {
-		const { resource = Resource.default(), logRecordLimits, forceFlushTimeoutMillis, } = merge({}, loadDefaultConfig(), config);
-		this._sharedState = new LoggerProviderSharedState(resource, forceFlushTimeoutMillis, reconfigureLimits(logRecordLimits));
+		const mergedConfig = merge({}, loadDefaultConfig(), config);
+		const resource = Resource.default().merge(mergedConfig.resource ?? Resource.empty());
+		this._sharedState = new LoggerProviderSharedState(resource, mergedConfig.forceFlushTimeoutMillis, reconfigureLimits(mergedConfig.logRecordLimits));
 		this._shutdownOnce = new BindOnceFuture(this._shutdown, this);
 	}
 	getLogger(name, version, options) {
@@ -306,21 +318,38 @@ class SimpleLogRecordProcessor {
 	constructor(_exporter) {
 		this._exporter = _exporter;
 		this._shutdownOnce = new BindOnceFuture(this._shutdown, this);
+		this._unresolvedExports = new Set();
 	}
 	onEmit(logRecord) {
 		if (this._shutdownOnce.isCalled) {
 			return;
 		}
-		this._exporter.export([logRecord], (res) => {
-			if (res.code !== ExportResultCode.SUCCESS) {
-				globalErrorHandler(res.error ??
-					new Error(`SimpleLogRecordProcessor: log record export failed (status ${res})`));
-				return;
+		const doExport = () => internal
+			._export(this._exporter, [logRecord])
+			.then((result) => {
+			if (result.code !== ExportResultCode.SUCCESS) {
+				globalErrorHandler(result.error ??
+					new Error(`SimpleLogRecordProcessor: log record export failed (status ${result})`));
 			}
-		});
+		})
+			.catch(globalErrorHandler);
+		if (logRecord.resource.asyncAttributesPending) {
+			const exportPromise = logRecord.resource
+				.waitForAsyncAttributes?.()
+				.then(() => {
+				this._unresolvedExports.delete(exportPromise);
+				return doExport();
+			}, globalErrorHandler);
+			if (exportPromise != null) {
+				this._unresolvedExports.add(exportPromise);
+			}
+		}
+		else {
+			void doExport();
+		}
 	}
-	forceFlush() {
-		return Promise.resolve();
+	async forceFlush() {
+		await Promise.all(Array.from(this._unresolvedExports));
 	}
 	shutdown() {
 		return this._shutdownOnce.call();
@@ -453,16 +482,24 @@ class BatchLogRecordProcessorBase {
 		}
 	}
 	_export(logRecords) {
-		return new Promise((resolve, reject) => {
-			this._exporter.export(logRecords, (res) => {
-				if (res.code !== ExportResultCode.SUCCESS) {
-					reject(res.error ??
-						new Error(`BatchLogRecordProcessorBase: log record export failed (status ${res})`));
-					return;
-				}
-				resolve(res);
-			});
-		});
+		const doExport = () => internal
+			._export(this._exporter, logRecords)
+			.then((result) => {
+			if (result.code !== ExportResultCode.SUCCESS) {
+				globalErrorHandler(result.error ??
+					new Error(`BatchLogRecordProcessor: log record export failed (status ${result})`));
+			}
+		})
+			.catch(globalErrorHandler);
+		const pendingResources = logRecords
+			.map(logRecord => logRecord.resource)
+			.filter(resource => resource.asyncAttributesPending);
+		if (pendingResources.length === 0) {
+			return doExport();
+		}
+		else {
+			return Promise.all(pendingResources.map(resource => resource.waitForAsyncAttributes?.())).then(doExport, globalErrorHandler);
+		}
 	}
 }
 

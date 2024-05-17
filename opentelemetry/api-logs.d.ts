@@ -14,12 +14,21 @@
  * limitations under the License.
  */
 
-import { AttributeValue, Context, Attributes } from './api.d.ts';
+import { AttributeValue, TimeInput, Context, Attributes } from './api.d.ts';
 
-declare type LogAttributeValue = AttributeValue | LogAttributes;
-interface LogAttributes {
-	[attributeKey: string]: LogAttributeValue | undefined;
+/**
+ * AnyValueMap is a map from string to AnyValue (attribute value or a nested map)
+ */
+interface AnyValueMap {
+	[attributeKey: string]: AnyValue | undefined;
 }
+/**
+ * AnyValue is a either an attribute value or a map of AnyValue(s)
+ */
+declare type AnyValue = AttributeValue | AnyValueMap;
+
+declare type LogBody = AnyValue;
+declare type LogAttributes = AnyValueMap;
 declare enum SeverityNumber {
 	UNSPECIFIED = 0,
 	TRACE = 1,
@@ -51,11 +60,11 @@ interface LogRecord {
 	/**
 	* The time when the log record occurred as UNIX Epoch time in nanoseconds.
 	*/
-	timestamp?: number;
+	timestamp?: TimeInput;
 	/**
 	* Time when the event was observed by the collection system.
 	*/
-	observedTimestamp?: number;
+	observedTimestamp?: TimeInput;
 	/**
 	* Numerical value of the severity.
 	*/
@@ -67,7 +76,7 @@ interface LogRecord {
 	/**
 	* A value containing the body of the log record.
 	*/
-	body?: string;
+	body?: LogBody;
 	/**
 	* Attributes that define the log record.
 	*/
@@ -153,4 +162,4 @@ declare class LogsAPI {
 
 declare const logs: LogsAPI;
 
-export { LogAttributeValue, LogAttributes, LogRecord, Logger, LoggerOptions, LoggerProvider, NOOP_LOGGER, NOOP_LOGGER_PROVIDER, NoopLogger, NoopLoggerProvider, SeverityNumber, logs };
+export { AnyValue, AnyValueMap, LogAttributes, LogBody, LogRecord, Logger, LoggerOptions, LoggerProvider, NOOP_LOGGER, NOOP_LOGGER_PROVIDER, NoopLogger, NoopLoggerProvider, SeverityNumber, logs };

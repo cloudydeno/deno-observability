@@ -24,8 +24,8 @@ import { Resource } from './resources.js';
 const ExceptionEventName = 'exception';
 
 class Span {
-	constructor(parentTracer, context, spanName, spanContext, kind, parentSpanId, links = [], startTime, _deprecatedClock
-	) {
+	constructor(parentTracer, context, spanName, spanContext, kind, parentSpanId, links = [], startTime, _deprecatedClock,
+	attributes) {
 		this.attributes = {};
 		this.links = [];
 		this.events = [];
@@ -52,10 +52,13 @@ class Span {
 		this.resource = parentTracer.resource;
 		this.instrumentationLibrary = parentTracer.instrumentationLibrary;
 		this._spanLimits = parentTracer.getSpanLimits();
-		this._spanProcessor = parentTracer.getActiveSpanProcessor();
-		this._spanProcessor.onStart(this, context);
 		this._attributeValueLengthLimit =
 			this._spanLimits.attributeValueLengthLimit || 0;
+		if (attributes != null) {
+			this.setAttributes(attributes);
+		}
+		this._spanProcessor = parentTracer.getActiveSpanProcessor();
+		this._spanProcessor.onStart(this, context);
 	}
 	spanContext() {
 		return this._spanContext;
@@ -95,7 +98,9 @@ class Span {
 			return this;
 		}
 		if (this.events.length >= this._spanLimits.eventCountLimit) {
-			diag.warn('Dropping extra events.');
+			if (this._droppedEventsCount === 0) {
+				diag.debug('Dropping extra events.');
+			}
 			this.events.shift();
 			this._droppedEventsCount++;
 		}
@@ -138,6 +143,9 @@ class Span {
 			diag.warn('Inconsistent start and end time, startTime > endTime. Setting span duration to 0ms.', this.startTime, this.endTime);
 			this.endTime = this.startTime.slice();
 			this._duration = [0, 0];
+		}
+		if (this._droppedEventsCount > 0) {
+			diag.warn(`Dropped ${this._droppedEventsCount} events because eventCountLimit reached`);
 		}
 		this._spanProcessor.onEnd(this);
 	}
@@ -523,7 +531,14 @@ class BatchSpanProcessorBase {
 				reject(new Error('Timeout'));
 			}, this._exportTimeoutMillis);
 			context.with(suppressTracing(context.active()), () => {
-				const spans = this._finishedSpans.splice(0, this._maxExportBatchSize);
+				let spans;
+				if (this._finishedSpans.length <= this._maxExportBatchSize) {
+					spans = this._finishedSpans;
+					this._finishedSpans = [];
+				}
+				else {
+					spans = this._finishedSpans.splice(0, this._maxExportBatchSize);
+				}
 				const doExport = () => this._exporter.export(spans, result => {
 					clearTimeout(timer);
 					if (result.code === ExportResultCode.SUCCESS) {
@@ -534,14 +549,20 @@ class BatchSpanProcessorBase {
 							new Error('BatchSpanProcessor: span export failed'));
 					}
 				});
-				const pendingResources = spans
-					.map(span => span.resource)
-					.filter(resource => resource.asyncAttributesPending);
-				if (pendingResources.length === 0) {
+				let pendingResources = null;
+				for (let i = 0, len = spans.length; i < len; i++) {
+					const span = spans[i];
+					if (span.resource.asyncAttributesPending &&
+						span.resource.waitForAsyncAttributes) {
+						pendingResources ??= [];
+						pendingResources.push(span.resource.waitForAsyncAttributes());
+					}
+				}
+				if (pendingResources === null) {
 					doExport();
 				}
 				else {
-					Promise.all(pendingResources.map(resource => resource.waitForAsyncAttributes?.())).then(doExport, err => {
+					Promise.all(pendingResources).then(doExport, err => {
 						globalErrorHandler(err);
 						reject(err);
 					});
@@ -555,7 +576,7 @@ class BatchSpanProcessorBase {
 		const flush = () => {
 			this._isExporting = true;
 			this._flushOneBatch()
-				.then(() => {
+				.finally(() => {
 				this._isExporting = false;
 				if (this._finishedSpans.length > 0) {
 					this._clearTimer();
@@ -662,9 +683,8 @@ class Tracer {
 			const nonRecordingSpan = api.trace.wrapSpanContext(spanContext);
 			return nonRecordingSpan;
 		}
-		const span = new Span(this, context, name, spanContext, spanKind, parentSpanId, links, options.startTime);
 		const initAttributes = sanitizeAttributes(Object.assign(attributes, samplingResult.attributes));
-		span.setAttributes(initAttributes);
+		const span = new Span(this, context, name, spanContext, spanKind, parentSpanId, links, options.startTime, undefined, initAttributes);
 		return span;
 	}
 	startActiveSpan(name, arg2, arg3, arg4) {
@@ -918,6 +938,9 @@ class ConsoleSpanExporter {
 	}
 	_exportInfo(span) {
 		return {
+			resource: {
+				attributes: span.resource.attributes,
+			},
 			traceId: span.spanContext().traceId,
 			parentId: span.parentSpanId,
 			traceState: span.spanContext().traceState?.serialize(),

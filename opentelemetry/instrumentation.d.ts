@@ -15,6 +15,7 @@
  */
 
 import { TracerProvider, MeterProvider, DiagLogger, Meter, Tracer } from './api.d.ts';
+import { LoggerProvider, Logger } from './api-logs.d.ts';
 
 /** Interface Instrumentation to apply patch. */
 interface Instrumentation {
@@ -36,6 +37,8 @@ interface Instrumentation {
 	setTracerProvider(tracerProvider: TracerProvider): void;
 	/** Method to set meter provider  */
 	setMeterProvider(meterProvider: MeterProvider): void;
+	/** Method to set logger provider  */
+	setLoggerProvider?(loggerProvider: LoggerProvider): void;
 	/** Method to set instrumentation config  */
 	setConfig(config: InstrumentationConfig): void;
 	/** Method to get instrumentation config  */
@@ -64,46 +67,46 @@ interface ShimWrapped extends Function {
 	__unwrap: Function;
 	__original: Function;
 }
-
-interface InstrumentationModuleFile<T> {
+interface InstrumentationModuleFile {
 	/** Name of file to be patched with relative path */
 	name: string;
-	moduleExports?: T;
+	moduleExports?: unknown;
 	/** Supported version this file */
 	supportedVersions: string[];
 	/** Method to patch the instrumentation  */
-	patch(moduleExports: T, moduleVersion?: string): T;
+	patch(moduleExports: unknown, moduleVersion?: string): unknown;
 	/** Method to patch the instrumentation  */
 	/** Method to unpatch the instrumentation  */
-	unpatch(moduleExports?: T, moduleVersion?: string): void;
+	unpatch(moduleExports?: unknown, moduleVersion?: string): void;
 }
-interface InstrumentationModuleDefinition<T> {
+interface InstrumentationModuleDefinition {
 	/** Module name or path  */
 	name: string;
-	moduleExports?: T;
+	moduleExports?: any;
 	/** Instrumented module version */
 	moduleVersion?: string;
 	/** Supported version of module  */
 	supportedVersions: string[];
 	/** Module internal files to be patched  */
-	files: InstrumentationModuleFile<any>[];
+	files: InstrumentationModuleFile[];
 	/** If set to true, the includePrerelease check will be included when calling semver.satisfies */
 	includePrerelease?: boolean;
 	/** Method to patch the instrumentation  */
-	patch?: (moduleExports: T, moduleVersion?: string) => T;
+	patch?: (moduleExports: any, moduleVersion?: string) => any;
 	/** Method to unpatch the instrumentation  */
-	unpatch?: (moduleExports: T, moduleVersion?: string) => void;
+	unpatch?: (moduleExports: any, moduleVersion?: string) => void;
 }
 
 /**
  * Base abstract internal class for instrumenting node and web plugins
  */
-declare abstract class InstrumentationAbstract<T = any> implements Instrumentation {
+declare abstract class InstrumentationAbstract implements Instrumentation {
 	readonly instrumentationName: string;
 	readonly instrumentationVersion: string;
 	protected _config: InstrumentationConfig;
 	private _tracer;
 	private _meter;
+	private _logger;
 	protected _diag: DiagLogger;
 	constructor(instrumentationName: string, instrumentationVersion: string, config?: InstrumentationConfig);
 	protected _wrap: <Nodule extends object, FieldName extends keyof Nodule>(nodule: Nodule, name: FieldName, wrapper: (original: Nodule[FieldName]) => Nodule[FieldName]) => void;
@@ -116,6 +119,21 @@ declare abstract class InstrumentationAbstract<T = any> implements Instrumentati
 	* @param meterProvider
 	*/
 	setMeterProvider(meterProvider: MeterProvider): void;
+	protected get logger(): Logger;
+	/**
+	* Sets LoggerProvider to this plugin
+	* @param loggerProvider
+	*/
+	setLoggerProvider(loggerProvider: LoggerProvider): void;
+	/**
+	* @experimental
+	*
+	* Get module definitions defined by {@link init}.
+	* This can be used for experimental compile-time instrumentation.
+	*
+	* @returns an array of {@link InstrumentationModuleDefinition}
+	*/
+	getModuleDefinitions(): InstrumentationModuleDefinition[];
 	/**
 	* Sets the new metric instruments with the current Meter.
 	*/
@@ -136,9 +154,9 @@ declare abstract class InstrumentationAbstract<T = any> implements Instrumentati
 	abstract disable(): void;
 	/**
 	* Init method in which plugin should define _modules and patches for
-	* methods
+	* methods.
 	*/
-	protected abstract init(): InstrumentationModuleDefinition<T> | InstrumentationModuleDefinition<T>[] | void;
+	protected abstract init(): InstrumentationModuleDefinition | InstrumentationModuleDefinition[] | void;
 }
 
 /**
@@ -156,6 +174,7 @@ interface AutoLoaderOptions {
 	instrumentations?: InstrumentationOption[];
 	tracerProvider?: TracerProvider;
 	meterProvider?: MeterProvider;
+	loggerProvider?: LoggerProvider;
 }
 
 /**
@@ -165,6 +184,23 @@ interface AutoLoaderOptions {
  *   registered
  */
 declare function registerInstrumentations(options: AutoLoaderOptions): () => void;
+
+declare class InstrumentationNodeModuleDefinition implements InstrumentationModuleDefinition {
+	name: string;
+	supportedVersions: string[];
+	patch?: ((exports: any, moduleVersion?: string | undefined) => any) | undefined;
+	unpatch?: ((exports: any, moduleVersion?: string | undefined) => void) | undefined;
+	files: InstrumentationModuleFile[];
+	constructor(name: string, supportedVersions: string[], patch?: ((exports: any, moduleVersion?: string | undefined) => any) | undefined, unpatch?: ((exports: any, moduleVersion?: string | undefined) => void) | undefined, files?: InstrumentationModuleFile[]);
+}
+
+declare class InstrumentationNodeModuleFile implements InstrumentationModuleFile {
+	supportedVersions: string[];
+	patch: (moduleExports: any, moduleVersion?: string) => any;
+	unpatch: (moduleExports?: any, moduleVersion?: string) => void;
+	name: string;
+	constructor(name: string, supportedVersions: string[], patch: (moduleExports: any, moduleVersion?: string) => any, unpatch: (moduleExports?: any, moduleVersion?: string) => void);
+}
 
 /**
  * function to execute patched function and being able to catch errors
@@ -184,4 +220,4 @@ declare function safeExecuteInTheMiddleAsync<T>(execute: () => T, onFinish: (e: 
  */
 declare function isWrapped(func: unknown): func is ShimWrapped;
 
-export { AutoLoaderOptions, AutoLoaderResult, Instrumentation, InstrumentationBase, InstrumentationConfig, InstrumentationOption, ShimWrapped, isWrapped, registerInstrumentations, safeExecuteInTheMiddle, safeExecuteInTheMiddleAsync };
+export { AutoLoaderOptions, AutoLoaderResult, Instrumentation, InstrumentationBase, InstrumentationConfig, InstrumentationModuleDefinition, InstrumentationModuleFile, InstrumentationNodeModuleDefinition, InstrumentationNodeModuleFile, InstrumentationOption, ShimWrapped, isWrapped, registerInstrumentations, safeExecuteInTheMiddle, safeExecuteInTheMiddleAsync };

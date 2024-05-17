@@ -15,6 +15,7 @@
  */
 
 import { Attributes } from './api.d.ts';
+import { AnyValue } from './api-logs.d.ts';
 
 interface Event {
 	/**
@@ -25,6 +26,11 @@ interface Event {
 	* The name of the event.
 	*/
 	name: string;
+	/**
+	* Data that describes the event.
+	* Intended to be used by instrumentation libraries.
+	*/
+	data?: AnyValue;
 	/**
 	* Additional attributes that describe the event.
 	*/
@@ -43,7 +49,7 @@ interface Event {
 	spanId?: string;
 }
 
-interface EventEmitter {
+interface EventLogger {
 	/**
 	* Emit an event. This method should only be used by instrumentations emitting events.
 	*
@@ -52,7 +58,7 @@ interface EventEmitter {
 	emit(event: Event): void;
 }
 
-interface EventEmitterOptions {
+interface EventLoggerOptions {
 	/**
 	* The schemaUrl of the tracer or instrumentation library
 	* @default ''
@@ -65,43 +71,42 @@ interface EventEmitterOptions {
 }
 
 /**
- * A registry for creating named {@link EventEmitter}s.
+ * A registry for creating named {@link EventLogger}s.
  */
-interface EventEmitterProvider {
+interface EventLoggerProvider {
 	/**
-	* Returns an EventEmitter, creating one if one with the given name, version, and
+	* Returns an EventLogger, creating one if one with the given name, version, and
 	* schemaUrl pair is not already created.
 	*
-	* @param name The name of the event emitter or instrumentation library.
-	* @param domain The domain for events created by the event emitter.
-	* @param version The version of the event emitter or instrumentation library.
-	* @param options The options of the event emitter or instrumentation library.
-	* @returns EventEmitter An event emitter with the given name and version.
+	* @param name The name of the event logger or instrumentation library.
+	* @param version The version of the event logger or instrumentation library.
+	* @param options The options of the event logger or instrumentation library.
+	* @returns EventLogger An event logger with the given name and version.
 	*/
-	getEventEmitter(name: string, domain: string, version?: string, options?: EventEmitterOptions): EventEmitter;
+	getEventLogger(name: string, version?: string, options?: EventLoggerOptions): EventLogger;
 }
 
 declare class EventsAPI {
 	private static _instance?;
 	private constructor();
 	static getInstance(): EventsAPI;
-	setGlobalEventEmitterProvider(provider: EventEmitterProvider): EventEmitterProvider;
+	setGlobalEventLoggerProvider(provider: EventLoggerProvider): EventLoggerProvider;
 	/**
-	* Returns the global event emitter provider.
+	* Returns the global event logger provider.
 	*
-	* @returns EventEmitterProvider
+	* @returns EventLoggerProvider
 	*/
-	getEventEmitterProvider(): EventEmitterProvider;
+	getEventLoggerProvider(): EventLoggerProvider;
 	/**
-	* Returns a event emitter from the global event emitter provider.
+	* Returns a event logger from the global event logger provider.
 	*
-	* @returns EventEmitter
+	* @returns EventLogger
 	*/
-	getEventEmitter(name: string, domain: string, version?: string, options?: EventEmitterOptions): EventEmitter;
-	/** Remove the global event emitter provider */
+	getEventLogger(name: string, version?: string, options?: EventLoggerOptions): EventLogger;
+	/** Remove the global event logger provider */
 	disable(): void;
 }
 
 declare const events: EventsAPI;
 
-export { Event, EventEmitter, EventEmitterOptions, EventEmitterProvider, events };
+export { Event, EventLogger, EventLoggerOptions, EventLoggerProvider, events };

@@ -16,7 +16,6 @@
 /// <reference types="./core.d.ts" />
 
 import { createContextKey, baggageEntryMetadataFromString, propagation, diag, DiagLogLevel, trace, isSpanContextValid, TraceFlags, SamplingDecision, isValidTraceId, context } from './api.js';
-
 import { SemanticResourceAttributes, TelemetrySdkLanguageValues } from './semantic-conventions.js';
 
 const SUPPRESS_TRACING_KEY = createContextKey('OpenTelemetry SDK Context Key SUPPRESS_TRACING');
@@ -482,22 +481,33 @@ function getEnvWithoutDefaults() {
 
 function getEnv() {
 	const processEnv = parseEnvironment(Deno.env.toObject());
-	return Object.assign({
-		HOSTNAME: Deno.hostname?.(),
-	}, DEFAULT_ENVIRONMENT, processEnv);
+	return Object.assign({}, DEFAULT_ENVIRONMENT, processEnv);
 }
 
 const _globalThis = typeof globalThis === 'object' ? globalThis : global;
 
-function hexToBase64(hexStr) {
-	const hexStrLen = hexStr.length;
-	let hexAsciiCharsStr = '';
-	for (let i = 0; i < hexStrLen; i += 2) {
-		const hexPair = hexStr.substring(i, i + 2);
-		const hexVal = parseInt(hexPair, 16);
-		hexAsciiCharsStr += String.fromCharCode(hexVal);
+function intValue(charCode) {
+	if (charCode >= 48 && charCode <= 57) {
+		return charCode - 48;
 	}
-	return btoa(hexAsciiCharsStr);
+	if (charCode >= 97 && charCode <= 102) {
+		return charCode - 87;
+	}
+	return charCode - 55;
+}
+function hexToBinary(hexStr) {
+	const buf = new Uint8Array(hexStr.length / 2);
+	let offset = 0;
+	for (let i = 0; i < hexStr.length; i += 2) {
+		const hi = intValue(hexStr.charCodeAt(i));
+		const lo = intValue(hexStr.charCodeAt(i + 1));
+		buf[offset++] = (hi << 4) | lo;
+	}
+	return buf;
+}
+
+function hexToBase64(hexStr) {
+	return btoa(String.fromCharCode(...hexToBinary(hexStr)));
 }
 
 const SPAN_ID_BYTES = 8;
@@ -523,7 +533,7 @@ function getIdGenerator(bytes) {
 
 const otperformance = performance;
 
-const VERSION$1 = "1.18.0";
+const VERSION$1 = "1.24.0";
 
 const SDK_INFO = {
 	[SemanticResourceAttributes.TELEMETRY_SDK_NAME]: 'opentelemetry',
@@ -1204,4 +1214,4 @@ const internal = {
 	_export,
 };
 
-export { AlwaysOffSampler, AlwaysOnSampler, AnchoredClock, BindOnceFuture, CompositePropagator, DEFAULT_ATTRIBUTE_COUNT_LIMIT, DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT, DEFAULT_ENVIRONMENT, DEFAULT_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT, DEFAULT_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT, ExportResultCode, ParentBasedSampler, RPCType, RandomIdGenerator, SDK_INFO, TRACE_PARENT_HEADER, TRACE_STATE_HEADER, TimeoutError, TraceIdRatioBasedSampler, TraceState, TracesSamplerValues, VERSION$1 as VERSION, W3CBaggagePropagator, W3CTraceContextPropagator, _globalThis, addHrTimes, utils as baggageUtils, callWithTimeout, deleteRPCMetadata, getEnv, getEnvWithoutDefaults, getRPCMetadata, getTimeOrigin, globalErrorHandler, hexToBase64, hrTime, hrTimeDuration, hrTimeToMicroseconds, hrTimeToMilliseconds, hrTimeToNanoseconds, hrTimeToTimeStamp, internal, isAttributeKey, isAttributeValue, isTimeInput, isTimeInputHrTime, isTracingSuppressed, isUrlIgnored, isWrapped, loggingErrorHandler, merge, millisToHrTime, otperformance, parseEnvironment, parseTraceParent, sanitizeAttributes, setGlobalErrorHandler, setRPCMetadata, suppressTracing, timeInputToHrTime, unrefTimer, unsuppressTracing, urlMatches };
+export { AlwaysOffSampler, AlwaysOnSampler, AnchoredClock, BindOnceFuture, CompositePropagator, DEFAULT_ATTRIBUTE_COUNT_LIMIT, DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT, DEFAULT_ENVIRONMENT, DEFAULT_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT, DEFAULT_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT, ExportResultCode, ParentBasedSampler, RPCType, RandomIdGenerator, SDK_INFO, TRACE_PARENT_HEADER, TRACE_STATE_HEADER, TimeoutError, TraceIdRatioBasedSampler, TraceState, TracesSamplerValues, VERSION$1 as VERSION, W3CBaggagePropagator, W3CTraceContextPropagator, _globalThis, addHrTimes, utils as baggageUtils, callWithTimeout, deleteRPCMetadata, getEnv, getEnvWithoutDefaults, getRPCMetadata, getTimeOrigin, globalErrorHandler, hexToBase64, hexToBinary, hrTime, hrTimeDuration, hrTimeToMicroseconds, hrTimeToMilliseconds, hrTimeToNanoseconds, hrTimeToTimeStamp, internal, isAttributeKey, isAttributeValue, isTimeInput, isTimeInputHrTime, isTracingSuppressed, isUrlIgnored, isWrapped, loggingErrorHandler, merge, millisToHrTime, otperformance, parseEnvironment, parseTraceParent, sanitizeAttributes, setGlobalErrorHandler, setRPCMetadata, suppressTracing, timeInputToHrTime, unrefTimer, unsuppressTracing, urlMatches };

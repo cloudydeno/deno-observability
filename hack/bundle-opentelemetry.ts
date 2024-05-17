@@ -85,6 +85,8 @@ async function buildModuleWithRollup(directory: string, modName: string, externa
       return match[0].slice(0, start) + newImport + match[0].slice(end);
     });
 
+    text = text.replace(`import { randomUUID } from 'crypto';`, '');
+    text = text.replace(` randomUUID()`, ` crypto.randomUUID()`);
     text = text.replace(`typeof process !== 'undefined' && process && process.env\n        ? parseEnvironment(process.env)\n        : parseEnvironment(_globalThis$1);`, `parseEnvironment(Deno.env.toObject())`);
     text = text.replace(`(process.env)`, `(Deno.env.toObject())`);
     text = text.replace(`os.hostname()`, `Deno.hostname?.()`);
@@ -236,7 +238,13 @@ await Deno.writeTextFile('hack/opentelemetry-js/tsconfig.esnext.deno.json', JSON
 console.error(`Running npm install...`);
 {
   const npm = new Deno.Command('npm', {
-    args: ['install', /*'--production',*/ '--ignore-scripts'],
+    args: [
+      'install',
+      // '--production',
+      '--ignore-scripts',
+      '--no-audit',
+      '--no-fund',
+    ],
     cwd: 'hack/opentelemetry-js',
     stdout: 'inherit',
     stderr: 'inherit',

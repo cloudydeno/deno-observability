@@ -16,6 +16,7 @@
 /// <reference types="./instrumentation.d.ts" />
 
 import { trace, metrics, diag } from './api.js';
+import { logs } from './api-logs.js';
 import * as shimmer from 'https://esm.sh/shimmer';
 
 function parseInstrumentationOptions(options = []) {
@@ -35,7 +36,7 @@ function parseInstrumentationOptions(options = []) {
 	}
 	return { instrumentations };
 }
-function enableInstrumentations(instrumentations, tracerProvider, meterProvider) {
+function enableInstrumentations(instrumentations, tracerProvider, meterProvider, loggerProvider) {
 	for (let i = 0, j = instrumentations.length; i < j; i++) {
 		const instrumentation = instrumentations[i];
 		if (tracerProvider) {
@@ -43,6 +44,9 @@ function enableInstrumentations(instrumentations, tracerProvider, meterProvider)
 		}
 		if (meterProvider) {
 			instrumentation.setMeterProvider(meterProvider);
+		}
+		if (loggerProvider && instrumentation.setLoggerProvider) {
+			instrumentation.setLoggerProvider(loggerProvider);
 		}
 		if (!instrumentation.getConfig().enabled) {
 			instrumentation.enable();
@@ -57,7 +61,8 @@ function registerInstrumentations(options) {
 	const { instrumentations } = parseInstrumentationOptions(options.instrumentations);
 	const tracerProvider = options.tracerProvider || trace.getTracerProvider();
 	const meterProvider = options.meterProvider || metrics.getMeterProvider();
-	enableInstrumentations(instrumentations, tracerProvider, meterProvider);
+	const loggerProvider = options.loggerProvider || logs.getLoggerProvider();
+	enableInstrumentations(instrumentations, tracerProvider, meterProvider, loggerProvider);
 	return () => {
 		disableInstrumentations(instrumentations);
 	};
@@ -80,6 +85,7 @@ class InstrumentationAbstract {
 		});
 		this._tracer = trace.getTracer(instrumentationName, instrumentationVersion);
 		this._meter = metrics.getMeter(instrumentationName, instrumentationVersion);
+		this._logger = logs.getLogger(instrumentationName, instrumentationVersion);
 		this._updateMetricInstruments();
 	}
 	get meter() {
@@ -88,6 +94,19 @@ class InstrumentationAbstract {
 	setMeterProvider(meterProvider) {
 		this._meter = meterProvider.getMeter(this.instrumentationName, this.instrumentationVersion);
 		this._updateMetricInstruments();
+	}
+	get logger() {
+		return this._logger;
+	}
+	setLoggerProvider(loggerProvider) {
+		this._logger = loggerProvider.getLogger(this.instrumentationName, this.instrumentationVersion);
+	}
+	getModuleDefinitions() {
+		const initResult = this.init() ?? [];
+		if (!Array.isArray(initResult)) {
+			return [initResult];
+		}
+		return initResult;
 	}
 	_updateMetricInstruments() {
 		return;
@@ -112,6 +131,34 @@ class InstrumentationBase extends InstrumentationAbstract {
 		if (this._config.enabled) {
 			this.enable();
 		}
+	}
+}
+
+function normalize(path) {
+	diag.warn('Path normalization is not implemented for this platform. To silence this warning, ensure no node-specific instrumentations are loaded, and node-specific types (e.g. InstrumentationNodeModuleFile), are not used in a browser context)');
+	return path;
+}
+
+class InstrumentationNodeModuleDefinition {
+	constructor(name, supportedVersions,
+	patch,
+	unpatch, files) {
+		this.name = name;
+		this.supportedVersions = supportedVersions;
+		this.patch = patch;
+		this.unpatch = unpatch;
+		this.files = files || [];
+	}
+}
+
+class InstrumentationNodeModuleFile {
+	constructor(name, supportedVersions,
+	patch,
+	unpatch) {
+		this.supportedVersions = supportedVersions;
+		this.patch = patch;
+		this.unpatch = unpatch;
+		this.name = normalize(name);
 	}
 }
 
@@ -156,4 +203,4 @@ function isWrapped(func) {
 		func.__wrapped === true);
 }
 
-export { InstrumentationBase, isWrapped, registerInstrumentations, safeExecuteInTheMiddle, safeExecuteInTheMiddleAsync };
+export { InstrumentationBase, InstrumentationNodeModuleDefinition, InstrumentationNodeModuleFile, isWrapped, registerInstrumentations, safeExecuteInTheMiddle, safeExecuteInTheMiddleAsync };

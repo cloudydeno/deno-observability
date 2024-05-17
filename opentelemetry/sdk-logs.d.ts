@@ -16,7 +16,7 @@
 
 import { IResource } from './resources.d.ts';
 import * as logsAPI from './api-logs.d.ts';
-import { SeverityNumber, LogAttributes, Logger } from './api-logs.d.ts';
+import { SeverityNumber, LogBody, LogAttributes, Logger } from './api-logs.d.ts';
 import * as api from './api.d.ts';
 import { HrTime, SpanContext, AttributeValue, Context } from './api.d.ts';
 import { InstrumentationScope, ExportResult } from './core.d.ts';
@@ -65,10 +65,11 @@ interface ReadableLogRecord {
 	readonly spanContext?: SpanContext;
 	readonly severityText?: string;
 	readonly severityNumber?: SeverityNumber;
-	readonly body?: string;
+	readonly body?: LogBody;
 	readonly resource: IResource;
 	readonly instrumentationScope: InstrumentationScope;
 	readonly attributes: LogAttributes;
+	readonly droppedAttributesCount: number;
 }
 
 declare class LoggerProviderSharedState {
@@ -91,18 +92,20 @@ declare class LogRecord implements ReadableLogRecord {
 	private _severityText?;
 	private _severityNumber?;
 	private _body?;
+	private totalAttributesCount;
 	private _isReadonly;
 	private readonly _logRecordLimits;
 	set severityText(severityText: string | undefined);
 	get severityText(): string | undefined;
 	set severityNumber(severityNumber: logsAPI.SeverityNumber | undefined);
 	get severityNumber(): logsAPI.SeverityNumber | undefined;
-	set body(body: string | undefined);
-	get body(): string | undefined;
+	set body(body: LogBody | undefined);
+	get body(): LogBody | undefined;
+	get droppedAttributesCount(): number;
 	constructor(_sharedState: LoggerProviderSharedState, instrumentationScope: InstrumentationScope, logRecord: logsAPI.LogRecord);
 	setAttribute(key: string, value?: LogAttributes | AttributeValue): this;
 	setAttributes(attributes: LogAttributes): this;
-	setBody(body: string): this;
+	setBody(body: LogBody): this;
 	setSeverityNumber(severityNumber: logsAPI.SeverityNumber): this;
 	setSeverityText(severityText: string): this;
 	/**
@@ -210,6 +213,7 @@ declare class ConsoleLogRecordExporter implements LogRecordExporter {
 declare class SimpleLogRecordProcessor implements LogRecordProcessor {
 	private readonly _exporter;
 	private _shutdownOnce;
+	private _unresolvedExports;
 	constructor(_exporter: LogRecordExporter);
 	onEmit(logRecord: LogRecord): void;
 	forceFlush(): Promise<void>;

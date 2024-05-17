@@ -16,7 +16,7 @@
 /// <reference types="./exporter-metrics-otlp-http.d.ts" />
 
 import { getEnv } from './core.js';
-import { AggregationTemporality, InstrumentType } from './sdk-metrics.js';
+import { AggregationTemporality, InstrumentType, Aggregation } from './sdk-metrics.js';
 import { diag } from './api.js';
 
 var AggregationTemporalityPreference;
@@ -31,6 +31,7 @@ const DeltaTemporalitySelector = (instrumentType) => {
 	switch (instrumentType) {
 		case InstrumentType.COUNTER:
 		case InstrumentType.OBSERVABLE_COUNTER:
+		case InstrumentType.GAUGE:
 		case InstrumentType.HISTOGRAM:
 		case InstrumentType.OBSERVABLE_GAUGE:
 			return AggregationTemporality.DELTA;
@@ -44,6 +45,7 @@ const LowMemoryTemporalitySelector = (instrumentType) => {
 		case InstrumentType.COUNTER:
 		case InstrumentType.HISTOGRAM:
 			return AggregationTemporality.DELTA;
+		case InstrumentType.GAUGE:
 		case InstrumentType.UP_DOWN_COUNTER:
 		case InstrumentType.OBSERVABLE_UP_DOWN_COUNTER:
 		case InstrumentType.OBSERVABLE_COUNTER:
@@ -78,9 +80,18 @@ function chooseTemporalitySelector(temporalityPreference) {
 	}
 	return chooseTemporalitySelectorFromEnvironment();
 }
+function chooseAggregationSelector(config) {
+	if (config?.aggregationPreference) {
+		return config.aggregationPreference;
+	}
+	else {
+		return (_instrumentType) => Aggregation.Default();
+	}
+}
 class OTLPMetricExporterBase {
 	constructor(exporter, config) {
 		this._otlpExporter = exporter;
+		this._aggregationSelector = chooseAggregationSelector(config);
 		this._aggregationTemporalitySelector = chooseTemporalitySelector(config?.temporalityPreference);
 	}
 	export(metrics, resultCallback) {
@@ -91,6 +102,9 @@ class OTLPMetricExporterBase {
 	}
 	forceFlush() {
 		return Promise.resolve();
+	}
+	selectAggregation(instrumentType) {
+		return this._aggregationSelector(instrumentType);
 	}
 	selectAggregationTemporality(instrumentType) {
 		return this._aggregationTemporalitySelector(instrumentType);
