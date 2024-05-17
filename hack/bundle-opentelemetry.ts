@@ -1,102 +1,28 @@
 #!/usr/bin/env -S deno run --allow-run --allow-read --allow-write=. --allow-env --allow-sys --allow-ffi
 
-// pass --refresh-yarn to force rerunning yarn on the opentelemetry packages
-
 import { rollup, Plugin } from 'npm:rollup@4.17.2';
 import { nodeResolve } from 'npm:@rollup/plugin-node-resolve@15.2.3';
 import commonjs from 'npm:@rollup/plugin-commonjs@25.0.7';
 import sourcemaps from 'npm:rollup-plugin-sourcemaps@0.6.3';
 import cleanup from 'npm:rollup-plugin-cleanup@3.2.1';
 import dts from 'npm:rollup-plugin-dts@4.2.3';
-// import { terser } from "npm:rollup-plugin-terser";
 
-// import magicString from 'npm:rollup-plugin-magic-string'
-
-
-// import MagicStringMod from 'npm:magic-string';
-// const MagicString = MagicStringMod as unknown as MagicStringMod.default;
-// import fs from 'node:fs'
-// import path from 'node:path'
-// function escape(str: string) {
-//     return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, '\\$&')
-// }
-// // Figures out where the correct relative path should
-// // based on the output directory and the appendPath
-// function rollupOutputDir(opts, appendPath) {
-//     let dir = ''
-//     if (opts.file) {
-//         dir = path.dirname(opts.file)
-//     }
-//     else if (opts.dir) {
-//         dir = path.dirname(opts.dir)
-//     }
-//     return path.relative(dir, appendPath)
-// }
-
-// const patternImport = new RegExp(/import(?:["'\s]*([\w*${}\n\r\t, ]+)from\s*)?["'\s]["'\s](.*[@\w_-]+)["'\s].*;$/, 'mg')
-// const rewritePlugin: Plugin = {
-//     name: 'rewriteImports',
-//     renderChunk(code, info, opts) {
-//         // get the location of the output directory
-//         const magicString = new MagicString(code);
-//         let hasReplacements = false;
-//         let match: RegExpMatchArray | null = null;
-//         function replaceImport() {
-//             let newImport = '';
-//             if (match![2].startsWith('@opentelemetry/')) {
-//               newImport = match![2].split('/')[1] + '.js';
-//             }
-//             if (newImport) {
-//               hasReplacements = true
-//               const start = match!.index!
-//               const end = start + match![0].length
-//               magicString.overwrite(start, end, newImport)
-//             }
-//         }
-//         while (match = patternImport.exec(code)) {
-//           replaceImport()
-//         }
-//         if (!hasReplacements) return null
-//         const result = { code: magicString.toString() }
-//         return result
-//     }
-// };
-
-export async function buildModuleWithRollup(directory: string, modName: string, external: string[]) {
+async function buildModuleWithRollup(directory: string, modName: string, external: string[]) {
 
   const mainFile = await Deno.readTextFile(directory+'/build/esnext/index.js');
   const licenseComment = mainFile.startsWith('/*') ? mainFile.slice(0, mainFile.indexOf('*/')+3) : '';
 
   const bundle = await rollup({
-    // input: fromFileUrl(inputUrl),
     input: directory+'/build/esnext/index.js',
     external,
     plugins: [
       sourcemaps(),
       nodeResolve({
         // extensions : [".js",".jsx"],
-        // resolveOnly: module => {console.log({module});return true},
+        // resolveOnly: module => {console.error({module});return true},
       }),
       commonjs(),
       cleanup(),
-      // terser(),
-      // magicString({
-      //   magic(code: string, id, string) {
-      //     const patternImport = new RegExp(/import(?:["'\s]*([\w*${}\n\r\t, ]+)from\s*)?["'\s]["'\s](.*[@\w_-]+)["'\s].*;$/, 'mg')
-      //     let match: RegExpMatchArray | null = null;
-      //     while (match = patternImport.exec(code)) {
-      //       let newImport = '';
-      //       if (match[2].startsWith('@opentelemetry/')) {
-      //         newImport = './' + match[2].split('/')[1] + '.js';
-      //       }
-      //       if (newImport) {
-      //         const start = match.index! + match[0].indexOf(match[2]);
-      //         const end = start + match[2].length
-      //         string.overwrite(start, end, newImport)
-      //       }
-      //     }
-      //   },
-      // }),
     ],
   }).then(x => x.generate({
     format: 'es',
@@ -139,7 +65,7 @@ export async function buildModuleWithRollup(directory: string, modName: string, 
     const patternImport = /(?:import|export)(?:["'\s]*([\w*${}\n\r\t, ]+)from\s*)?["'\s]["'\s](.*[@\w_-]+)["'\s].*;$/m;
     const patternImportG = new RegExp(patternImport, 'mg');
     text = text.replaceAll(patternImportG, matchText => {
-      // console.log({matchText})
+      // console.error({matchText})
       let match = matchText.match(patternImport);
       if (!match) throw new Error('bug');
       let newImport = '';
@@ -151,7 +77,7 @@ export async function buildModuleWithRollup(directory: string, modName: string, 
       } else if (['shimmer'].includes(match[2])) {
         newImport = `https://esm.sh/${match[2]}`;
       } else {
-        console.log('Unhandled import:', match[2]);
+        console.error('Unhandled import:', match[2]);
       }
       if (!newImport) return match[0];
       const start = match.index! + match[0].lastIndexOf(match[2]);
@@ -180,31 +106,14 @@ export async function buildModuleWithRollup(directory: string, modName: string, 
   }
 }
 
-const modules = [
-  'hack/opentelemetry-js/api',
-  'hack/opentelemetry-js/packages/opentelemetry-core',
-  // 'hack/opentelemetry-js/packages/opentelemetry-context-async-hooks',
-  // 'hack/opentelemetry-js/packages/opentelemetry-context-zone-peer-dep',
-  // 'hack/opentelemetry-js/packages/opentelemetry-context-zone',
-  'hack/opentelemetry-js/packages/opentelemetry-semantic-conventions',
-  'hack/opentelemetry-js/packages/opentelemetry-resources',
-  'hack/opentelemetry-js/packages/opentelemetry-propagator-b3',
-  'hack/opentelemetry-js/packages/opentelemetry-sdk-trace-base',
-  // 'hack/opentelemetry-js/packages/opentelemetry-sdk-trace-web',
-  'hack/opentelemetry-js/packages/sdk-metrics',
-  'hack/opentelemetry-js/experimental/packages/api-events',
-  'hack/opentelemetry-js/experimental/packages/api-logs',
-  'hack/opentelemetry-js/experimental/packages/otlp-exporter-base',
-  'hack/opentelemetry-js/experimental/packages/otlp-transformer',
-  // 'hack/opentelemetry-js/experimental/packages/exporter-trace-otlp-http',
-  // 'hack/opentelemetry-js/experimental/packages/opentelemetry-browser-detector',
-  'hack/opentelemetry-js/experimental/packages/opentelemetry-exporter-metrics-otlp-http',
-  'hack/opentelemetry-js/experimental/packages/opentelemetry-instrumentation',
-  // 'hack/opentelemetry-js/experimental/packages/opentelemetry-instrumentation-fetch',
-  // 'hack/opentelemetry-js/experimental/packages/opentelemetry-instrumentation-http',
-  // 'hack/opentelemetry-js/experimental/packages/opentelemetry-instrumentation-xml-http-request',
-  'hack/opentelemetry-js/experimental/packages/sdk-logs',
-];
+console.error(`Patching opentelemetry-js installation to remove NodeJSisms...`);
+
+await new Deno.Command('rm', {
+  args: ['-rf', 'experimental/packages/opentelemetry-exporter-metrics-otlp-http/src/platform'],
+  cwd: 'hack/opentelemetry-js',
+  stdout: 'inherit',
+  stderr: 'inherit',
+}).output();
 
 // use runtime's performance instead of node's
 await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-core/src/platform/node/performance.ts', 'export const otperformance = performance;');
@@ -213,7 +122,8 @@ await Deno.writeTextFile('hack/opentelemetry-js/packages/sdk-metrics/test/index-
 await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/otlp-exporter-base/test/browser/index-webpack.ts', '');
 
 await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-core/src/platform/node/timer-util.ts',
-`export function unrefTimer(timer: number): void {
+`// Typescript seems to think that setTimeout will return a "Timeout" like in NodeJS
+export function unrefTimer(timer: any): void {
   // @ts-expect-error TODO: Deno types in tsc
   Deno.unrefTimer?.(timer);
 }`);
@@ -257,7 +167,7 @@ await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-resources
 
 // TODO: maybe put a deno impl in there?
 await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/otlp-exporter-base/src/platform/index.ts', 'export {};');
-await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/opentelemetry-exporter-metrics-otlp-http/src/platform/index.ts', 'export {};');
+await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/opentelemetry-exporter-metrics-otlp-http/src/platform.ts', 'export {};');
 await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/opentelemetry-instrumentation/src/platform/index.ts', `export * from './browser';`);
 
 await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-core/src/platform/node/RandomIdGenerator.ts',
@@ -271,55 +181,108 @@ await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-sdk-trace
 await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-resources/src/platform/node/machine-id/getMachineId.ts',
   await Deno.readTextFile('hack/opentelemetry-js/packages/opentelemetry-resources/src/platform/node/machine-id/getMachineId-linux.ts'));
 
-async function yarnInstall(directory: string) {
-  if (!Deno.args.includes('--refresh-yarn')) {
-    if (await Deno.stat(directory+'/node_modules').then(() => true, () => false)) return;
-  }
-  const yarn = new Deno.Command('yarn', {
+// tsconfig doesn't allow module/target overrides in build mode, so we patch
+await Deno.writeTextFile('hack/opentelemetry-js/tsconfig.base.esnext.json',
+  await Deno.readTextFile('hack/opentelemetry-js/tsconfig.base.esnext.json').then(text => text
+    .replace('esnext', 'es2020') // module
+    .replace('es2017', 'es2021'))); // target
+await Deno.writeTextFile('hack/opentelemetry-js/tsconfig.base.json',
+  await Deno.readTextFile('hack/opentelemetry-js/tsconfig.base.json').then(text => text
+    .replace('es2017', 'es2021'))); // target
+
+// from upstream tsconfig.esnext.json
+const packagePaths = [
+  "api",
+  // "packages/opentelemetry-context-zone",
+  // "packages/opentelemetry-context-zone-peer-dep",
+  "packages/opentelemetry-core",
+  // "packages/opentelemetry-exporter-zipkin",
+  "packages/opentelemetry-propagator-b3",
+  "packages/opentelemetry-propagator-jaeger",
+  "packages/opentelemetry-resources",
+  "packages/opentelemetry-sdk-trace-base",
+  // "packages/opentelemetry-sdk-trace-web",
+  "packages/opentelemetry-semantic-conventions",
+  // "packages/propagator-aws-xray",
+  "packages/sdk-metrics",
+  "experimental/packages/api-events",
+  "experimental/packages/api-logs",
+  // "experimental/packages/exporter-logs-otlp-http",
+  // "experimental/packages/exporter-logs-otlp-proto",
+  // "experimental/packages/exporter-trace-otlp-http",
+  // "experimental/packages/exporter-trace-otlp-proto",
+  // "experimental/packages/opentelemetry-browser-detector",
+  "experimental/packages/opentelemetry-exporter-metrics-otlp-http",
+  // "experimental/packages/opentelemetry-exporter-metrics-otlp-proto",
+  "experimental/packages/opentelemetry-instrumentation",
+  // "experimental/packages/opentelemetry-instrumentation-fetch",
+  // "experimental/packages/opentelemetry-instrumentation-xml-http-request",
+  "experimental/packages/otlp-exporter-base",
+  // "experimental/packages/otlp-proto-exporter-base",
+  "experimental/packages/otlp-transformer",
+  "experimental/packages/sdk-logs",
+]
+
+console.error(`Writing new tsconfig...`);
+// create tsconfig project with the subset of modules we care about
+await Deno.writeTextFile('hack/opentelemetry-js/tsconfig.esnext.deno.json', JSON.stringify({
+  "extends": "./tsconfig.base.esnext.json",
+  "files": [],
+  "references": packagePaths.map(x => ({
+    "path": `${x}/tsconfig.esnext.json`,
+  })),
+}, null, 2));
+
+console.error(`Running npm install...`);
+{
+  const npm = new Deno.Command('npm', {
     args: ['install', /*'--production',*/ '--ignore-scripts'],
-    cwd: directory,
+    cwd: 'hack/opentelemetry-js',
     stdout: 'inherit',
     stderr: 'inherit',
   });
-  const yarnOut = await yarn.output();
-  // if (yarnOut.stdout.byteLength > 0) {
-  //   console.log(new TextDecoder().decode(yarnOut.stdout));
-  // }
-  if (!yarnOut.success) throw new Error(`yarn failed on ${directory}`);
+  const npmOut = await npm.output();
+  if (!npmOut.success) throw new Error(`npm failed on hack/opentelemetry-js`);
 }
 
-await yarnInstall('hack/opentelemetry-js');
-
-// import ts from "npm:typescript";
-
-for (const mod of modules) {
-  console.log('---------------')
-  console.log(mod);
-  console.log();
-
+console.error(`Adding version.ts to each package...`);
+for (const mod of packagePaths) {
+  const path = `hack/opentelemetry-js/${mod}`;
   const {
-    name, version,
-    dependencies, peerDependencies,
-  } = JSON.parse(await Deno.readTextFile(mod+'/package.json'));
-  const modName = name.split('/')[1];
-  await Deno.writeTextFile(mod+'/src/version.ts', `export const VERSION = ${JSON.stringify(version)};`);
+    version,
+  } = JSON.parse(await Deno.readTextFile(path+'/package.json'));
+  await Deno.writeTextFile(path+'/src/version.ts', `export const VERSION = ${JSON.stringify(version)};`);
+}
 
-  await yarnInstall(mod);
-
-  const tsc = new Deno.Command('hack/opentelemetry-js/node_modules/.bin/tsc', {
-    args: [
-      '--project', mod+'/tsconfig.esnext.json',
-      '--target', 'es2021',
-      '--module', 'es2020',
-      // '--lib', TODO: can we provide deno's lib somehow?
-    ],
+console.error(`Running tsc build...`);
+{
+  const tsc = new Deno.Command('node_modules/.bin/tsc', {
+    args: [ '--build', 'tsconfig.esnext.deno.json' ],
+    cwd: 'hack/opentelemetry-js',
+    stdout: 'inherit',
+    stderr: 'inherit',
   });
   const tscOut = await tsc.output();
-  console.log(new TextDecoder().decode(tscOut.stdout));
-  if (!tscOut.success) throw new Error(`TSC failed on ${mod}`);
+  if (!tscOut.success) throw new Error(`TSC failed :(`);
+}
 
-  await buildModuleWithRollup(mod, modName, [
+console.error(`Bundling packages with rollup...`);
+for (const mod of packagePaths) {
+  const path = `hack/opentelemetry-js/${mod}`;
+
+  const {
+    name,
+    dependencies,
+    peerDependencies,
+  } = JSON.parse(await Deno.readTextFile(path+'/package.json'));
+  const modName = name.split('/')[1];
+  console.error('  Bundling', name);
+
+  await buildModuleWithRollup(path, modName, [
     ...Object.keys(dependencies ?? {}),
     ...Object.keys(peerDependencies ?? {}),
   ]);
+
 }
+console.error('Bundled', packagePaths.length, 'packages.');
+console.error();

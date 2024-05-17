@@ -15,10 +15,53 @@
  */
 /// <reference types="./otlp-transformer.d.ts" />
 
-import * as core from './core.js';
-import { hrTimeToNanoseconds, hexToBase64 } from './core.js';
+import { hexToBase64, hrTimeToNanoseconds } from './core.js';
 import { ValueType } from './api.js';
 import { DataPointType, AggregationTemporality } from './sdk-metrics.js';
+
+const NANOSECONDS = BigInt(1000000000);
+function hrTimeToNanos(hrTime) {
+	return BigInt(hrTime[0]) * NANOSECONDS + BigInt(hrTime[1]);
+}
+function toLongBits(value) {
+	const low = Number(BigInt.asUintN(32, value));
+	const high = Number(BigInt.asUintN(32, value >> BigInt(32)));
+	return { low, high };
+}
+function encodeAsLongBits(hrTime) {
+	const nanos = hrTimeToNanos(hrTime);
+	return toLongBits(nanos);
+}
+function encodeAsString(hrTime) {
+	const nanos = hrTimeToNanos(hrTime);
+	return nanos.toString();
+}
+const encodeTimestamp = typeof BigInt !== 'undefined' ? encodeAsString : hrTimeToNanoseconds;
+function identity(value) {
+	return value;
+}
+function optionalHexToBase64(str) {
+	if (str === undefined)
+		return undefined;
+	return hexToBase64(str);
+}
+const DEFAULT_ENCODER = {
+	encodeHrTime: encodeAsLongBits,
+	encodeSpanContext: hexToBase64,
+	encodeOptionalSpanContext: optionalHexToBase64,
+};
+function getOtlpEncoder(options) {
+	if (options === undefined) {
+		return DEFAULT_ENCODER;
+	}
+	const useLongBits = options.useLongBits ?? true;
+	const useHex = options.useHex ?? false;
+	return {
+		encodeHrTime: useLongBits ? encodeAsLongBits : encodeTimestamp,
+		encodeSpanContext: useHex ? identity : hexToBase64,
+		encodeOptionalSpanContext: useHex ? identity : optionalHexToBase64,
+	};
+}
 
 var ESpanKind;
 (function (ESpanKind) {
@@ -63,62 +106,54 @@ function toAnyValue(value) {
 	return {};
 }
 
-function sdkSpanToOtlpSpan(span, useHex) {
+function sdkSpanToOtlpSpan(span, encoder) {
 	const ctx = span.spanContext();
 	const status = span.status;
-	const parentSpanId = useHex
-		? span.parentSpanId
-		: span.parentSpanId != null
-			? core.hexToBase64(span.parentSpanId)
-			: undefined;
 	return {
-		traceId: useHex ? ctx.traceId : core.hexToBase64(ctx.traceId),
-		spanId: useHex ? ctx.spanId : core.hexToBase64(ctx.spanId),
-		parentSpanId: parentSpanId,
+		traceId: encoder.encodeSpanContext(ctx.traceId),
+		spanId: encoder.encodeSpanContext(ctx.spanId),
+		parentSpanId: encoder.encodeOptionalSpanContext(span.parentSpanId),
 		traceState: ctx.traceState?.serialize(),
 		name: span.name,
 		kind: span.kind == null ? 0 : span.kind + 1,
-		startTimeUnixNano: hrTimeToNanoseconds(span.startTime),
-		endTimeUnixNano: hrTimeToNanoseconds(span.endTime),
+		startTimeUnixNano: encoder.encodeHrTime(span.startTime),
+		endTimeUnixNano: encoder.encodeHrTime(span.endTime),
 		attributes: toAttributes(span.attributes),
 		droppedAttributesCount: span.droppedAttributesCount,
-		events: span.events.map(toOtlpSpanEvent),
+		events: span.events.map(event => toOtlpSpanEvent(event, encoder)),
 		droppedEventsCount: span.droppedEventsCount,
 		status: {
 			code: status.code,
 			message: status.message,
 		},
-		links: span.links.map(link => toOtlpLink(link, useHex)),
+		links: span.links.map(link => toOtlpLink(link, encoder)),
 		droppedLinksCount: span.droppedLinksCount,
 	};
 }
-function toOtlpLink(link, useHex) {
+function toOtlpLink(link, encoder) {
 	return {
 		attributes: link.attributes ? toAttributes(link.attributes) : [],
-		spanId: useHex
-			? link.context.spanId
-			: core.hexToBase64(link.context.spanId),
-		traceId: useHex
-			? link.context.traceId
-			: core.hexToBase64(link.context.traceId),
+		spanId: encoder.encodeSpanContext(link.context.spanId),
+		traceId: encoder.encodeSpanContext(link.context.traceId),
 		traceState: link.context.traceState?.serialize(),
 		droppedAttributesCount: link.droppedAttributesCount || 0,
 	};
 }
-function toOtlpSpanEvent(timedEvent) {
+function toOtlpSpanEvent(timedEvent, encoder) {
 	return {
 		attributes: timedEvent.attributes
 			? toAttributes(timedEvent.attributes)
 			: [],
 		name: timedEvent.name,
-		timeUnixNano: hrTimeToNanoseconds(timedEvent.time),
+		timeUnixNano: encoder.encodeHrTime(timedEvent.time),
 		droppedAttributesCount: timedEvent.droppedAttributesCount || 0,
 	};
 }
 
-function createExportTraceServiceRequest(spans, useHex) {
+function createExportTraceServiceRequest(spans, options) {
+	const encoder = getOtlpEncoder(options);
 	return {
-		resourceSpans: spanRecordsToResourceSpans(spans, useHex),
+		resourceSpans: spanRecordsToResourceSpans(spans, encoder),
 	};
 }
 function createResourceMap$1(readableSpans) {
@@ -139,7 +174,7 @@ function createResourceMap$1(readableSpans) {
 	}
 	return resourceMap;
 }
-function spanRecordsToResourceSpans(readableSpans, useHex) {
+function spanRecordsToResourceSpans(readableSpans, encoder) {
 	const resourceMap = createResourceMap$1(readableSpans);
 	const out = [];
 	const entryIterator = resourceMap.entries();
@@ -153,7 +188,7 @@ function spanRecordsToResourceSpans(readableSpans, useHex) {
 			const scopeSpans = ilmEntry.value;
 			if (scopeSpans.length > 0) {
 				const { name, version, schemaUrl } = scopeSpans[0].instrumentationLibrary;
-				const spans = scopeSpans.map(readableSpan => sdkSpanToOtlpSpan(readableSpan, useHex));
+				const spans = scopeSpans.map(readableSpan => sdkSpanToOtlpSpan(readableSpan, encoder));
 				scopeResourceSpans.push({
 					scope: { name, version },
 					spans: spans,
@@ -176,27 +211,28 @@ function spanRecordsToResourceSpans(readableSpans, useHex) {
 	return out;
 }
 
-function toResourceMetrics(resourceMetrics) {
+function toResourceMetrics(resourceMetrics, options) {
+	const encoder = getOtlpEncoder(options);
 	return {
 		resource: {
 			attributes: toAttributes(resourceMetrics.resource.attributes),
 			droppedAttributesCount: 0,
 		},
 		schemaUrl: undefined,
-		scopeMetrics: toScopeMetrics(resourceMetrics.scopeMetrics),
+		scopeMetrics: toScopeMetrics(resourceMetrics.scopeMetrics, encoder),
 	};
 }
-function toScopeMetrics(scopeMetrics) {
+function toScopeMetrics(scopeMetrics, encoder) {
 	return Array.from(scopeMetrics.map(metrics => ({
 		scope: {
 			name: metrics.scope.name,
 			version: metrics.scope.version,
 		},
-		metrics: metrics.metrics.map(metricData => toMetric(metricData)),
+		metrics: metrics.metrics.map(metricData => toMetric(metricData, encoder)),
 		schemaUrl: metrics.scope.schemaUrl,
 	})));
 }
-function toMetric(metricData) {
+function toMetric(metricData, encoder) {
 	const out = {
 		name: metricData.descriptor.name,
 		description: metricData.descriptor.description,
@@ -208,34 +244,34 @@ function toMetric(metricData) {
 			out.sum = {
 				aggregationTemporality,
 				isMonotonic: metricData.isMonotonic,
-				dataPoints: toSingularDataPoints(metricData),
+				dataPoints: toSingularDataPoints(metricData, encoder),
 			};
 			break;
 		case DataPointType.GAUGE:
 			out.gauge = {
-				dataPoints: toSingularDataPoints(metricData),
+				dataPoints: toSingularDataPoints(metricData, encoder),
 			};
 			break;
 		case DataPointType.HISTOGRAM:
 			out.histogram = {
 				aggregationTemporality,
-				dataPoints: toHistogramDataPoints(metricData),
+				dataPoints: toHistogramDataPoints(metricData, encoder),
 			};
 			break;
 		case DataPointType.EXPONENTIAL_HISTOGRAM:
 			out.exponentialHistogram = {
 				aggregationTemporality,
-				dataPoints: toExponentialHistogramDataPoints(metricData),
+				dataPoints: toExponentialHistogramDataPoints(metricData, encoder),
 			};
 			break;
 	}
 	return out;
 }
-function toSingularDataPoint(dataPoint, valueType) {
+function toSingularDataPoint(dataPoint, valueType, encoder) {
 	const out = {
 		attributes: toAttributes(dataPoint.attributes),
-		startTimeUnixNano: hrTimeToNanoseconds(dataPoint.startTime),
-		timeUnixNano: hrTimeToNanoseconds(dataPoint.endTime),
+		startTimeUnixNano: encoder.encodeHrTime(dataPoint.startTime),
+		timeUnixNano: encoder.encodeHrTime(dataPoint.endTime),
 	};
 	switch (valueType) {
 		case ValueType.INT:
@@ -247,12 +283,12 @@ function toSingularDataPoint(dataPoint, valueType) {
 	}
 	return out;
 }
-function toSingularDataPoints(metricData) {
+function toSingularDataPoints(metricData, encoder) {
 	return metricData.dataPoints.map(dataPoint => {
-		return toSingularDataPoint(dataPoint, metricData.descriptor.valueType);
+		return toSingularDataPoint(dataPoint, metricData.descriptor.valueType, encoder);
 	});
 }
-function toHistogramDataPoints(metricData) {
+function toHistogramDataPoints(metricData, encoder) {
 	return metricData.dataPoints.map(dataPoint => {
 		const histogram = dataPoint.value;
 		return {
@@ -263,12 +299,12 @@ function toHistogramDataPoints(metricData) {
 			sum: histogram.sum,
 			min: histogram.min,
 			max: histogram.max,
-			startTimeUnixNano: hrTimeToNanoseconds(dataPoint.startTime),
-			timeUnixNano: hrTimeToNanoseconds(dataPoint.endTime),
+			startTimeUnixNano: encoder.encodeHrTime(dataPoint.startTime),
+			timeUnixNano: encoder.encodeHrTime(dataPoint.endTime),
 		};
 	});
 }
-function toExponentialHistogramDataPoints(metricData) {
+function toExponentialHistogramDataPoints(metricData, encoder) {
 	return metricData.dataPoints.map(dataPoint => {
 		const histogram = dataPoint.value;
 		return {
@@ -287,8 +323,8 @@ function toExponentialHistogramDataPoints(metricData) {
 			},
 			scale: histogram.scale,
 			zeroCount: histogram.zeroCount,
-			startTimeUnixNano: hrTimeToNanoseconds(dataPoint.startTime),
-			timeUnixNano: hrTimeToNanoseconds(dataPoint.endTime),
+			startTimeUnixNano: encoder.encodeHrTime(dataPoint.startTime),
+			timeUnixNano: encoder.encodeHrTime(dataPoint.endTime),
 		};
 	});
 }
@@ -301,15 +337,16 @@ function toAggregationTemporality(temporality) {
 	}
 }
 
-function createExportMetricsServiceRequest(resourceMetrics) {
+function createExportMetricsServiceRequest(resourceMetrics, options) {
 	return {
-		resourceMetrics: resourceMetrics.map(metrics => toResourceMetrics(metrics)),
+		resourceMetrics: resourceMetrics.map(metrics => toResourceMetrics(metrics, options)),
 	};
 }
 
-function createExportLogsServiceRequest(logRecords, useHex) {
+function createExportLogsServiceRequest(logRecords, options) {
+	const encoder = getOtlpEncoder(options);
 	return {
-		resourceLogs: logRecordsToResourceLogs(logRecords, useHex),
+		resourceLogs: logRecordsToResourceLogs(logRecords, encoder),
 	};
 }
 function createResourceMap(logRecords) {
@@ -331,7 +368,7 @@ function createResourceMap(logRecords) {
 	}
 	return resourceMap;
 }
-function logRecordsToResourceLogs(logRecords, useHex) {
+function logRecordsToResourceLogs(logRecords, encoder) {
 	const resourceMap = createResourceMap(logRecords);
 	return Array.from(resourceMap, ([resource, ismMap]) => ({
 		resource: {
@@ -342,41 +379,32 @@ function logRecordsToResourceLogs(logRecords, useHex) {
 			const { instrumentationScope: { name, version, schemaUrl }, } = scopeLogs[0];
 			return {
 				scope: { name, version },
-				logRecords: scopeLogs.map(log => toLogRecord(log, useHex)),
+				logRecords: scopeLogs.map(log => toLogRecord(log, encoder)),
 				schemaUrl,
 			};
 		}),
 		schemaUrl: undefined,
 	}));
 }
-function toLogRecord(log, useHex) {
+function toLogRecord(log, encoder) {
 	return {
-		timeUnixNano: hrTimeToNanoseconds(log.hrTime),
-		observedTimeUnixNano: hrTimeToNanoseconds(log.hrTimeObserved),
+		timeUnixNano: encoder.encodeHrTime(log.hrTime),
+		observedTimeUnixNano: encoder.encodeHrTime(log.hrTimeObserved),
 		severityNumber: toSeverityNumber(log.severityNumber),
 		severityText: log.severityText,
 		body: toAnyValue(log.body),
 		attributes: toLogAttributes(log.attributes),
 		droppedAttributesCount: 0,
 		flags: log.spanContext?.traceFlags,
-		traceId: useHex
-			? log.spanContext?.traceId
-			: optionalHexToBase64(log.spanContext?.traceId),
-		spanId: useHex
-			? log.spanContext?.spanId
-			: optionalHexToBase64(log.spanContext?.spanId),
+		traceId: encoder.encodeOptionalSpanContext(log.spanContext?.traceId),
+		spanId: encoder.encodeOptionalSpanContext(log.spanContext?.spanId),
 	};
 }
 function toSeverityNumber(severityNumber) {
 	return severityNumber;
 }
-function optionalHexToBase64(str) {
-	if (str === undefined)
-		return undefined;
-	return hexToBase64(str);
-}
 function toLogAttributes(attributes) {
 	return Object.keys(attributes).map(key => toKeyValue(key, attributes[key]));
 }
 
-export { ESpanKind, createExportLogsServiceRequest, createExportMetricsServiceRequest, createExportTraceServiceRequest };
+export { ESpanKind, createExportLogsServiceRequest, createExportMetricsServiceRequest, createExportTraceServiceRequest, encodeAsLongBits, encodeAsString, getOtlpEncoder, hrTimeToNanos, toLongBits };

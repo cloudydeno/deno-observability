@@ -79,11 +79,11 @@ abstract class OTLPFetchExporterBase<
   }
 
   onInit(): void {
-    window.addEventListener('unload', this.shutdown);
+    globalThis.addEventListener('unload', this.shutdown);
   }
 
   onShutdown(): void {
-    window.removeEventListener('unload', this.shutdown);
+    globalThis.removeEventListener('unload', this.shutdown);
   }
 
   send(
@@ -136,7 +136,10 @@ export class OTLPTracesExporter
   }
 
   convert(spans: ReadableSpan[]) {
-    return createExportTraceServiceRequest(spans, true);
+    return createExportTraceServiceRequest(spans, {
+      useHex: true,
+      useLongBits: false,
+    });
   }
 }
 
@@ -167,7 +170,10 @@ export class OTLPLogsExporter
   }
 
   convert(logs: ReadableLogRecord[]) {
-    return createExportLogsServiceRequest(logs, true);
+    return createExportLogsServiceRequest(logs, {
+      useHex: true,
+      useLongBits: false,
+    });
   }
 }
 // btw, events are event.name and event.domain

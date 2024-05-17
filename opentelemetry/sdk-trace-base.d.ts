@@ -464,6 +464,7 @@ declare abstract class BatchSpanProcessorBase<T extends BufferConfig> implements
 	private readonly _maxQueueSize;
 	private readonly _scheduledDelayMillis;
 	private readonly _exportTimeoutMillis;
+	private _isExporting;
 	private _finishedSpans;
 	private _timer;
 	private _shutdownOnce;
