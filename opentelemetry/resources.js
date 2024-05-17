@@ -21,7 +21,7 @@ import { SDK_INFO, getEnv } from './core.js';
 
 
 
-import { randomUUID } from 'crypto';
+
 
 function defaultServiceName() {
 	return `unknown_service:deno`;
@@ -132,7 +132,7 @@ const processDetector = new ProcessDetector();
 class ServiceInstanceIdDetectorSync {
 	detect(_config) {
 		const attributes = {
-			[SEMRESATTRS_SERVICE_INSTANCE_ID]: randomUUID(),
+			[SEMRESATTRS_SERVICE_INSTANCE_ID]: crypto.randomUUID(),
 		};
 		return new Resource(attributes);
 	}
