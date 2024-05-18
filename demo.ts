@@ -1,4 +1,4 @@
-#!/usr/bin/env -S deno run --watch --allow-read --allow-sys=hostname,osRelease --allow-env --allow-net --allow-run=uptime,sleep,ping
+#!/usr/bin/env -S deno run --watch --allow-read --allow-sys=hostname,osRelease --allow-env --allow-net --allow-run=uptime,sleep,ping,nonextant
 import { metrics, trace, ValueType } from "./opentelemetry/api.js";
 import { logs } from "./opentelemetry/api-logs.js";
 import { SEMATTRS_HTTP_METHOD } from "./opentelemetry/semantic-conventions.js";
@@ -33,10 +33,12 @@ async function handler(req: Request): Promise<Response> {
   test3.add(1, {[SEMATTRS_HTTP_METHOD]: req.method});
   test2.record(50+Math.round(Math.random()*25), {[SEMATTRS_HTTP_METHOD]: req.method});
 
-  logger.emit({
-    body: 'hello world',
-  });
-
+  if (url.pathname == '/log') {
+    logger.emit({
+      body: 'hello world',
+    });
+    return new Response('logged hello world');
+  }
 
   if (url.pathname == '/inner') {
     await getData();
@@ -48,49 +50,73 @@ async function handler(req: Request): Promise<Response> {
 
   if (url.pathname == '/uptime') {
     const text = await new Promise<string>(ok => setTimeout(async () => {
-      const proc = Deno.run({
-        cmd: ['uptime'],
+      const proc = await new Deno.Command('uptime', {
         stdin: 'null',
         stdout: 'piped',
         stderr: 'inherit',
-      });
-      const text = await new Response(proc.stdout.readable).text();
-      await proc.status();
+      }).output();
+      const text = new TextDecoder().decode(proc.stdout);
       ok(text);
     }, 50));
     return new Response(text);
   }
 
+  if (url.pathname == '/failure') {
+    try {
+      await new Deno.Command('nonextant', {
+        stdin: 'null',
+        stdout: 'piped',
+        stderr: 'inherit',
+      }).output();
+      return new Response('No failure happened??');
+    } catch (err) {
+      return new Response(`Failed as expected.\n${err.message}`);
+    }
+  }
+
   if (url.pathname == '/sleep') {
-    const proc = Deno.run({
-      cmd: ['sleep', '1'],
+
+    // First, we spawn and gather the output as two chained steps.
+    await new Deno.Command('sleep', {
+      args: ['1'],
       stdin: 'null',
-    });
-    await proc.status();
-    await Promise.all([1,2,3,4,5].map(x => {
-      const proc = Deno.run({
-        cmd: ['sleep', `${x}`],
+    }).spawn().output();
+
+    // Second, we spawn and gather the output as two different steps on the Command.
+    {
+      const sleepCmd = new Deno.Command('sleep', {
+        args: ['1'],
         stdin: 'null',
       });
-      return proc.status();
-    }));
-    const proc2 = Deno.run({
-      cmd: ['sleep', '1'],
+      sleepCmd.spawn();
+      await sleepCmd.output();
+    }
+
+    // Third, we run command in parallel, using the single-shot output() API.
+    await Promise.all([1,2,3,4,5].map(x =>
+      new Deno.Command('sleep', {
+        args: [`${x}`],
+        stdin: 'null',
+      }).output()));
+
+    // Fourth, we run the command with the synchronous single-shot API.
+    // This is not ideal in a server but we need to make sure our instrument works regardless.
+    new Deno.Command('sleep', {
+      args: ['1'],
       stdin: 'null',
-    });
-    await proc2.status();
-    return new Response('done');
+    }).outputSync();
+
+    return new Response('done sleeping');
   }
 
   if (url.pathname == '/ping') {
-    const proc = Deno.run({
-      cmd: ['ping', '-c5', 'google.com'],
+    const proc = new Deno.Command('ping', {
+      args: ['-c5', 'google.com'],
       stdin: 'null',
       stdout: 'piped',
       stderr: 'inherit',
-    });
-    proc.status();
-    return new Response(proc.stdout.readable);
+    }).spawn();
+    return new Response(proc.stdout);
   }
 
   if (url.pathname == '/') {
