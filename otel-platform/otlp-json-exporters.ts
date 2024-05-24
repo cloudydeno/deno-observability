@@ -14,6 +14,7 @@ import {
   type IExportTraceServiceRequest,
   type IExportMetricsServiceRequest,
   type IExportLogsServiceRequest,
+  type OtlpEncodingOptions,
 } from "../opentelemetry/otlp-transformer.js";
 
 import type {
@@ -120,6 +121,11 @@ abstract class OTLPFetchExporterBase<
   }
 }
 
+const otlpConfig: OtlpEncodingOptions = {
+  useHex: true,
+  useLongBits: false,
+};
+
 /**
  * Collector Trace Exporter for Deno using fetch()
  */
@@ -136,10 +142,7 @@ export class OTLPTracesExporter
   }
 
   convert(spans: ReadableSpan[]) {
-    return createExportTraceServiceRequest(spans, {
-      useHex: true,
-      useLongBits: false,
-    });
+    return createExportTraceServiceRequest(spans, otlpConfig);
   }
 }
 
@@ -154,7 +157,10 @@ export class OTLPMetricsExporter
       envKey: 'METRICS',
     });
   }
-  convert = createExportMetricsServiceRequest
+
+  convert(logs: ResourceMetrics[]) {
+    return createExportMetricsServiceRequest(logs, otlpConfig);
+  }
 }
 
 export class OTLPLogsExporter
@@ -170,10 +176,7 @@ export class OTLPLogsExporter
   }
 
   convert(logs: ReadableLogRecord[]) {
-    return createExportLogsServiceRequest(logs, {
-      useHex: true,
-      useLongBits: false,
-    });
+    return createExportLogsServiceRequest(logs, otlpConfig);
   }
 }
 // btw, events are event.name and event.domain
