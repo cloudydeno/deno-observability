@@ -17,7 +17,7 @@
 
 import { trace, metrics, diag } from './api.js';
 import { logs } from './api-logs.js';
-import * as shimmer from 'https://esm.sh/shimmer';
+import * as shimmer from 'https://esm.sh/shimmer@1.2.1';
 
 function parseInstrumentationOptions(options = []) {
 	let instrumentations = [];
