@@ -69,7 +69,8 @@ export class DenoKvInstrumentation extends InstrumentationBase {
           });
           span.end();
           return result;
-        } catch (err) {
+        } catch (thrown: unknown) {
+          const err = thrown as Error;
           span.recordException(err);
           span.end();
           throw err;
@@ -107,7 +108,8 @@ export class DenoKvInstrumentation extends InstrumentationBase {
           });
           span.end();
           return result;
-        } catch (err) {
+        } catch (thrown: unknown) {
+          const err = thrown as Error;
           span.recordException(err);
           span.end();
           throw err;
@@ -145,7 +147,8 @@ export class DenoKvInstrumentation extends InstrumentationBase {
           const result = original.call(this, selector, opts);
           listSpans.set(result, {span, docCount: 0});
           return result;
-        } catch (err) {
+        } catch (thrown: unknown) {
+          const err = thrown as Error;
           span.recordException(err);
           span.end();
           throw err;
@@ -179,7 +182,8 @@ export class DenoKvInstrumentation extends InstrumentationBase {
           });
           span.end();
           return result;
-        } catch (err) {
+        } catch (thrown: unknown) {
+          const err = thrown as Error;
           span.recordException(err);
           span.end();
           throw err;
@@ -209,7 +213,8 @@ export class DenoKvInstrumentation extends InstrumentationBase {
           const result = await original.call(this, key);
           span.end();
           return result;
-        } catch (err) {
+        } catch (thrown: unknown) {
+          const err = thrown as Error;
           span.recordException(err);
           span.end();
           throw err;
@@ -238,7 +243,8 @@ export class DenoKvInstrumentation extends InstrumentationBase {
           const result = await original.call(this);
           span.end();
           return result;
-        } catch (err) {
+        } catch (thrown: unknown) {
+          const err = thrown as Error;
           span.recordException(err);
           span.end();
           throw err;
@@ -260,7 +266,8 @@ export class DenoKvInstrumentation extends InstrumentationBase {
             const result = await original.call(this);
             ref.span.end();
             return result;
-          } catch (err) {
+          } catch (thrown: unknown) {
+            const err = thrown as Error;
             ref.span.recordException(err);
             ref.span.end();
             throw err;

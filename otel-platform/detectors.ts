@@ -71,7 +71,7 @@ const processResource = new Resource({
 });
 export class DenoProcessDetector implements DetectorSync {
   detect() {
-    // deno deploy currently lacks querySync, but can read
+    //@ts-ignore deno deploy currently lacks querySync, but can take the action
     const canRead = (Deno.permissions.querySync?.({name: 'read'}).state == 'granted') ?? true;
     if (!canRead) return processResource;
 

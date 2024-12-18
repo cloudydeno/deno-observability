@@ -91,7 +91,7 @@ export class DenoCommandInstrumentation extends InstrumentationBase {
           throw err;
         }
       }
-      outputSync(): Deno.CommandOutput {
+      override outputSync(): Deno.CommandOutput {
         const span = this._span ??= plugin.tracer.startSpan(this._spanName, this._attributes);
         try {
           const output = super.outputSync();
@@ -105,7 +105,7 @@ export class DenoCommandInstrumentation extends InstrumentationBase {
           throw err;
         }
       }
-      spawn(): Deno.ChildProcess {
+      override spawn(): Deno.ChildProcess {
         const span = this._span ??= plugin.tracer.startSpan(this._spanName, this._attributes);
         try {
           const process = super.spawn();
