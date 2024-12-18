@@ -69,7 +69,8 @@ async function handler(req: Request): Promise<Response> {
         stderr: 'inherit',
       }).output();
       return new Response('No failure happened??');
-    } catch (err) {
+    } catch (thrown: unknown) {
+      const err = thrown as Error;
       return new Response(`Failed as expected.\n${err.message}`);
     }
   }

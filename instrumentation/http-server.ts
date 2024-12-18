@@ -117,7 +117,8 @@ export function httpTracer(inner: Deno.ServeHandler, opts?: {
 
         return new Response(respSnoop.newBody, resp);
 
-      } catch (err) {
+      } catch (thrown: unknown) {
+        const err = thrown as Error;
         serverSpan.recordException(err);
         serverSpan.setStatus({
           code: SpanStatusCode.ERROR,
