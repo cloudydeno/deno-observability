@@ -47,13 +47,13 @@ import {
   safeExecuteInTheMiddle,
 } from "../opentelemetry/instrumentation.js";
 import {
-  SEMATTRS_HTTP_HOST,
-  SEMATTRS_HTTP_METHOD,
-  SEMATTRS_HTTP_ROUTE,
-  SEMATTRS_HTTP_SCHEME,
-  SEMATTRS_HTTP_STATUS_CODE,
-  SEMATTRS_HTTP_URL,
-  SEMATTRS_HTTP_USER_AGENT,
+  ATTR_HTTP_HOST,
+  ATTR_HTTP_METHOD,
+  ATTR_HTTP_ROUTE,
+  ATTR_HTTP_SCHEME,
+  ATTR_HTTP_STATUS_CODE,
+  ATTR_HTTP_URL,
+  ATTR_HTTP_USER_AGENT,
 } from "../opentelemetry/semantic-conventions.js";
 import {
   context,
@@ -117,17 +117,17 @@ export class FetchInstrumentation extends InstrumentationBase {
     response: FetchResponse
   ): void {
     const parsedUrl = new URL(response.url);
-    span.setAttribute(SEMATTRS_HTTP_STATUS_CODE, response.status);
+    span.setAttribute(ATTR_HTTP_STATUS_CODE, response.status);
     if (response.statusText != null) {
       span.setAttribute(AttributeNames.HTTP_STATUS_TEXT, response.statusText);
     }
-    span.setAttribute(SEMATTRS_HTTP_HOST, parsedUrl.host);
-    span.setAttribute(SEMATTRS_HTTP_ROUTE, parsedUrl.hostname); // Datadog likes having this
+    span.setAttribute(ATTR_HTTP_HOST, parsedUrl.host);
+    span.setAttribute(ATTR_HTTP_ROUTE, parsedUrl.hostname); // Datadog likes having this
     span.setAttribute(
-      SEMATTRS_HTTP_SCHEME,
+      ATTR_HTTP_SCHEME,
       parsedUrl.protocol.replace(':', '')
     );
-    span.setAttribute(SEMATTRS_HTTP_USER_AGENT, navigator.userAgent);
+    span.setAttribute(ATTR_HTTP_USER_AGENT, navigator.userAgent);
 
     if (response.status >= 500) {
       span.setStatus({
@@ -177,8 +177,8 @@ export class FetchInstrumentation extends InstrumentationBase {
       kind: SpanKind.CLIENT,
       attributes: {
         [AttributeNames.COMPONENT]: this.moduleName,
-        [SEMATTRS_HTTP_METHOD]: method,
-        [SEMATTRS_HTTP_URL]: url,
+        [ATTR_HTTP_METHOD]: method,
+        [ATTR_HTTP_URL]: url,
       },
     });
   }

@@ -9,11 +9,17 @@ import dts from 'npm:rollup-plugin-dts@4.2.3';
 
 async function buildModuleWithRollup(directory: string, modName: string, external: string[]) {
 
-  const mainFile = await Deno.readTextFile(directory+'/build/esnext/index.js');
+  let entrypoint = 'index';
+  // Treat semantic-conventions differently, at least for now
+  if (modName == 'semantic-conventions') {
+    entrypoint = 'index-incubating';
+  }
+
+  const mainFile = await Deno.readTextFile(directory+'/build/esnext/'+entrypoint+'.js');
   const licenseComment = mainFile.startsWith('/*') ? mainFile.slice(0, mainFile.indexOf('*/')+3) : '';
 
   const bundle = await rollup({
-    input: directory+'/build/esnext/index.js',
+    input: directory+'/build/esnext/'+entrypoint+'.js',
     external,
     plugins: [
       sourcemaps(),
@@ -43,7 +49,7 @@ async function buildModuleWithRollup(directory: string, modName: string, externa
   }
 
   const tsBundle = await rollup({
-    input: directory+'/build/esnext/index.d.ts',
+    input: directory+'/build/esnext/'+entrypoint+'.d.ts',
     external,
     plugins: [
       // sourcemaps(), // not obeyed by dts plugin
