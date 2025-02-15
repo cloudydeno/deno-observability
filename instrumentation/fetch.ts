@@ -16,6 +16,10 @@
  * limitations under the License.
  */
 
+type FetchApi = (input: Request | URL | string, init?: RequestInit & {
+  client?: Deno.HttpClient;
+}) => Promise<Response>;
+
 export interface FetchResponse {
   status: number;
   statusText?: string;
@@ -198,12 +202,12 @@ export class FetchInstrumentation extends InstrumentationBase {
   /**
    * Patches the constructor of fetch
    */
-  private _patchConstructor(): (original: typeof fetch) => typeof fetch {
+  private _patchConstructor(): (original: FetchApi) => FetchApi {
     return original => {
       const plugin = this;
       return function patchConstructor(
         this: typeof globalThis,
-        ...args: Parameters<typeof fetch>
+        ...args: Parameters<FetchApi>
       ): Promise<Response> {
         const self = this;
         const url = new URL(
