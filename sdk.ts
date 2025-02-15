@@ -2,7 +2,7 @@ import { DiagConsoleLogger, type TextMapPropagator, diag, metrics, Attributes, D
 import { logs } from "./opentelemetry/api-logs.js";
 
 import { OTLPMetricExporterBase } from "./opentelemetry/exporter-metrics-otlp-http.js";
-import { type InstrumentationOption, registerInstrumentations } from "./opentelemetry/instrumentation.js";
+import { type Instrumentation, registerInstrumentations } from "./opentelemetry/instrumentation.js";
 
 import {
   type DetectorSync, Resource,
@@ -51,7 +51,7 @@ export class DenoTelemetrySdk {
     detectors?: DetectorSync[];
     resource?: Resource;
     resourceAttrs?: Attributes;
-    instrumentations?: InstrumentationOption[];
+    instrumentations?: (Instrumentation | Instrumentation[])[];
     propagator?: TextMapPropagator;
     idGenerator?: IdGenerator;
     sampler?: Sampler;

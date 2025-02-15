@@ -93,7 +93,7 @@ export class FetchInstrumentation extends InstrumentationBase {
   readonly component: string = 'fetch';
   moduleName = this.component;
 
-  constructor(config?: FetchInstrumentationConfig) {
+  constructor(config: InstrumentationConfig = {}) {
     super('fetch', '0.1.0', config);
   }
 

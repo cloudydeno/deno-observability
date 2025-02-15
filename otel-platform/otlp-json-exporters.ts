@@ -8,13 +8,13 @@ import {
   parseHeaders,
 } from "../opentelemetry/otlp-exporter-base.js";
 import {
-  createExportTraceServiceRequest,
-  createExportMetricsServiceRequest,
-  createExportLogsServiceRequest,
-  type IExportTraceServiceRequest,
-  type IExportMetricsServiceRequest,
-  type IExportLogsServiceRequest,
-  type OtlpEncodingOptions,
+  JsonLogsSerializer,
+  JsonMetricsSerializer,
+  JsonTraceSerializer,
+  type IExportLogsServiceResponse,
+  type IExportMetricsServiceResponse,
+  type IExportTraceServiceResponse,
+  type ISerializer,
 } from "../opentelemetry/otlp-transformer.js";
 
 import type {
@@ -44,16 +44,16 @@ type ExporterOpts = OTLPExporterConfigBase & {
  */
 abstract class OTLPFetchExporterBase<
   ExportItem,
-  ServiceRequest
+  ServiceResponse
 > extends OTLPExporterBase<
   AbstractExporterOpts,
-  ExportItem,
-  ServiceRequest
+  ExportItem
 > {
   protected _headers: Headers;
 
   constructor(
     config: AbstractExporterOpts,
+    private readonly serializer: ISerializer<ExportItem[], ServiceResponse>,
   ) {
     super(config);
     this._headers = new Headers({
@@ -97,21 +97,22 @@ abstract class OTLPFetchExporterBase<
       return;
     }
 
-    diag.debug(`OLTP push to ${new URL(this.url).pathname} with ${items.length} items...`);
+    diag.debug(`OTLP push to ${new URL(this.url).pathname} with ${items.length} items...`);
     fetch(this.url, {
       method: 'POST',
-      body: JSON.stringify(this.convert(items)),
+      body: this.serializer.serializeRequest(items),
       headers: this._headers,
       signal: AbortSignal.timeout(this.timeoutMillis),
     }).catch(err => {
-      diag.error(`OLTP failed: ${err.message}`);
+      diag.debug(`OTLP failed: ${err.message}`);
       throw new OTLPExporterError(err.message);
     }).then(resp => {
-      diag.debug(`OLTP response: ${resp.status}`);
+      diag.debug(`OTLP response: ${resp.status}`);
       if (!resp.ok) {
         resp.text().then(text => diag.debug(text));
         throw new OTLPExporterError(`HTTP ${resp.statusText ?? 'error'} from ${this.url}`, resp.status);
       } else {
+        // this.serializer.deserializeResponse(resp.arrayBuffer())
         resp.body?.cancel();
       }
     }).then(onSuccess, onError);
@@ -121,16 +122,11 @@ abstract class OTLPFetchExporterBase<
   }
 }
 
-const otlpConfig: OtlpEncodingOptions = {
-  useHex: true,
-  useLongBits: false,
-};
-
 /**
- * Collector Trace Exporter for Deno using fetch()
+ * JSON-based Trace Exporter for Deno using fetch()
  */
 export class OTLPTracesExporter
-  extends OTLPFetchExporterBase<ReadableSpan, IExportTraceServiceRequest>
+  extends OTLPFetchExporterBase<ReadableSpan, IExportTraceServiceResponse>
   implements SpanExporter
 {
   constructor(config?: ExporterOpts) {
@@ -138,33 +134,31 @@ export class OTLPTracesExporter
       resourcePath: 'v1/traces',
       ...config,
       envKey: 'TRACES',
-    });
-  }
-
-  convert(spans: ReadableSpan[]) {
-    return createExportTraceServiceRequest(spans, otlpConfig);
+    }, JsonTraceSerializer);
   }
 }
 
-// usage: new OTLPMetricExporterBase(new OTLPExporterDeno())
+/**
+ * JSON-based Metrics Exporter for Deno using fetch()
+ * usage: new OTLPMetricExporterBase(new OTLPExporterDeno())
+ */
 export class OTLPMetricsExporter
-  extends OTLPFetchExporterBase<ResourceMetrics, IExportMetricsServiceRequest>
+  extends OTLPFetchExporterBase<ResourceMetrics, IExportMetricsServiceResponse>
 {
   constructor(config?: ExporterOpts) {
     super({
       resourcePath: 'v1/metrics',
       ...config,
       envKey: 'METRICS',
-    });
-  }
-
-  convert(logs: ResourceMetrics[]) {
-    return createExportMetricsServiceRequest(logs, otlpConfig);
+    }, JsonMetricsSerializer);
   }
 }
 
+/**
+ * JSON-based Logs Exporter for Deno using fetch()
+ */
 export class OTLPLogsExporter
-  extends OTLPFetchExporterBase<ReadableLogRecord, IExportLogsServiceRequest>
+  extends OTLPFetchExporterBase<ReadableLogRecord, IExportLogsServiceResponse>
   implements LogRecordExporter
 {
   constructor(config?: ExporterOpts) {
@@ -172,11 +166,7 @@ export class OTLPLogsExporter
       resourcePath: 'v1/logs',
       ...config,
       envKey: 'LOGS',
-    });
-  }
-
-  convert(logs: ReadableLogRecord[]) {
-    return createExportLogsServiceRequest(logs, otlpConfig);
+    }, JsonLogsSerializer);
   }
 }
 // btw, events are event.name and event.domain

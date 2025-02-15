@@ -46,7 +46,7 @@ export class DenoCommandInstrumentation extends InstrumentationBase {
   readonly component: string = 'Deno.Command';
   moduleName = this.component;
 
-  constructor(config?: InstrumentationConfig) {
+  constructor(config: InstrumentationConfig = {}) {
     super('Deno.Command', '0.1.0', config);
   }
 
