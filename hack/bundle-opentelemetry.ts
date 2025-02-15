@@ -165,6 +165,22 @@ await Deno.remove('hack/opentelemetry-js/experimental/packages/opentelemetry-exp
   .catch(err => err instanceof Deno.errors.NotFound ? null : Promise.reject(err));
 await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/otlp-exporter-base/src/platform/index.ts', 'export {};');
 
+// Trying to avoid embedding the generated protobuf code, at least for now
+await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/otlp-transformer/src/protobuf/serializers.ts', `
+import { ISerializer } from '../common/i-serializer';
+export const MissingSerializer: ISerializer<
+  any[],
+  any
+> = {
+  serializeRequest: (arg: any[]) => {throw new Error('not implemented')},
+  deserializeResponse: (arg: Uint8Array) => {throw new Error('not implemented')},
+};
+
+export const ProtobufLogsSerializer = MissingSerializer;
+export const ProtobufMetricsSerializer = MissingSerializer;
+export const ProtobufTraceSerializer = MissingSerializer;
+`);
+
 await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/opentelemetry-exporter-metrics-otlp-http/src/platform.ts', 'export {};');
 await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/opentelemetry-instrumentation/src/platform/index.ts', `export * from './browser';`);
 
@@ -246,20 +262,6 @@ console.error(`Running npm install...`);
     stderr: 'inherit',
   }).output();
   if (!result.success) throw new Error(`npm failed on hack/opentelemetry-js`);
-}
-
-console.error(`Running protos:generate...`);
-{
-  const result = await new Deno.Command('node_modules/.bin/lerna', {
-    args: [
-      'run',
-      'protos:generate',
-    ],
-    cwd: 'hack/opentelemetry-js',
-    stdout: 'inherit',
-    stderr: 'inherit',
-  }).output();
-  if (!result.success) throw new Error(`protos:generate failed on hack/opentelemetry-js`);
 }
 
 console.error(`Adding version.ts to each package...`);

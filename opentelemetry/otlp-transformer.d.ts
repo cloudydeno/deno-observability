@@ -609,9 +609,9 @@ interface ISerializer<Request, Response> {
 	deserializeResponse(data: Uint8Array): Response;
 }
 
-declare const ProtobufLogsSerializer: ISerializer<ReadableLogRecord[], IExportLogsServiceResponse>;
-declare const ProtobufMetricsSerializer: ISerializer<ResourceMetrics[], IExportMetricsServiceResponse>;
-declare const ProtobufTraceSerializer: ISerializer<ReadableSpan[], IExportTraceServiceResponse>;
+declare const ProtobufLogsSerializer: ISerializer<any[], any>;
+declare const ProtobufMetricsSerializer: ISerializer<any[], any>;
+declare const ProtobufTraceSerializer: ISerializer<any[], any>;
 
 declare const JsonTraceSerializer: ISerializer<ReadableSpan[], IExportTraceServiceResponse>;
 declare const JsonMetricsSerializer: ISerializer<ResourceMetrics[], IExportMetricsServiceResponse>;
