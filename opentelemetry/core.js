@@ -471,7 +471,7 @@ function getEnv() {
 	return Object.assign({}, DEFAULT_ENVIRONMENT, processEnv);
 }
 function getEnvWithoutDefaults() {
-	return parseEnvironment(process.env);
+	return parseEnvironment(Deno.env.toObject());
 }
 
 const _globalThis = typeof globalThis === 'object' ? globalThis : global;

@@ -88,7 +88,7 @@ async function buildModuleWithRollup(directory: string, modName: string, externa
     text = text.replace(`import { randomUUID } from 'crypto';`, '');
     text = text.replace(` randomUUID()`, ` crypto.randomUUID()`);
     text = text.replace(`typeof process !== 'undefined' && process && process.env\n        ? parseEnvironment(process.env)\n        : parseEnvironment(_globalThis$1);`, `parseEnvironment(Deno.env.toObject())`);
-    text = text.replace(`(process.env)`, `(Deno.env.toObject())`);
+    text = text.replaceAll(`(process.env)`, `(Deno.env.toObject())`);
     text = text.replace(`os.hostname()`, `Deno.hostname?.()`);
     text = text.replace("${process.argv0}", "deno");
     text = text.replace("import * as shimmer from 'npm:shimmer';", "import shimmer from 'npm:shimmer';");
@@ -161,7 +161,8 @@ await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-resources
 `);
 
 // TODO: maybe put a deno impl in there?
-await Deno.remove('hack/opentelemetry-js/experimental/packages/opentelemetry-exporter-metrics-otlp-http/src/platform', {recursive: true});
+await Deno.remove('hack/opentelemetry-js/experimental/packages/opentelemetry-exporter-metrics-otlp-http/src/platform', {recursive: true})
+  .catch(err => err instanceof Deno.errors.NotFound ? null : Promise.reject(err));
 await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/otlp-exporter-base/src/platform/index.ts', 'export {};');
 
 await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/opentelemetry-exporter-metrics-otlp-http/src/platform.ts', 'export {};');
