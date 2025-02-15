@@ -17,7 +17,6 @@
 import { OTLPExporterConfigBase, OTLPExporterBase } from './otlp-exporter-base.d.ts';
 import { AggregationTemporality, AggregationSelector, AggregationTemporalitySelector, ResourceMetrics, PushMetricExporter, InstrumentType, Aggregation } from './sdk-metrics.d.ts';
 import { ExportResult } from './core.d.ts';
-import { IExportMetricsServiceRequest } from './otlp-transformer.d.ts';
 
 interface OTLPMetricExporterOptions extends OTLPExporterConfigBase {
 	temporalityPreference?: AggregationTemporalityPreference | AggregationTemporality;
@@ -32,7 +31,7 @@ declare enum AggregationTemporalityPreference {
 declare const CumulativeTemporalitySelector: AggregationTemporalitySelector;
 declare const DeltaTemporalitySelector: AggregationTemporalitySelector;
 declare const LowMemoryTemporalitySelector: AggregationTemporalitySelector;
-declare class OTLPMetricExporterBase<T extends OTLPExporterBase<OTLPMetricExporterOptions, ResourceMetrics, IExportMetricsServiceRequest>> implements PushMetricExporter {
+declare class OTLPMetricExporterBase<T extends OTLPExporterBase<OTLPMetricExporterOptions, ResourceMetrics>> implements PushMetricExporter {
 	_otlpExporter: T;
 	private _aggregationTemporalitySelector;
 	private _aggregationSelector;

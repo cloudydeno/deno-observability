@@ -16,7 +16,7 @@
 /// <reference types="./core.d.ts" />
 
 import { createContextKey, baggageEntryMetadataFromString, propagation, diag, DiagLogLevel, trace, isSpanContextValid, TraceFlags, SamplingDecision, isValidTraceId, context } from './api.js';
-import { SemanticResourceAttributes, TelemetrySdkLanguageValues } from './semantic-conventions.js';
+import { SEMRESATTRS_TELEMETRY_SDK_NAME, SEMRESATTRS_PROCESS_RUNTIME_NAME, SEMRESATTRS_TELEMETRY_SDK_LANGUAGE, TELEMETRYSDKLANGUAGEVALUES_NODEJS, SEMRESATTRS_TELEMETRY_SDK_VERSION } from './semantic-conventions.js';
 
 const SUPPRESS_TRACING_KEY = createContextKey('OpenTelemetry SDK Context Key SUPPRESS_TRACING');
 function suppressTracing(context) {
@@ -267,16 +267,6 @@ var TracesSamplerValues;
 	TracesSamplerValues["TraceIdRatio"] = "traceidratio";
 })(TracesSamplerValues || (TracesSamplerValues = {}));
 
-const _globalThis$1 = typeof globalThis === 'object'
-	? globalThis
-	: typeof self === 'object'
-		? self
-		: typeof window === 'object'
-			? window
-			: typeof global === 'object'
-				? global
-				: {};
-
 const DEFAULT_LIST_SEPARATOR = ',';
 const ENVIRONMENT_BOOLEAN_KEYS = ['OTEL_SDK_DISABLED'];
 function isEnvVarABoolean(key) {
@@ -475,13 +465,13 @@ function parseEnvironment(values) {
 	}
 	return environment;
 }
-function getEnvWithoutDefaults() {
-	return parseEnvironment(Deno.env.toObject())
-}
 
 function getEnv() {
 	const processEnv = parseEnvironment(Deno.env.toObject());
 	return Object.assign({}, DEFAULT_ENVIRONMENT, processEnv);
+}
+function getEnvWithoutDefaults() {
+	return parseEnvironment(process.env);
 }
 
 const _globalThis = typeof globalThis === 'object' ? globalThis : global;
@@ -533,13 +523,13 @@ function getIdGenerator(bytes) {
 
 const otperformance = performance;
 
-const VERSION$1 = "1.24.0";
+const VERSION$1 = "1.25.0";
 
 const SDK_INFO = {
-	[SemanticResourceAttributes.TELEMETRY_SDK_NAME]: 'opentelemetry',
-	[SemanticResourceAttributes.PROCESS_RUNTIME_NAME]: 'deno',
-	[SemanticResourceAttributes.TELEMETRY_SDK_LANGUAGE]: 'js',
-	[SemanticResourceAttributes.TELEMETRY_SDK_VERSION]: VERSION$1,
+	[SEMRESATTRS_TELEMETRY_SDK_NAME]: 'opentelemetry',
+	[SEMRESATTRS_PROCESS_RUNTIME_NAME]: 'deno',
+	[SEMRESATTRS_TELEMETRY_SDK_LANGUAGE]: TELEMETRYSDKLANGUAGEVALUES_NODEJS,
+	[SEMRESATTRS_TELEMETRY_SDK_VERSION]: VERSION$1,
 };
 
 function unrefTimer(timer) {

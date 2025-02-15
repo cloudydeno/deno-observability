@@ -18,7 +18,7 @@
 import * as api from './api.js';
 import { SpanStatusCode, diag, trace, isSpanContextValid, TraceFlags, isValidTraceId, context, propagation } from './api.js';
 import { otperformance, getTimeOrigin, isAttributeValue, isTimeInput, sanitizeAttributes, hrTimeDuration, hrTime, millisToHrTime, isTimeInputHrTime, addHrTimes, globalErrorHandler, getEnv, TracesSamplerValues, getEnvWithoutDefaults, DEFAULT_ATTRIBUTE_COUNT_LIMIT, DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT, BindOnceFuture, suppressTracing, unrefTimer, ExportResultCode, isTracingSuppressed, merge, CompositePropagator, W3CTraceContextPropagator, W3CBaggagePropagator, hrTimeToMicroseconds, internal } from './core.js';
-import { SemanticAttributes } from './semantic-conventions.js';
+import { SEMATTRS_EXCEPTION_TYPE, SEMATTRS_EXCEPTION_MESSAGE, SEMATTRS_EXCEPTION_STACKTRACE } from './semantic-conventions.js';
 import { Resource } from './resources.js';
 
 const ExceptionEventName = 'exception';
@@ -119,6 +119,14 @@ class Span {
 		});
 		return this;
 	}
+	addLink(link) {
+		this.links.push(link);
+		return this;
+	}
+	addLinks(links) {
+		this.links.push(...links);
+		return this;
+	}
 	setStatus(status) {
 		if (this._isSpanEnded())
 			return this;
@@ -174,25 +182,24 @@ class Span {
 	recordException(exception, time) {
 		const attributes = {};
 		if (typeof exception === 'string') {
-			attributes[SemanticAttributes.EXCEPTION_MESSAGE] = exception;
+			attributes[SEMATTRS_EXCEPTION_MESSAGE] = exception;
 		}
 		else if (exception) {
 			if (exception.code) {
-				attributes[SemanticAttributes.EXCEPTION_TYPE] =
-					exception.code.toString();
+				attributes[SEMATTRS_EXCEPTION_TYPE] = exception.code.toString();
 			}
 			else if (exception.name) {
-				attributes[SemanticAttributes.EXCEPTION_TYPE] = exception.name;
+				attributes[SEMATTRS_EXCEPTION_TYPE] = exception.name;
 			}
 			if (exception.message) {
-				attributes[SemanticAttributes.EXCEPTION_MESSAGE] = exception.message;
+				attributes[SEMATTRS_EXCEPTION_MESSAGE] = exception.message;
 			}
 			if (exception.stack) {
-				attributes[SemanticAttributes.EXCEPTION_STACKTRACE] = exception.stack;
+				attributes[SEMATTRS_EXCEPTION_STACKTRACE] = exception.stack;
 			}
 		}
-		if (attributes[SemanticAttributes.EXCEPTION_TYPE] ||
-			attributes[SemanticAttributes.EXCEPTION_MESSAGE]) {
+		if (attributes[SEMATTRS_EXCEPTION_TYPE] ||
+			attributes[SEMATTRS_EXCEPTION_MESSAGE]) {
 			this.addEvent(ExceptionEventName, attributes, time);
 		}
 		else {

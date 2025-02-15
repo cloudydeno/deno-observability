@@ -296,6 +296,9 @@ class ConsoleLogRecordExporter {
 	}
 	_exportInfo(logRecord) {
 		return {
+			resource: {
+				attributes: logRecord.resource.attributes,
+			},
 			timestamp: hrTimeToMicroseconds(logRecord.hrTime),
 			traceId: logRecord.spanContext?.traceId,
 			spanId: logRecord.spanContext?.spanId,

@@ -54,7 +54,7 @@ interface OTLPExporterConfigBase {
 /**
  * Collector Exporter abstract base class
  */
-declare abstract class OTLPExporterBase<T extends OTLPExporterConfigBase, ExportItem, ServiceRequest> {
+declare abstract class OTLPExporterBase<T extends OTLPExporterConfigBase, ExportItem> {
 	readonly url: string;
 	readonly hostname: string | undefined;
 	readonly timeoutMillis: number;
@@ -88,7 +88,6 @@ declare abstract class OTLPExporterBase<T extends OTLPExporterConfigBase, Export
 	abstract onInit(config: T): void;
 	abstract send(items: ExportItem[], onSuccess: () => void, onError: (error: OTLPExporterError) => void): void;
 	abstract getDefaultUrl(config: T): string;
-	abstract convert(objects: ExportItem[]): ServiceRequest;
 }
 
 /**

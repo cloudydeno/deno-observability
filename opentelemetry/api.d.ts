@@ -199,6 +199,30 @@ declare enum SpanStatusCode {
 }
 
 /**
+ * A pointer from the current {@link Span} to another span in the same trace or
+ * in a different trace.
+ * Few examples of Link usage.
+ * 1. Batch Processing: A batch of elements may contain elements associated
+ *    with one or more traces/spans. Since there can only be one parent
+ *    SpanContext, Link is used to keep reference to SpanContext of all
+ *    elements in the batch.
+ * 2. Public Endpoint: A SpanContext in incoming client request on a public
+ *    endpoint is untrusted from service provider perspective. In such case it
+ *    is advisable to start a new trace with appropriate sampling decision.
+ *    However, it is desirable to associate incoming SpanContext to new trace
+ *    initiated on service provider side so two traces (from Client and from
+ *    Service Provider) can be correlated.
+ */
+interface Link {
+	/** The {@link SpanContext} of a linked span. */
+	context: SpanContext;
+	/** A set of {@link SpanAttributes} on the link. */
+	attributes?: SpanAttributes;
+	/** Count of attributes of the link that were dropped due to collection limits */
+	droppedAttributesCount?: number;
+}
+
+/**
  * An interface that represents a span. A span represents a single operation
  * within a trace. Examples of span might include remote procedure calls or a
  * in-process function calls to sub-components. A Trace has a single, top-level
@@ -246,6 +270,24 @@ interface Span {
 	* @param [startTime] start time of the event.
 	*/
 	addEvent(name: string, attributesOrStartTime?: SpanAttributes | TimeInput, startTime?: TimeInput): this;
+	/**
+	* Adds a single link to the span.
+	*
+	* Links added after the creation will not affect the sampling decision.
+	* It is preferred span links be added at span creation.
+	*
+	* @param link the link to add.
+	*/
+	addLink(link: Link): this;
+	/**
+	* Adds multiple links to the span.
+	*
+	* Links added after the creation will not affect the sampling decision.
+	* It is preferred span links be added at span creation.
+	*
+	* @param links the links to add.
+	*/
+	addLinks(links: Link[]): this;
 	/**
 	* Sets a status to the span. If used, this will override the default Span
 	* status. Default is {@link SpanStatusCode.UNSET}. SetStatus overrides the value
@@ -359,30 +401,6 @@ interface ContextManager {
 	* Disable context management
 	*/
 	disable(): this;
-}
-
-/**
- * A pointer from the current {@link Span} to another span in the same trace or
- * in a different trace.
- * Few examples of Link usage.
- * 1. Batch Processing: A batch of elements may contain elements associated
- *    with one or more traces/spans. Since there can only be one parent
- *    SpanContext, Link is used to keep reference to SpanContext of all
- *    elements in the batch.
- * 2. Public Endpoint: A SpanContext in incoming client request on a public
- *    endpoint is untrusted from service provider perspective. In such case it
- *    is advisable to start a new trace with appropriate sampling decision.
- *    However, it is desirable to associate incoming SpanContext to new trace
- *    initiated on service provider side so two traces (from Client and from
- *    Service Provider) can be correlated.
- */
-interface Link {
-	/** The {@link SpanContext} of a linked span. */
-	context: SpanContext;
-	/** A set of {@link SpanAttributes} on the link. */
-	attributes?: SpanAttributes;
-	/** Count of attributes of the link that were dropped due to collection limits */
-	droppedAttributesCount?: number;
 }
 
 declare enum SpanKind {
@@ -933,6 +951,12 @@ interface UpDownCounter<AttributesTypes extends MetricAttributes = MetricAttribu
 	*/
 	add(value: number, attributes?: AttributesTypes, context?: Context): void;
 }
+interface Gauge<AttributesTypes extends MetricAttributes = MetricAttributes> {
+	/**
+	* Records a measurement.
+	*/
+	record(value: number, attributes?: AttributesTypes, context?: Context): void;
+}
 interface Histogram<AttributesTypes extends MetricAttributes = MetricAttributes> {
 	/**
 	* Records a measurement. Value of the measurement must not be negative.
@@ -988,6 +1012,12 @@ interface MeterOptions {
  * for the exported metric are deferred.
  */
 interface Meter {
+	/**
+	* Creates and returns a new `Gauge`.
+	* @param name the name of the metric.
+	* @param [options] the metric options.
+	*/
+	createGauge<AttributesTypes extends MetricAttributes = MetricAttributes>(name: string, options?: MetricOptions): Gauge<AttributesTypes>;
 	/**
 	* Creates and returns a new `Histogram`.
 	* @param name the name of the metric.
@@ -1491,4 +1521,4 @@ declare const _default: {
 };
 //# sourceMappingURL=index.d.ts.map
 
-export { AttributeValue, Attributes, Baggage, BaggageEntry, BaggageEntryMetadata, BatchObservableCallback, BatchObservableResult, ComponentLoggerOptions, Context, ContextAPI, ContextManager, Counter, DiagAPI, DiagConsoleLogger, DiagLogFunction, DiagLogLevel, DiagLogger, DiagLoggerOptions, Exception, Histogram, HrTime, INVALID_SPANID, INVALID_SPAN_CONTEXT, INVALID_TRACEID, Link, Meter, MeterOptions, MeterProvider, MetricAdvice, MetricAttributeValue, MetricAttributes, MetricOptions, MetricsAPI, Observable, ObservableCallback, ObservableCounter, ObservableGauge, ObservableResult, ObservableUpDownCounter, PropagationAPI, ProxyTracer, ProxyTracerProvider, ROOT_CONTEXT, Sampler, SamplingDecision, SamplingResult, Span, SpanAttributeValue, SpanAttributes, SpanContext, SpanKind, SpanOptions, SpanStatus, SpanStatusCode, TextMapGetter, TextMapPropagator, TextMapSetter, TimeInput, TraceAPI, TraceFlags, TraceState, Tracer, TracerDelegator, TracerOptions, TracerProvider, UpDownCounter, ValueType, baggageEntryMetadataFromString, context, createContextKey, createNoopMeter, createTraceState, _default as default, defaultTextMapGetter, defaultTextMapSetter, diag, isSpanContextValid, isValidSpanId, isValidTraceId, metrics, propagation, trace };
+export { AttributeValue, Attributes, Baggage, BaggageEntry, BaggageEntryMetadata, BatchObservableCallback, BatchObservableResult, ComponentLoggerOptions, Context, ContextAPI, ContextManager, Counter, DiagAPI, DiagConsoleLogger, DiagLogFunction, DiagLogLevel, DiagLogger, DiagLoggerOptions, Exception, Gauge, Histogram, HrTime, INVALID_SPANID, INVALID_SPAN_CONTEXT, INVALID_TRACEID, Link, Meter, MeterOptions, MeterProvider, MetricAdvice, MetricAttributeValue, MetricAttributes, MetricOptions, MetricsAPI, Observable, ObservableCallback, ObservableCounter, ObservableGauge, ObservableResult, ObservableUpDownCounter, PropagationAPI, ProxyTracer, ProxyTracerProvider, ROOT_CONTEXT, Sampler, SamplingDecision, SamplingResult, Span, SpanAttributeValue, SpanAttributes, SpanContext, SpanKind, SpanOptions, SpanStatus, SpanStatusCode, TextMapGetter, TextMapPropagator, TextMapSetter, TimeInput, TraceAPI, TraceFlags, TraceState, Tracer, TracerDelegator, TracerOptions, TracerProvider, UpDownCounter, ValueType, baggageEntryMetadataFromString, context, createContextKey, createNoopMeter, createTraceState, _default as default, defaultTextMapGetter, defaultTextMapSetter, diag, isSpanContextValid, isValidSpanId, isValidTraceId, metrics, propagation, trace };

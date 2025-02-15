@@ -17,7 +17,7 @@
 
 const _globalThis = typeof globalThis === 'object' ? globalThis : global;
 
-const VERSION = "1.8.0";
+const VERSION = "1.9.0";
 
 const re = /^(\d+)\.(\d+)\.(\d+)(-(.+))?$/;
 function _makeCompatibilityCheck(ownVersion) {
@@ -344,6 +344,9 @@ class DiagConsoleLogger {
 
 class NoopMeter {
 	constructor() { }
+	createGauge(_name, _options) {
+		return NOOP_GAUGE_METRIC;
+	}
 	createHistogram(_name, _options) {
 		return NOOP_HISTOGRAM_METRIC;
 	}
@@ -373,6 +376,9 @@ class NoopCounterMetric extends NoopMetric {
 class NoopUpDownCounterMetric extends NoopMetric {
 	add(_value, _attributes) { }
 }
+class NoopGaugeMetric extends NoopMetric {
+	record(_value, _attributes) { }
+}
 class NoopHistogramMetric extends NoopMetric {
 	record(_value, _attributes) { }
 }
@@ -388,6 +394,7 @@ class NoopObservableUpDownCounterMetric extends NoopObservableMetric {
 }
 const NOOP_METER = new NoopMeter();
 const NOOP_COUNTER_METRIC = new NoopCounterMetric();
+const NOOP_GAUGE_METRIC = new NoopGaugeMetric();
 const NOOP_HISTOGRAM_METRIC = new NoopHistogramMetric();
 const NOOP_UP_DOWN_COUNTER_METRIC = new NoopUpDownCounterMetric();
 const NOOP_OBSERVABLE_COUNTER_METRIC = new NoopObservableCounterMetric();
@@ -503,6 +510,12 @@ class NonRecordingSpan {
 		return this;
 	}
 	addEvent(_name, _attributes) {
+		return this;
+	}
+	addLink(_link) {
+		return this;
+	}
+	addLinks(_links) {
 		return this;
 	}
 	setStatus(_status) {

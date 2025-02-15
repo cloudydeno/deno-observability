@@ -110,13 +110,6 @@ async function buildModuleWithRollup(directory: string, modName: string, externa
 
 console.error(`Patching opentelemetry-js installation to remove NodeJSisms...`);
 
-await new Deno.Command('rm', {
-  args: ['-rf', 'experimental/packages/opentelemetry-exporter-metrics-otlp-http/src/platform'],
-  cwd: 'hack/opentelemetry-js',
-  stdout: 'inherit',
-  stderr: 'inherit',
-}).output();
-
 // use runtime's performance instead of node's
 await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-core/src/platform/node/performance.ts', 'export const otperformance = performance;');
 
@@ -137,7 +130,7 @@ await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-resources
 })[archString] ?? archString;
 export const normalizeType = (os: string) => os;`);
 
-await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-resources/src/platform/node/machine-id/getMachineId.ts',
+await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-resources/src/detectors/platform/node/machine-id/getMachineId.ts',
 `import { getMachineId as bsdGetId } from './getMachineId-bsd';
 import { getMachineId as darwinGetId } from './getMachineId-darwin';
 import { getMachineId as linuxGetId } from './getMachineId-linux';
@@ -154,7 +147,7 @@ export const getMachineId = {
 }[Deno.build.os] ?? unsupportedGetId;
 `);
 
-await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-resources/src/platform/node/machine-id/execAsync.ts',
+await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-resources/src/detectors/platform/node/machine-id/execAsync.ts',
 `export async function execAsync(command: string) {
   const [cmd, ...args] = command.replaceAll('"', '').split(' ');
   // @ts-expect-error TODO: Deno types in tsc
@@ -168,7 +161,9 @@ await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-resources
 `);
 
 // TODO: maybe put a deno impl in there?
+await Deno.remove('hack/opentelemetry-js/experimental/packages/opentelemetry-exporter-metrics-otlp-http/src/platform', {recursive: true});
 await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/otlp-exporter-base/src/platform/index.ts', 'export {};');
+
 await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/opentelemetry-exporter-metrics-otlp-http/src/platform.ts', 'export {};');
 await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/opentelemetry-instrumentation/src/platform/index.ts', `export * from './browser';`);
 
@@ -180,8 +175,8 @@ await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-sdk-trace
   await Deno.readTextFile('hack/opentelemetry-js/packages/opentelemetry-sdk-trace-base/src/platform/browser/RandomIdGenerator.ts'));
 
 // TODO: does dynamic require crap
-await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-resources/src/platform/node/machine-id/getMachineId.ts',
-  await Deno.readTextFile('hack/opentelemetry-js/packages/opentelemetry-resources/src/platform/node/machine-id/getMachineId-linux.ts'));
+await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-resources/src/detectors/platform/node/machine-id/getMachineId.ts',
+  await Deno.readTextFile('hack/opentelemetry-js/packages/opentelemetry-resources/src/detectors/platform/node/machine-id/getMachineId-linux.ts'));
 
 // tsconfig doesn't allow module/target overrides in build mode, so we patch
 await Deno.writeTextFile('hack/opentelemetry-js/tsconfig.base.esnext.json',
@@ -237,7 +232,7 @@ await Deno.writeTextFile('hack/opentelemetry-js/tsconfig.esnext.deno.json', JSON
 
 console.error(`Running npm install...`);
 {
-  const npm = new Deno.Command('npm', {
+  const result = await new Deno.Command('npm', {
     args: [
       'install',
       // '--production',
@@ -248,9 +243,22 @@ console.error(`Running npm install...`);
     cwd: 'hack/opentelemetry-js',
     stdout: 'inherit',
     stderr: 'inherit',
-  });
-  const npmOut = await npm.output();
-  if (!npmOut.success) throw new Error(`npm failed on hack/opentelemetry-js`);
+  }).output();
+  if (!result.success) throw new Error(`npm failed on hack/opentelemetry-js`);
+}
+
+console.error(`Running protos:generate...`);
+{
+  const result = await new Deno.Command('node_modules/.bin/lerna', {
+    args: [
+      'run',
+      'protos:generate',
+    ],
+    cwd: 'hack/opentelemetry-js',
+    stdout: 'inherit',
+    stderr: 'inherit',
+  }).output();
+  if (!result.success) throw new Error(`protos:generate failed on hack/opentelemetry-js`);
 }
 
 console.error(`Adding version.ts to each package...`);

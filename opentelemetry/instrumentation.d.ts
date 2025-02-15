@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-import { TracerProvider, MeterProvider, DiagLogger, Meter, Tracer } from './api.d.ts';
+import { TracerProvider, MeterProvider, Span, DiagLogger, Meter, Tracer } from './api.d.ts';
 import { LoggerProvider, Logger } from './api-logs.d.ts';
 
 /** Interface Instrumentation to apply patch. */
-interface Instrumentation {
+interface Instrumentation<ConfigType extends InstrumentationConfig = InstrumentationConfig> {
 	/** Instrumentation Name  */
 	instrumentationName: string;
 	/** Instrumentation Version  */
@@ -40,17 +40,16 @@ interface Instrumentation {
 	/** Method to set logger provider  */
 	setLoggerProvider?(loggerProvider: LoggerProvider): void;
 	/** Method to set instrumentation config  */
-	setConfig(config: InstrumentationConfig): void;
+	setConfig(config: ConfigType): void;
 	/** Method to get instrumentation config  */
-	getConfig(): InstrumentationConfig;
-	/**
-	* Contains all supported versions.
-	* All versions must be compatible with [semver](https://semver.org/spec/v2.0.0.html) format.
-	* If the version is not supported, we won't apply instrumentation patch (see `enable` method).
-	* If omitted, all versions of the module will be patched.
-	*/
-	supportedVersions?: string[];
+	getConfig(): ConfigType;
 }
+/**
+ * Base interface for configuration options common to all instrumentations.
+ * This interface can be extended by individual instrumentations to include
+ * additional configuration options specific to that instrumentation.
+ * All configuration options must be optional.
+ */
 interface InstrumentationConfig {
 	/**
 	* Whether to enable the plugin.
@@ -71,11 +70,22 @@ interface InstrumentationModuleFile {
 	/** Name of file to be patched with relative path */
 	name: string;
 	moduleExports?: unknown;
-	/** Supported version this file */
+	/** Supported versions for the file.
+	*
+	* A module version is supported if one of the supportedVersions in the array satisfies the module version.
+	* The syntax of the version is checked with the `satisfies` function of "The semantic versioner for npm", see
+	* [`semver` package](https://www.npmjs.com/package/semver)
+	* If the version is not supported, we won't apply instrumentation patch.
+	* If omitted, all versions of the module will be patched.
+	*
+	* It is recommended to always specify a range that is bound to a major version, to avoid breaking changes.
+	* New major versions should be reviewed and tested before being added to the supportedVersions array.
+	*
+	* Example: ['>=1.2.3 <3']
+	*/
 	supportedVersions: string[];
 	/** Method to patch the instrumentation  */
 	patch(moduleExports: unknown, moduleVersion?: string): unknown;
-	/** Method to patch the instrumentation  */
 	/** Method to unpatch the instrumentation  */
 	unpatch(moduleExports?: unknown, moduleVersion?: string): void;
 }
@@ -85,7 +95,19 @@ interface InstrumentationModuleDefinition {
 	moduleExports?: any;
 	/** Instrumented module version */
 	moduleVersion?: string;
-	/** Supported version of module  */
+	/** Supported version of module.
+	*
+	* A module version is supported if one of the supportedVersions in the array satisfies the module version.
+	* The syntax of the version is checked with the `satisfies` function of "The semantic versioner for npm", see
+	* [`semver` package](https://www.npmjs.com/package/semver)
+	* If the version is not supported, we won't apply instrumentation patch (see `enable` method).
+	* If omitted, all versions of the module will be patched.
+	*
+	* It is recommended to always specify a range that is bound to a major version, to avoid breaking changes.
+	* New major versions should be reviewed and tested before being added to the supportedVersions array.
+	*
+	* Example: ['>=1.2.3 <3']
+	*/
 	supportedVersions: string[];
 	/** Module internal files to be patched  */
 	files: InstrumentationModuleFile[];
@@ -96,19 +118,54 @@ interface InstrumentationModuleDefinition {
 	/** Method to unpatch the instrumentation  */
 	unpatch?: (moduleExports: any, moduleVersion?: string) => void;
 }
+/**
+ * SpanCustomizationHook is a common way for instrumentations to expose extension points
+ * where users can add custom behavior to a span based on info object passed to the hook at different times of the span lifecycle.
+ * This is an advanced feature, commonly used to add additional or non-spec-compliant attributes to the span,
+ * capture payloads, modify the span in some way, or carry some other side effect.
+ *
+ * The hook is registered with the instrumentation specific config by implementing an handler function with this signature,
+ * and if the hook is present, it will be called with the span and the event information
+ * when the event is emitted.
+ *
+ * When and under what conditions the hook is called and what data is passed
+ * in the info argument, is specific to each instrumentation and life-cycle event
+ * and should be documented where it is used.
+ *
+ * Instrumentation may define multiple hooks, for different spans, or different span life-cycle events.
+ */
+declare type SpanCustomizationHook<SpanCustomizationInfoType> = (span: Span, info: SpanCustomizationInfoType) => void;
+
+interface AutoLoaderResult {
+	instrumentations: Instrumentation[];
+}
+interface AutoLoaderOptions {
+	instrumentations?: (Instrumentation | Instrumentation[])[];
+	tracerProvider?: TracerProvider;
+	meterProvider?: MeterProvider;
+	loggerProvider?: LoggerProvider;
+}
+
+/**
+ * It will register instrumentations and plugins
+ * @param options
+ * @return returns function to unload instrumentation and plugins that were
+ *   registered
+ */
+declare function registerInstrumentations(options: AutoLoaderOptions): () => void;
 
 /**
  * Base abstract internal class for instrumenting node and web plugins
  */
-declare abstract class InstrumentationAbstract implements Instrumentation {
+declare abstract class InstrumentationAbstract<ConfigType extends InstrumentationConfig = InstrumentationConfig> implements Instrumentation<ConfigType> {
 	readonly instrumentationName: string;
 	readonly instrumentationVersion: string;
-	protected _config: InstrumentationConfig;
+	protected _config: ConfigType;
 	private _tracer;
 	private _meter;
 	private _logger;
 	protected _diag: DiagLogger;
-	constructor(instrumentationName: string, instrumentationVersion: string, config?: InstrumentationConfig);
+	constructor(instrumentationName: string, instrumentationVersion: string, config: ConfigType);
 	protected _wrap: <Nodule extends object, FieldName extends keyof Nodule>(nodule: Nodule, name: FieldName, wrapper: (original: Nodule[FieldName]) => Nodule[FieldName]) => void;
 	protected _unwrap: <Nodule extends object>(nodule: Nodule, name: keyof Nodule) => void;
 	protected _massWrap: <Nodule extends object, FieldName extends keyof Nodule>(nodules: Nodule[], names: FieldName[], wrapper: (original: Nodule[FieldName]) => Nodule[FieldName]) => void;
@@ -138,12 +195,12 @@ declare abstract class InstrumentationAbstract implements Instrumentation {
 	* Sets the new metric instruments with the current Meter.
 	*/
 	protected _updateMetricInstruments(): void;
-	getConfig(): InstrumentationConfig;
+	getConfig(): ConfigType;
 	/**
 	* Sets InstrumentationConfig to this plugin
 	* @param InstrumentationConfig
 	*/
-	setConfig(config?: InstrumentationConfig): void;
+	setConfig(config: ConfigType): void;
 	/**
 	* Sets TraceProvider to this plugin
 	* @param tracerProvider
@@ -157,33 +214,23 @@ declare abstract class InstrumentationAbstract implements Instrumentation {
 	* methods.
 	*/
 	protected abstract init(): InstrumentationModuleDefinition | InstrumentationModuleDefinition[] | void;
+	/**
+	* Execute span customization hook, if configured, and log any errors.
+	* Any semantics of the trigger and info are defined by the specific instrumentation.
+	* @param hookHandler The optional hook handler which the user has configured via instrumentation config
+	* @param triggerName The name of the trigger for executing the hook for logging purposes
+	* @param span The span to which the hook should be applied
+	* @param info The info object to be passed to the hook, with useful data the hook may use
+	*/
+	protected _runSpanCustomizationHook<SpanCustomizationInfoType>(hookHandler: SpanCustomizationHook<SpanCustomizationInfoType> | undefined, triggerName: string, span: Span, info: SpanCustomizationInfoType): void;
 }
 
 /**
  * Base abstract class for instrumenting web plugins
  */
-declare abstract class InstrumentationBase extends InstrumentationAbstract implements Instrumentation {
-	constructor(instrumentationName: string, instrumentationVersion: string, config?: InstrumentationConfig);
+declare abstract class InstrumentationBase<ConfigType extends InstrumentationConfig = InstrumentationConfig> extends InstrumentationAbstract<ConfigType> implements Instrumentation<ConfigType> {
+	constructor(instrumentationName: string, instrumentationVersion: string, config: ConfigType);
 }
-
-declare type InstrumentationOption = typeof InstrumentationBase | (typeof InstrumentationBase)[] | Instrumentation | Instrumentation[];
-interface AutoLoaderResult {
-	instrumentations: Instrumentation[];
-}
-interface AutoLoaderOptions {
-	instrumentations?: InstrumentationOption[];
-	tracerProvider?: TracerProvider;
-	meterProvider?: MeterProvider;
-	loggerProvider?: LoggerProvider;
-}
-
-/**
- * It will register instrumentations and plugins
- * @param options
- * @return returns function to unload instrumentation and plugins that were
- *   registered
- */
-declare function registerInstrumentations(options: AutoLoaderOptions): () => void;
 
 declare class InstrumentationNodeModuleDefinition implements InstrumentationModuleDefinition {
 	name: string;
@@ -220,4 +267,4 @@ declare function safeExecuteInTheMiddleAsync<T>(execute: () => T, onFinish: (e: 
  */
 declare function isWrapped(func: unknown): func is ShimWrapped;
 
-export { AutoLoaderOptions, AutoLoaderResult, Instrumentation, InstrumentationBase, InstrumentationConfig, InstrumentationModuleDefinition, InstrumentationModuleFile, InstrumentationNodeModuleDefinition, InstrumentationNodeModuleFile, InstrumentationOption, ShimWrapped, isWrapped, registerInstrumentations, safeExecuteInTheMiddle, safeExecuteInTheMiddleAsync };
+export { AutoLoaderOptions, AutoLoaderResult, Instrumentation, InstrumentationBase, InstrumentationConfig, InstrumentationModuleDefinition, InstrumentationModuleFile, InstrumentationNodeModuleDefinition, InstrumentationNodeModuleFile, ShimWrapped, SpanCustomizationHook, isWrapped, registerInstrumentations, safeExecuteInTheMiddle, safeExecuteInTheMiddleAsync };

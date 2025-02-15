@@ -326,6 +326,8 @@ declare class Span implements Span$1, ReadableSpan {
 	* @param [timeStamp] Specified time stamp for the event
 	*/
 	addEvent(name: string, attributesOrStartTime?: SpanAttributes | TimeInput, timeStamp?: TimeInput): this;
+	addLink(link: Link): this;
+	addLinks(links: Link[]): this;
 	setStatus(status: SpanStatus): this;
 	updateName(name: string): this;
 	end(endTime?: TimeInput): void;

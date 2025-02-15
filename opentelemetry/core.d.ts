@@ -314,16 +314,12 @@ declare const DEFAULT_ENVIRONMENT: Required<ENVIRONMENT>;
  * @param values
  */
 declare function parseEnvironment(values: RAW_ENVIRONMENT): ENVIRONMENT;
-/**
- * Get environment in node or browser without
- * populating default values.
- */
-declare function getEnvWithoutDefaults(): ENVIRONMENT;
 
 /**
  * Gets the environment variables
  */
 declare function getEnv(): Required<ENVIRONMENT>;
+declare function getEnvWithoutDefaults(): ENVIRONMENT;
 
 /** only globals that common to node and browsers are allowed */
 declare const _globalThis: typeof globalThis;
@@ -363,7 +359,7 @@ declare const otperformance: Performance;
 declare const SDK_INFO: {
 	"telemetry.sdk.name": string;
 	"process.runtime.name": string;
-	"telemetry.sdk.language": "nodejs";
+	"telemetry.sdk.language": string;
 	"telemetry.sdk.version": string;
 };
 
@@ -597,7 +593,7 @@ declare class BindOnceFuture<R, This = unknown, T extends (this: This, ...args: 
 	call(...args: Parameters<T>): Promise<R>;
 }
 
-declare const VERSION = "1.24.0";
+declare const VERSION = "1.25.0";
 
 interface Exporter<T> {
 	export(arg: T, resultCallback: (result: ExportResult) => void): void;

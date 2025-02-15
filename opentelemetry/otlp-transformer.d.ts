@@ -601,4 +601,20 @@ declare function createExportMetricsServiceRequest(resourceMetrics: ResourceMetr
 
 declare function createExportLogsServiceRequest(logRecords: ReadableLogRecord[], options?: OtlpEncodingOptions): IExportLogsServiceRequest;
 
-export { EAggregationTemporality, ESeverityNumber, ESpanKind, EStatusCode, Encoder, Fixed64, HrTimeEncodeFunction, IAnyValue, IArrayValue, IBuckets, IEvent, IExemplar, IExponentialHistogram, IExponentialHistogramDataPoint, IExportLogsPartialSuccess, IExportLogsServiceRequest, IExportLogsServiceResponse, IExportMetricsPartialSuccess, IExportMetricsServiceRequest, IExportMetricsServiceResponse, IExportTracePartialSuccess, IExportTraceServiceRequest, IExportTraceServiceResponse, IGauge, IHistogram, IHistogramDataPoint, IInstrumentationScope, IKeyValue, IKeyValueList, ILink, ILogRecord, IMetric, INumberDataPoint, IResource, IResourceLogs, IResourceMetrics, IResourceSpans, IScopeLogs, IScopeMetrics, IScopeSpans, ISpan, IStatus, ISum, ISummary, ISummaryDataPoint, IValueAtQuantile, LongBits, OptionalSpanContextEncodeFunction, OtlpEncodingOptions, SpanContextEncodeFunction, createExportLogsServiceRequest, createExportMetricsServiceRequest, createExportTraceServiceRequest, encodeAsLongBits, encodeAsString, getOtlpEncoder, hrTimeToNanos, toLongBits };
+/**
+ * Serializes and deserializes the OTLP request/response to and from {@link Uint8Array}
+ */
+interface ISerializer<Request, Response> {
+	serializeRequest(request: Request): Uint8Array | undefined;
+	deserializeResponse(data: Uint8Array): Response;
+}
+
+declare const ProtobufLogsSerializer: ISerializer<ReadableLogRecord[], IExportLogsServiceResponse>;
+declare const ProtobufMetricsSerializer: ISerializer<ResourceMetrics[], IExportMetricsServiceResponse>;
+declare const ProtobufTraceSerializer: ISerializer<ReadableSpan[], IExportTraceServiceResponse>;
+
+declare const JsonTraceSerializer: ISerializer<ReadableSpan[], IExportTraceServiceResponse>;
+declare const JsonMetricsSerializer: ISerializer<ResourceMetrics[], IExportMetricsServiceResponse>;
+declare const JsonLogsSerializer: ISerializer<ReadableLogRecord[], IExportLogsServiceResponse>;
+
+export { EAggregationTemporality, ESeverityNumber, ESpanKind, EStatusCode, Encoder, Fixed64, HrTimeEncodeFunction, IAnyValue, IArrayValue, IBuckets, IEvent, IExemplar, IExponentialHistogram, IExponentialHistogramDataPoint, IExportLogsPartialSuccess, IExportLogsServiceRequest, IExportLogsServiceResponse, IExportMetricsPartialSuccess, IExportMetricsServiceRequest, IExportMetricsServiceResponse, IExportTracePartialSuccess, IExportTraceServiceRequest, IExportTraceServiceResponse, IGauge, IHistogram, IHistogramDataPoint, IInstrumentationScope, IKeyValue, IKeyValueList, ILink, ILogRecord, IMetric, INumberDataPoint, IResource, IResourceLogs, IResourceMetrics, IResourceSpans, IScopeLogs, IScopeMetrics, IScopeSpans, ISerializer, ISpan, IStatus, ISum, ISummary, ISummaryDataPoint, IValueAtQuantile, JsonLogsSerializer, JsonMetricsSerializer, JsonTraceSerializer, LongBits, OptionalSpanContextEncodeFunction, OtlpEncodingOptions, ProtobufLogsSerializer, ProtobufMetricsSerializer, ProtobufTraceSerializer, SpanContextEncodeFunction, createExportLogsServiceRequest, createExportMetricsServiceRequest, createExportTraceServiceRequest, encodeAsLongBits, encodeAsString, getOtlpEncoder, hrTimeToNanos, toLongBits };
