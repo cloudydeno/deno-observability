@@ -75,7 +75,7 @@ async function buildModuleWithRollup(directory: string, modName: string, externa
         // newImport = 'node:'+match[2];
         return '';
       } else if (['shimmer'].includes(match[2])) {
-        newImport = `https://esm.sh/${match[2]}`;
+        newImport = `https://esm.sh/${match[2]}@1.2.1`;
       } else {
         console.error('Unhandled import:', match[2]);
       }
