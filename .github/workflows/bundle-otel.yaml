@@ -15,12 +15,12 @@ jobs:
     - name: Checkout source
       uses: actions/checkout@v4
       with:
-        submodules: true
+        submodules: recursive
 
     - name: Set up Deno
-      uses: denoland/setup-deno@v1
+      uses: denoland/setup-deno@v2
       with:
-        deno-version: v1.40
+        deno-version: v2.1
 
     # "https" cache: code from the Internet
     # External sources won't change much so we use less precise keys
