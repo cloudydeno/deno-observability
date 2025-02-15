@@ -207,6 +207,7 @@ await Deno.writeTextFile('hack/opentelemetry-js/tsconfig.base.json',
 // from upstream tsconfig.esnext.json
 const packagePaths = [
   "api",
+  "semantic-conventions",
   // "packages/opentelemetry-context-zone",
   // "packages/opentelemetry-context-zone-peer-dep",
   "packages/opentelemetry-core",
@@ -216,7 +217,6 @@ const packagePaths = [
   "packages/opentelemetry-resources",
   "packages/opentelemetry-sdk-trace-base",
   // "packages/opentelemetry-sdk-trace-web",
-  "packages/opentelemetry-semantic-conventions",
   // "packages/propagator-aws-xray",
   "packages/sdk-metrics",
   "experimental/packages/api-events",

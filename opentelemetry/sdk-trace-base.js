@@ -351,20 +351,21 @@ const env = getEnv();
 const FALLBACK_OTEL_TRACES_SAMPLER = TracesSamplerValues.AlwaysOn;
 const DEFAULT_RATIO = 1;
 function loadDefaultConfig() {
+	const _env = getEnv();
 	return {
 		sampler: buildSamplerFromEnv(env),
 		forceFlushTimeoutMillis: 30000,
 		generalLimits: {
-			attributeValueLengthLimit: getEnv().OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT,
-			attributeCountLimit: getEnv().OTEL_ATTRIBUTE_COUNT_LIMIT,
+			attributeValueLengthLimit: _env.OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT,
+			attributeCountLimit: _env.OTEL_ATTRIBUTE_COUNT_LIMIT,
 		},
 		spanLimits: {
-			attributeValueLengthLimit: getEnv().OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT,
-			attributeCountLimit: getEnv().OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT,
-			linkCountLimit: getEnv().OTEL_SPAN_LINK_COUNT_LIMIT,
-			eventCountLimit: getEnv().OTEL_SPAN_EVENT_COUNT_LIMIT,
-			attributePerEventCountLimit: getEnv().OTEL_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT,
-			attributePerLinkCountLimit: getEnv().OTEL_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT,
+			attributeValueLengthLimit: _env.OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT,
+			attributeCountLimit: _env.OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT,
+			linkCountLimit: _env.OTEL_SPAN_LINK_COUNT_LIMIT,
+			eventCountLimit: _env.OTEL_SPAN_EVENT_COUNT_LIMIT,
+			attributePerEventCountLimit: _env.OTEL_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT,
+			attributePerLinkCountLimit: _env.OTEL_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT,
 		},
 	};
 }
@@ -948,6 +949,7 @@ class ConsoleSpanExporter {
 			resource: {
 				attributes: span.resource.attributes,
 			},
+			instrumentationScope: span.instrumentationLibrary,
 			traceId: span.spanContext().traceId,
 			parentId: span.parentSpanId,
 			traceState: span.spanContext().traceState?.serialize(),

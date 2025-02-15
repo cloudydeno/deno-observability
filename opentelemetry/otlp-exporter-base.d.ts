@@ -56,6 +56,9 @@ interface OTLPExporterConfigBase {
  */
 declare abstract class OTLPExporterBase<T extends OTLPExporterConfigBase, ExportItem> {
 	readonly url: string;
+	/**
+	* @deprecated scheduled for removal. This is only used in tests.
+	*/
 	readonly hostname: string | undefined;
 	readonly timeoutMillis: number;
 	protected _concurrencyLimit: number;
@@ -116,4 +119,23 @@ declare function appendRootPathToUrlIfNeeded(url: string): string;
 declare function configureExporterTimeout(timeoutMillis: number | undefined): number;
 declare function invalidTimeout(timeout: number, defaultTimeout: number): number;
 
-export { ExportServiceError, OTLPExporterBase, OTLPExporterConfigBase, OTLPExporterError, appendResourcePathToUrl, appendRootPathToUrlIfNeeded, configureExporterTimeout, invalidTimeout, parseHeaders };
+interface ExportResponseSuccess {
+	status: 'success';
+	data?: Uint8Array;
+}
+interface ExportResponseFailure {
+	status: 'failure';
+	error: Error;
+}
+interface ExportResponseRetryable {
+	status: 'retryable';
+	retryInMillis?: number;
+}
+declare type ExportResponse = ExportResponseSuccess | ExportResponseFailure | ExportResponseRetryable;
+
+interface IExporterTransport {
+	send(data: Uint8Array, timeoutMillis: number): Promise<ExportResponse>;
+	shutdown(): void;
+}
+
+export { ExportResponse, ExportResponseFailure, ExportResponseRetryable, ExportResponseSuccess, ExportServiceError, IExporterTransport, OTLPExporterBase, OTLPExporterConfigBase, OTLPExporterError, appendResourcePathToUrl, appendRootPathToUrlIfNeeded, configureExporterTimeout, invalidTimeout, parseHeaders };

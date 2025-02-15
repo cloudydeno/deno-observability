@@ -23,12 +23,6 @@ interface Instrumentation<ConfigType extends InstrumentationConfig = Instrumenta
 	instrumentationName: string;
 	/** Instrumentation Version  */
 	instrumentationVersion: string;
-	/**
-	* Instrumentation Description - please describe all useful information
-	* as Instrumentation might patch different version of different modules,
-	* or support different browsers etc.
-	*/
-	instrumentationDescription?: string;
 	/** Method to disable the instrumentation  */
 	disable(): void;
 	/** Method to enable the instrumentation  */
@@ -114,9 +108,9 @@ interface InstrumentationModuleDefinition {
 	/** If set to true, the includePrerelease check will be included when calling semver.satisfies */
 	includePrerelease?: boolean;
 	/** Method to patch the instrumentation  */
-	patch?: (moduleExports: any, moduleVersion?: string) => any;
+	patch?: ((moduleExports: any, moduleVersion?: string | undefined) => any) | undefined;
 	/** Method to unpatch the instrumentation  */
-	unpatch?: (moduleExports: any, moduleVersion?: string) => void;
+	unpatch?: ((moduleExports: any, moduleVersion?: string | undefined) => void) | undefined;
 }
 /**
  * SpanCustomizationHook is a common way for instrumentations to expose extension points
@@ -198,7 +192,7 @@ declare abstract class InstrumentationAbstract<ConfigType extends Instrumentatio
 	getConfig(): ConfigType;
 	/**
 	* Sets InstrumentationConfig to this plugin
-	* @param InstrumentationConfig
+	* @param config
 	*/
 	setConfig(config: ConfigType): void;
 	/**

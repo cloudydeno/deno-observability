@@ -36,6 +36,8 @@ interface ExceptionWithName {
  * Defines Exception.
  *
  * string or an object with one of (message or name or code) and optional stack
+ *
+ * @since 1.0.0
  */
 declare type Exception = ExceptionWithCode | ExceptionWithMessage | ExceptionWithName | string;
 
@@ -50,12 +52,16 @@ declare type Exception = ExceptionWithCode | ExceptionWithMessage | ExceptionWit
  * The second number is calculated by converting the digits after the decimal point of the subtraction, (1609504210150 / 1000) - HrTime[0], to nanoseconds:
  * HrTime[1] = Number((1609504210.150 - HrTime[0]).toFixed(9)) * 1e9 = 150000000.
  * This is represented in HrTime format as [1609504210, 150000000].
+ *
+ * @since 1.0.0
  */
 declare type HrTime = [number, number];
 /**
  * Defines TimeInput.
  *
  * hrtime, epoch milliseconds, performance.now() or Date
+ *
+ * @since 1.0.0
  */
 declare type TimeInput = HrTime | number | Date;
 
@@ -63,6 +69,8 @@ declare type TimeInput = HrTime | number | Date;
  * Attributes is a map from string to attribute values.
  *
  * Note: only the own enumerable keys are counted as valid attribute keys.
+ *
+ * @since 1.3.0
  */
 interface Attributes {
 	[attributeKey: string]: AttributeValue | undefined;
@@ -71,18 +79,25 @@ interface Attributes {
  * Attribute values may be any non-nullish primitive value except an object.
  *
  * null or undefined attribute values are invalid and will result in undefined behavior.
+ *
+ * @since 1.3.0
  */
 declare type AttributeValue = string | number | boolean | Array<null | undefined | string> | Array<null | undefined | number> | Array<null | undefined | boolean>;
 
 /**
  * @deprecated please use {@link Attributes}
+ * @since 1.0.0
  */
 declare type SpanAttributes = Attributes;
 /**
  * @deprecated please use {@link AttributeValue}
+ * @since 1.0.0
  */
 declare type SpanAttributeValue = AttributeValue;
 
+/**
+ * @since 1.0.0
+ */
 interface TraceState {
 	/**
 	* Create a new TraceState which inherits from this TraceState and has the
@@ -124,6 +139,8 @@ interface TraceState {
 /**
  * A SpanContext represents the portion of a {@link Span} which must be
  * serialized and propagated along side of a {@link Baggage}.
+ *
+ * @since 1.0.0
  */
 interface SpanContext {
 	/**
@@ -173,6 +190,9 @@ interface SpanContext {
 	traceState?: TraceState;
 }
 
+/**
+ * @since 1.0.0
+ */
 interface SpanStatus {
 	/** The status code of this message. */
 	code: SpanStatusCode;
@@ -181,6 +201,8 @@ interface SpanStatus {
 }
 /**
  * An enumeration of status codes.
+ *
+ * @since 1.0.0
  */
 declare enum SpanStatusCode {
 	/**
@@ -212,6 +234,8 @@ declare enum SpanStatusCode {
  *    However, it is desirable to associate incoming SpanContext to new trace
  *    initiated on service provider side so two traces (from Client and from
  *    Service Provider) can be correlated.
+ *
+ * @since 1.0.0
  */
 interface Link {
 	/** The {@link SpanContext} of a linked span. */
@@ -230,6 +254,8 @@ interface Link {
  * may have children.
  *
  * Spans are created by the {@link Tracer.startSpan} method.
+ *
+ * @since 1.0.0
  */
 interface Span {
 	/**
@@ -336,11 +362,19 @@ interface Span {
 	recordException(exception: Exception, time?: TimeInput): void;
 }
 
+/**
+ * @since 1.0.0
+ */
 declare function isValidTraceId(traceId: string): boolean;
+/**
+ * @since 1.0.0
+ */
 declare function isValidSpanId(spanId: string): boolean;
 /**
  * Returns true if this {@link SpanContext} is valid.
  * @return true if this {@link SpanContext} is valid.
+ *
+ * @since 1.0.0
  */
 declare function isSpanContextValid(spanContext: SpanContext): boolean;
 /**
@@ -351,6 +385,9 @@ declare function isSpanContextValid(spanContext: SpanContext): boolean;
  */
 declare function wrapSpanContext(spanContext: SpanContext): Span;
 
+/**
+ * @since 1.0.0
+ */
 interface Context {
 	/**
 	* Get a value from the context.
@@ -374,6 +411,9 @@ interface Context {
 	*/
 	deleteValue(key: symbol): Context;
 }
+/**
+ * @since 1.0.0
+ */
 interface ContextManager {
 	/**
 	* Get the current active context
@@ -403,6 +443,9 @@ interface ContextManager {
 	disable(): this;
 }
 
+/**
+ * @since 1.0.0
+ */
 declare enum SpanKind {
 	/** Default value. Indicates that the span is used internally. */
 	INTERNAL = 0,
@@ -432,6 +475,8 @@ declare enum SpanKind {
 
 /**
  * Options needed for span creation
+ *
+ * @since 1.0.0
  */
 interface SpanOptions {
 	/**
@@ -451,6 +496,8 @@ interface SpanOptions {
 
 /**
  * Tracer provides an interface for creating {@link Span}s.
+ *
+ * @since 1.0.0
  */
 interface Tracer {
 	/**
@@ -519,6 +566,8 @@ interface Tracer {
 
 /**
  * An interface describes additional metadata of a tracer.
+ *
+ * @since 1.3.0
  */
 interface TracerOptions {
 	/**
@@ -529,6 +578,8 @@ interface TracerOptions {
 
 /**
  * A registry for creating named {@link Tracer}s.
+ *
+ * @since 1.0.0
  */
 interface TracerProvider {
 	/**
@@ -586,6 +637,8 @@ declare function getSpanContext(context: Context): SpanContext | undefined;
 
 /**
  * Singleton object which represents the entry point to the OpenTelemetry Tracing API
+ *
+ * @since 1.0.0
  */
 declare class TraceAPI {
 	private static _instance?;
@@ -630,6 +683,8 @@ declare class TraceAPI {
  * (extractor) side is usually an object such as http headers. Propagation is
  * usually implemented via library-specific request interceptors, where the
  * client-side injects values and the server-side extracts them.
+ *
+ * @since 1.0.0
  */
 interface TextMapPropagator<Carrier = any> {
 	/**
@@ -666,7 +721,9 @@ interface TextMapPropagator<Carrier = any> {
 }
 /**
  * A setter is specified by the caller to define a specific method
- * to set key/value pairs on the carrier within a propagator.
+ * to set key/value pairs on the carrier within a propagator
+ *
+ * @since 1.0.0
  */
 interface TextMapSetter<Carrier = any> {
 	/**
@@ -684,6 +741,8 @@ interface TextMapSetter<Carrier = any> {
 /**
  * A getter is specified by the caller to define a specific method
  * to get the value of a key from a carrier.
+ *
+ * @since 1.0.0
  */
 interface TextMapGetter<Carrier = any> {
 	/**
@@ -700,7 +759,13 @@ interface TextMapGetter<Carrier = any> {
 	*/
 	get(carrier: Carrier, key: string): undefined | string | string[];
 }
+/**
+ * @since 1.0.0
+ */
 declare const defaultTextMapGetter: TextMapGetter;
+/**
+ * @since 1.0.0
+ */
 declare const defaultTextMapSetter: TextMapSetter;
 
 /**
@@ -708,6 +773,9 @@ declare const defaultTextMapSetter: TextMapSetter;
  */
 declare const baggageEntryMetadataSymbol: unique symbol;
 
+/**
+ * @since 1.0.0
+ */
 interface BaggageEntry {
 	/** `String` value of the `BaggageEntry`. */
 	value: string;
@@ -720,6 +788,8 @@ interface BaggageEntry {
 /**
  * Serializable Metadata defined by the W3C baggage specification.
  * It currently has no special meaning defined by the OpenTelemetry or W3C.
+ *
+ * @since 1.0.0
  */
 declare type BaggageEntryMetadata = {
 	toString(): string;
@@ -730,6 +800,8 @@ declare type BaggageEntryMetadata = {
  * Baggage represents collection of key-value pairs with optional metadata.
  * Each key of Baggage is associated with exactly one value.
  * Baggage may be used to annotate and enrich telemetry data.
+ *
+ * @since 1.0.0
  */
 interface Baggage {
 	/**
@@ -805,11 +877,14 @@ declare function createBaggage(entries?: Record<string, BaggageEntry>): Baggage;
  *
  * @param str string metadata. Format is currently not defined by the spec and has no special meaning.
  *
+ * @since 1.0.0
  */
 declare function baggageEntryMetadataFromString(str: string): BaggageEntryMetadata;
 
 /**
  * Singleton object which represents the entry point to the OpenTelemetry Propagation API
+ *
+ * @since 1.0.0
  */
 declare class PropagationAPI {
 	private static _instance?;
@@ -855,6 +930,8 @@ declare class PropagationAPI {
 
 /**
  * Interface that is being used in callback function for Observable Metric.
+ *
+ * @since 1.3.0
  */
 interface ObservableResult<AttributesTypes extends MetricAttributes = MetricAttributes> {
 	/**
@@ -885,6 +962,8 @@ interface BatchObservableResult<AttributesTypes extends MetricAttributes = Metri
 
 /**
  * Advisory options influencing aggregation configuration parameters.
+ *
+ * @since 1.7.0
  * @experimental
  */
 interface MetricAdvice {
@@ -896,6 +975,8 @@ interface MetricAdvice {
 }
 /**
  * Options needed for metric creation
+ *
+ * @since 1.3.0
  */
 interface MetricOptions {
 	/**
@@ -916,10 +997,15 @@ interface MetricOptions {
 	/**
 	* The advice influencing aggregation configuration parameters.
 	* @experimental
+	* @since 1.7.0
 	*/
 	advice?: MetricAdvice;
 }
-/** The Type of value. It describes how the data is reported. */
+/**
+ * The Type of value. It describes how the data is reported.
+ *
+ * @since 1.3.0
+ */
 declare enum ValueType {
 	INT = 0,
 	DOUBLE = 1
@@ -938,6 +1024,8 @@ declare enum ValueType {
  *   <li> count the number of checkpoints run. </li>
  *   <li> count the number of 5xx errors. </li>
  * <ol>
+ *
+ * @since 1.3.0
  */
 interface Counter<AttributesTypes extends MetricAttributes = MetricAttributes> {
 	/**
@@ -945,18 +1033,27 @@ interface Counter<AttributesTypes extends MetricAttributes = MetricAttributes> {
 	*/
 	add(value: number, attributes?: AttributesTypes, context?: Context): void;
 }
+/**
+ * @since 1.3.0
+ */
 interface UpDownCounter<AttributesTypes extends MetricAttributes = MetricAttributes> {
 	/**
 	* Increment value of counter by the input. Inputs may be negative.
 	*/
 	add(value: number, attributes?: AttributesTypes, context?: Context): void;
 }
+/**
+ * @since 1.9.0
+ */
 interface Gauge<AttributesTypes extends MetricAttributes = MetricAttributes> {
 	/**
 	* Records a measurement.
 	*/
 	record(value: number, attributes?: AttributesTypes, context?: Context): void;
 }
+/**
+ * @since 1.3.0
+ */
 interface Histogram<AttributesTypes extends MetricAttributes = MetricAttributes> {
 	/**
 	* Records a measurement. Value of the measurement must not be negative.
@@ -965,20 +1062,29 @@ interface Histogram<AttributesTypes extends MetricAttributes = MetricAttributes>
 }
 /**
  * @deprecated please use {@link Attributes}
+ * @since 1.3.0
  */
 declare type MetricAttributes = Attributes;
 /**
  * @deprecated please use {@link AttributeValue}
+ * @since 1.3.0
  */
 declare type MetricAttributeValue = AttributeValue;
 /**
  * The observable callback for Observable instruments.
+ *
+ * @since 1.3.0
  */
 declare type ObservableCallback<AttributesTypes extends MetricAttributes = MetricAttributes> = (observableResult: ObservableResult<AttributesTypes>) => void | Promise<void>;
 /**
  * The observable callback for a batch of Observable instruments.
+ *
+ * @since 1.3.0
  */
 declare type BatchObservableCallback<AttributesTypes extends MetricAttributes = MetricAttributes> = (observableResult: BatchObservableResult<AttributesTypes>) => void | Promise<void>;
+/**
+ * @since 1.3.0
+ */
 interface Observable<AttributesTypes extends MetricAttributes = MetricAttributes> {
 	/**
 	* Sets up a function that will be called whenever a metric collection is initiated.
@@ -991,12 +1097,23 @@ interface Observable<AttributesTypes extends MetricAttributes = MetricAttributes
 	*/
 	removeCallback(callback: ObservableCallback<AttributesTypes>): void;
 }
+/**
+ * @since 1.3.0
+ */
 declare type ObservableCounter<AttributesTypes extends MetricAttributes = MetricAttributes> = Observable<AttributesTypes>;
+/**
+ * @since 1.3.0
+ */
 declare type ObservableUpDownCounter<AttributesTypes extends MetricAttributes = MetricAttributes> = Observable<AttributesTypes>;
+/**
+ * @since 1.3.0
+ */
 declare type ObservableGauge<AttributesTypes extends MetricAttributes = MetricAttributes> = Observable<AttributesTypes>;
 
 /**
  * An interface describes additional metadata of a meter.
+ *
+ * @since 1.3.0
  */
 interface MeterOptions {
 	/**
@@ -1010,6 +1127,8 @@ interface MeterOptions {
  * {@link Metric}s are used for recording pre-defined aggregation (`Counter`),
  * or raw values (`Histogram`) in which the aggregation and attributes
  * for the exported metric are deferred.
+ *
+ * @since 1.3.0
  */
 interface Meter {
 	/**
@@ -1106,6 +1225,8 @@ interface Meter {
 
 /**
  * A registry for creating named {@link Meter}s.
+ *
+ * @since 1.3.0
  */
 interface MeterProvider {
 	/**
@@ -1146,6 +1267,9 @@ declare class MetricsAPI {
 	disable(): void;
 }
 
+/**
+ * @since 1.0.0
+ */
 declare type DiagLogFunction = (message: string, ...args: unknown[]) => void;
 /**
  * Defines an internal diagnostic logger interface which is used to log internal diagnostic
@@ -1154,6 +1278,8 @@ declare type DiagLogFunction = (message: string, ...args: unknown[]) => void;
  * - a No-Op {@link createNoopDiagLogger}
  * - a {@link DiagLogLevel} filtering wrapper {@link createLogLevelDiagLogger}
  * - a general Console {@link DiagConsoleLogger} version.
+ *
+ * @since 1.0.0
  */
 interface DiagLogger {
 	/** Log an error scenario that was not expected and caused the requested operation to fail. */
@@ -1211,10 +1337,15 @@ declare enum DiagLogLevel {
 }
 /**
  * Defines options for ComponentLogger
+ *
+ * @since 1.0.0
  */
 interface ComponentLoggerOptions {
 	namespace: string;
 }
+/**
+ * @since 1.4.1
+ */
 interface DiagLoggerOptions {
 	/**
 	* The {@link DiagLogLevel} used to filter logs sent to the logger.
@@ -1249,6 +1380,8 @@ interface DiagLoggerApi {
 /**
  * Singleton object which represents the entry point to the OpenTelemetry internal
  * diagnostic API
+ *
+ * @since 1.0.0
  */
 declare class DiagAPI implements DiagLogger, DiagLoggerApi {
 	private static _instance?;
@@ -1277,6 +1410,8 @@ declare class DiagAPI implements DiagLogger, DiagLoggerApi {
 
 /**
  * Singleton object which represents the entry point to the OpenTelemetry Context API
+ *
+ * @since 1.0.0
  */
 declare class ContextAPI {
 	private static _instance?;
@@ -1315,15 +1450,25 @@ declare class ContextAPI {
 	disable(): void;
 }
 
-/** Get a key to uniquely identify a context value */
+/**
+ * Get a key to uniquely identify a context value
+ *
+ * @since 1.0.0
+ */
 declare function createContextKey(description: string): symbol;
-/** The root context is used as the default parent context when there is no active context */
+/**
+ * The root context is used as the default parent context when there is no active context
+ *
+ * @since 1.0.0
+ */
 declare const ROOT_CONTEXT: Context;
 
 /**
  * A simple Immutable Console based diagnostic logger which will output any messages to the Console.
  * If you want to limit the amount of logging to a specific level or lower use the
  * {@link createLogLevelDiagLogger}
+ *
+ * @since 1.0.0
  */
 declare class DiagConsoleLogger implements DiagLogger {
 	constructor();
@@ -1359,11 +1504,15 @@ declare class DiagConsoleLogger implements DiagLogger {
 
 /**
  * Create a no-op Meter
+ *
+ * @since 1.3.0
  */
 declare function createNoopMeter(): Meter;
 
 /**
  * Proxy tracer provided by the proxy tracer provider
+ *
+ * @since 1.0.0
  */
 declare class ProxyTracer implements Tracer {
 	private _provider;
@@ -1380,6 +1529,9 @@ declare class ProxyTracer implements Tracer {
 	*/
 	private _getTracer;
 }
+/**
+ * @since 1.0.3
+ */
 interface TracerDelegator {
 	getDelegateTracer(name: string, version?: string, options?: TracerOptions): Tracer | undefined;
 }
@@ -1391,6 +1543,8 @@ interface TracerDelegator {
  *   When a delegate is set, traces are provided from the delegate.
  *   When a delegate is set after tracers have already been provided,
  *   all tracers already provided will use the provided delegate implementation.
+ *
+ * @since 1.0.0
  */
 declare class ProxyTracerProvider implements TracerProvider {
 	private _delegate?;
@@ -1410,6 +1564,8 @@ declare class ProxyTracerProvider implements TracerProvider {
  * @deprecated use the one declared in @opentelemetry/sdk-trace-base instead.
  * A sampling decision that determines how a {@link Span} will be recorded
  * and collected.
+ *
+ * @since 1.0.0
  */
 declare enum SamplingDecision {
 	/**
@@ -1432,6 +1588,8 @@ declare enum SamplingDecision {
  * @deprecated use the one declared in @opentelemetry/sdk-trace-base instead.
  * A sampling result contains a decision for a {@link Span} and additional
  * attributes the sampler would like to added to the Span.
+ *
+ * @since 1.0.0
  */
 interface SamplingResult {
 	/**
@@ -1458,6 +1616,8 @@ interface SamplingResult {
  * This interface represent a sampler. Sampling is a mechanism to control the
  * noise and overhead introduced by OpenTelemetry by reducing the number of
  * samples of traces collected and sent to the backend.
+ *
+ * @since 1.0.0
  */
 interface Sampler {
 	/**
@@ -1479,6 +1639,9 @@ interface Sampler {
 	toString(): string;
 }
 
+/**
+ * @since 1.0.0
+ */
 declare enum TraceFlags {
 	/** Represents no flag set. */
 	NONE = 0,
@@ -1486,13 +1649,28 @@ declare enum TraceFlags {
 	SAMPLED = 1
 }
 
+/**
+ * @since 1.1.0
+ */
 declare function createTraceState(rawTraceState?: string): TraceState;
 
+/**
+ * @since 1.0.0
+ */
 declare const INVALID_SPANID = "0000000000000000";
+/**
+ * @since 1.0.0
+ */
 declare const INVALID_TRACEID = "00000000000000000000000000000000";
+/**
+ * @since 1.0.0
+ */
 declare const INVALID_SPAN_CONTEXT: SpanContext;
 
-/** Entrypoint for context API */
+/**
+ * Entrypoint for context API
+ * @since 1.0.0
+ */
 declare const context: ContextAPI;
 
 /**
@@ -1500,16 +1678,30 @@ declare const context: ContextAPI;
  * Defines Diagnostic handler used for internal diagnostic logging operations.
  * The default provides a Noop DiagLogger implementation which may be changed via the
  * diag.setLogger(logger: DiagLogger) function.
+ *
+ * @since 1.0.0
  */
 declare const diag: DiagAPI;
 
-/** Entrypoint for metrics API */
+/**
+ * Entrypoint for metrics API
+ *
+ * @since 1.3.0
+ */
 declare const metrics: MetricsAPI;
 
-/** Entrypoint for propagation API */
+/**
+ * Entrypoint for propagation API
+ *
+ * @since 1.0.0
+ */
 declare const propagation: PropagationAPI;
 
-/** Entrypoint for trace API */
+/**
+ * Entrypoint for trace API
+ *
+ * @since 1.0.0
+ */
 declare const trace: TraceAPI;
 
 declare const _default: {

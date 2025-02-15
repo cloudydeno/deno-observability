@@ -55,14 +55,12 @@ class InstrumentationAbstract {
 	constructor(instrumentationName, instrumentationVersion, config) {
 		this.instrumentationName = instrumentationName;
 		this.instrumentationVersion = instrumentationVersion;
+		this._config = {};
 		this._wrap = shimmer.wrap;
 		this._unwrap = shimmer.unwrap;
 		this._massWrap = shimmer.massWrap;
 		this._massUnwrap = shimmer.massUnwrap;
-		this._config = {
-			enabled: true,
-			...config,
-		};
+		this.setConfig(config);
 		this._diag = diag.createComponentLogger({
 			namespace: instrumentationName,
 		});
@@ -98,7 +96,10 @@ class InstrumentationAbstract {
 		return this._config;
 	}
 	setConfig(config) {
-		this._config = { ...config };
+		this._config = {
+			enabled: true,
+			...config,
+		};
 	}
 	setTracerProvider(tracerProvider) {
 		this._tracer = tracerProvider.getTracer(this.instrumentationName, this.instrumentationVersion);

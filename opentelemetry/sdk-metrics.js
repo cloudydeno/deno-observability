@@ -106,25 +106,21 @@ function setEquals(lhs, rhs) {
 	}
 	return true;
 }
-function binarySearchLB(arr, value) {
+function binarySearchUB(arr, value) {
 	let lo = 0;
 	let hi = arr.length - 1;
-	while (hi - lo > 1) {
-		const mid = Math.trunc((hi + lo) / 2);
-		if (arr[mid] <= value) {
-			lo = mid;
+	let ret = arr.length;
+	while (hi >= lo) {
+		const mid = lo + Math.trunc((hi - lo) / 2);
+		if (arr[mid] < value) {
+			lo = mid + 1;
 		}
 		else {
+			ret = mid;
 			hi = mid - 1;
 		}
 	}
-	if (arr[hi] <= value) {
-		return hi;
-	}
-	else if (arr[lo] <= value) {
-		return lo;
-	}
-	return -1;
+	return ret;
 }
 function equalsCaseInsensitive(lhs, rhs) {
 	return lhs.toLowerCase() === rhs.toLowerCase();
@@ -234,8 +230,8 @@ class HistogramAccumulation {
 			this._current.max = Math.max(value, this._current.max);
 			this._current.hasMinMax = true;
 		}
-		const idx = binarySearchLB(this._boundaries, value);
-		this._current.buckets.counts[idx + 1] += 1;
+		const idx = binarySearchUB(this._boundaries, value);
+		this._current.buckets.counts[idx] += 1;
 	}
 	setStartTime(startTime) {
 		this.startTime = startTime;

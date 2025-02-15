@@ -14,18 +14,25 @@
  * limitations under the License.
  */
 
-import { AttributeValue, TimeInput, Context, Attributes } from './api.d.ts';
+import { TimeInput, Context, Attributes } from './api.d.ts';
 
+declare type AnyValueScalar = string | number | boolean;
+declare type AnyValueArray = Array<AnyValue>;
 /**
  * AnyValueMap is a map from string to AnyValue (attribute value or a nested map)
  */
 interface AnyValueMap {
-	[attributeKey: string]: AnyValue | undefined;
+	[attributeKey: string]: AnyValue;
 }
 /**
- * AnyValue is a either an attribute value or a map of AnyValue(s)
+ * AnyValue can be one of the following:
+ * - a scalar value
+ * - a byte array
+ * - array of any value
+ * - map from string to any value
+ * - empty value
  */
-declare type AnyValue = AttributeValue | AnyValueMap;
+declare type AnyValue = AnyValueScalar | Uint8Array | AnyValueArray | AnyValueMap | null | undefined;
 
 declare type LogBody = AnyValue;
 declare type LogAttributes = AnyValueMap;

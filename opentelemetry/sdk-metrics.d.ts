@@ -108,18 +108,18 @@ declare type LastValue = number;
 interface Histogram {
 	/**
 	* Buckets are implemented using two different arrays:
-	*  - boundaries: contains every finite bucket boundary, which are inclusive lower bounds
+	*  - boundaries: contains every finite bucket boundary, which are inclusive upper bounds
 	*  - counts: contains event counts for each bucket
 	*
 	* Note that we'll always have n+1 buckets, where n is the number of boundaries.
-	* This is because we need to count events that are below the lowest boundary.
+	* This is because we need to count events that are higher than the upper boundary.
 	*
 	* Example: if we measure the values: [5, 30, 5, 40, 5, 15, 15, 15, 25]
 	*  with the boundaries [ 10, 20, 30 ], we will have the following state:
 	*
 	* buckets: {
 	*	boundaries: [10, 20, 30],
-	*	counts: [3, 3, 1, 2],
+	*	counts: [3, 3, 2, 1],
 	* }
 	*/
 	buckets: {
@@ -1257,6 +1257,12 @@ declare class InMemoryMetricExporter implements PushMetricExporter {
 interface ConsoleMetricExporterOptions {
 	temporalitySelector?: AggregationTemporalitySelector;
 }
+/**
+ * This is an implementation of {@link PushMetricExporter} that prints metrics to the
+ * console. This class can be used for diagnostic purposes.
+ *
+ * NOTE: This {@link PushMetricExporter} is intended for diagnostics use only, output rendered to the console may change at any time.
+ */
 declare class ConsoleMetricExporter implements PushMetricExporter {
 	protected _shutdown: boolean;
 	protected _temporalitySelector: AggregationTemporalitySelector;

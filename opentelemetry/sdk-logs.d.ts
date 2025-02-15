@@ -185,6 +185,8 @@ interface LogRecordExporter {
 /**
  * This is implementation of {@link LogRecordExporter} that prints LogRecords to the
  * console. This class can be used for diagnostic purposes.
+ *
+ * NOTE: This {@link LogRecordExporter} is intended for diagnostics use only, output rendered to the console may change at any time.
  */
 declare class ConsoleLogRecordExporter implements LogRecordExporter {
 	/**

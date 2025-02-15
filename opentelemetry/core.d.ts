@@ -217,19 +217,6 @@ declare function parsePairKeyValue(entry: string): ParsedBaggageKeyValue | undef
  */
 declare function parseKeyPairsIntoRecord(value?: string): Record<string, string>;
 
-declare const utils_d_getKeyPairs: typeof getKeyPairs;
-declare const utils_d_parseKeyPairsIntoRecord: typeof parseKeyPairsIntoRecord;
-declare const utils_d_parsePairKeyValue: typeof parsePairKeyValue;
-declare const utils_d_serializeKeyPairs: typeof serializeKeyPairs;
-declare namespace utils_d {
-export {
-	utils_d_getKeyPairs as getKeyPairs,
-	utils_d_parseKeyPairsIntoRecord as parseKeyPairsIntoRecord,
-	utils_d_parsePairKeyValue as parsePairKeyValue,
-	utils_d_serializeKeyPairs as serializeKeyPairs,
-};
-}
-
 /**
  * Environment interface to define all names
  */
@@ -593,7 +580,7 @@ declare class BindOnceFuture<R, This = unknown, T extends (this: This, ...args: 
 	call(...args: Parameters<T>): Promise<R>;
 }
 
-declare const VERSION = "1.25.0";
+declare const VERSION = "1.26.0";
 
 interface Exporter<T> {
 	export(arg: T, resultCallback: (result: ExportResult) => void): void;
@@ -604,8 +591,15 @@ interface Exporter<T> {
  */
 declare function _export<T>(exporter: Exporter<T>, arg: T): Promise<ExportResult>;
 
+declare const baggageUtils: {
+	getKeyPairs: typeof getKeyPairs;
+	serializeKeyPairs: typeof serializeKeyPairs;
+	parseKeyPairsIntoRecord: typeof parseKeyPairsIntoRecord;
+	parsePairKeyValue: typeof parsePairKeyValue;
+};
+
 declare const internal: {
 	_export: typeof _export;
 };
 
-export { AlwaysOffSampler, AlwaysOnSampler, AnchoredClock, BindOnceFuture, Clock, CompositePropagator, CompositePropagatorConfig, DEFAULT_ATTRIBUTE_COUNT_LIMIT, DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT, DEFAULT_ENVIRONMENT, DEFAULT_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT, DEFAULT_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT, ENVIRONMENT, ErrorHandler, ExportResult, ExportResultCode, IdGenerator, InstrumentationLibrary, InstrumentationScope, ParentBasedSampler, RAW_ENVIRONMENT, RPCMetadata, RPCType, RandomIdGenerator, SDK_INFO, ShimWrapped, TRACE_PARENT_HEADER, TRACE_STATE_HEADER, TimeOriginLegacy, TimeoutError, TraceIdRatioBasedSampler, TraceState, TracesSamplerValues, VERSION, W3CBaggagePropagator, W3CTraceContextPropagator, _globalThis, addHrTimes, utils_d as baggageUtils, callWithTimeout, deleteRPCMetadata, getEnv, getEnvWithoutDefaults, getRPCMetadata, getTimeOrigin, globalErrorHandler, hexToBase64, hexToBinary, hrTime, hrTimeDuration, hrTimeToMicroseconds, hrTimeToMilliseconds, hrTimeToNanoseconds, hrTimeToTimeStamp, internal, isAttributeKey, isAttributeValue, isTimeInput, isTimeInputHrTime, isTracingSuppressed, isUrlIgnored, isWrapped, loggingErrorHandler, merge, millisToHrTime, otperformance, parseEnvironment, parseTraceParent, sanitizeAttributes, setGlobalErrorHandler, setRPCMetadata, suppressTracing, timeInputToHrTime, unrefTimer, unsuppressTracing, urlMatches };
+export { AlwaysOffSampler, AlwaysOnSampler, AnchoredClock, BindOnceFuture, Clock, CompositePropagator, CompositePropagatorConfig, DEFAULT_ATTRIBUTE_COUNT_LIMIT, DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT, DEFAULT_ENVIRONMENT, DEFAULT_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT, DEFAULT_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT, ENVIRONMENT, ErrorHandler, ExportResult, ExportResultCode, IdGenerator, InstrumentationLibrary, InstrumentationScope, ParentBasedSampler, RAW_ENVIRONMENT, RPCMetadata, RPCType, RandomIdGenerator, SDK_INFO, ShimWrapped, TRACE_PARENT_HEADER, TRACE_STATE_HEADER, TimeOriginLegacy, TimeoutError, TraceIdRatioBasedSampler, TraceState, TracesSamplerValues, VERSION, W3CBaggagePropagator, W3CTraceContextPropagator, _globalThis, addHrTimes, baggageUtils, callWithTimeout, deleteRPCMetadata, getEnv, getEnvWithoutDefaults, getRPCMetadata, getTimeOrigin, globalErrorHandler, hexToBase64, hexToBinary, hrTime, hrTimeDuration, hrTimeToMicroseconds, hrTimeToMilliseconds, hrTimeToNanoseconds, hrTimeToTimeStamp, internal, isAttributeKey, isAttributeValue, isTimeInput, isTimeInputHrTime, isTracingSuppressed, isUrlIgnored, isWrapped, loggingErrorHandler, merge, millisToHrTime, otperformance, parseEnvironment, parseTraceParent, sanitizeAttributes, setGlobalErrorHandler, setRPCMetadata, suppressTracing, timeInputToHrTime, unrefTimer, unsuppressTracing, urlMatches };

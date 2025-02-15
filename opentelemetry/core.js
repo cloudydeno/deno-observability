@@ -85,14 +85,6 @@ function parseKeyPairsIntoRecord(value) {
 	}, {});
 }
 
-var utils = /*#__PURE__*/Object.freeze({
-	__proto__: null,
-	getKeyPairs: getKeyPairs,
-	parseKeyPairsIntoRecord: parseKeyPairsIntoRecord,
-	parsePairKeyValue: parsePairKeyValue,
-	serializeKeyPairs: serializeKeyPairs
-});
-
 class W3CBaggagePropagator {
 	inject(context, carrier, setter) {
 		const baggage = propagation.getBaggage(context);
@@ -523,7 +515,7 @@ function getIdGenerator(bytes) {
 
 const otperformance = performance;
 
-const VERSION$1 = "1.25.0";
+const VERSION$1 = "1.26.0";
 
 const SDK_INFO = {
 	[SEMRESATTRS_TELEMETRY_SDK_NAME]: 'opentelemetry',
@@ -1200,8 +1192,14 @@ function _export(exporter, arg) {
 	});
 }
 
+const baggageUtils = {
+	getKeyPairs,
+	serializeKeyPairs,
+	parseKeyPairsIntoRecord,
+	parsePairKeyValue,
+};
 const internal = {
 	_export,
 };
 
-export { AlwaysOffSampler, AlwaysOnSampler, AnchoredClock, BindOnceFuture, CompositePropagator, DEFAULT_ATTRIBUTE_COUNT_LIMIT, DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT, DEFAULT_ENVIRONMENT, DEFAULT_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT, DEFAULT_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT, ExportResultCode, ParentBasedSampler, RPCType, RandomIdGenerator, SDK_INFO, TRACE_PARENT_HEADER, TRACE_STATE_HEADER, TimeoutError, TraceIdRatioBasedSampler, TraceState, TracesSamplerValues, VERSION$1 as VERSION, W3CBaggagePropagator, W3CTraceContextPropagator, _globalThis, addHrTimes, utils as baggageUtils, callWithTimeout, deleteRPCMetadata, getEnv, getEnvWithoutDefaults, getRPCMetadata, getTimeOrigin, globalErrorHandler, hexToBase64, hexToBinary, hrTime, hrTimeDuration, hrTimeToMicroseconds, hrTimeToMilliseconds, hrTimeToNanoseconds, hrTimeToTimeStamp, internal, isAttributeKey, isAttributeValue, isTimeInput, isTimeInputHrTime, isTracingSuppressed, isUrlIgnored, isWrapped, loggingErrorHandler, merge, millisToHrTime, otperformance, parseEnvironment, parseTraceParent, sanitizeAttributes, setGlobalErrorHandler, setRPCMetadata, suppressTracing, timeInputToHrTime, unrefTimer, unsuppressTracing, urlMatches };
+export { AlwaysOffSampler, AlwaysOnSampler, AnchoredClock, BindOnceFuture, CompositePropagator, DEFAULT_ATTRIBUTE_COUNT_LIMIT, DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT, DEFAULT_ENVIRONMENT, DEFAULT_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT, DEFAULT_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT, ExportResultCode, ParentBasedSampler, RPCType, RandomIdGenerator, SDK_INFO, TRACE_PARENT_HEADER, TRACE_STATE_HEADER, TimeoutError, TraceIdRatioBasedSampler, TraceState, TracesSamplerValues, VERSION$1 as VERSION, W3CBaggagePropagator, W3CTraceContextPropagator, _globalThis, addHrTimes, baggageUtils, callWithTimeout, deleteRPCMetadata, getEnv, getEnvWithoutDefaults, getRPCMetadata, getTimeOrigin, globalErrorHandler, hexToBase64, hexToBinary, hrTime, hrTimeDuration, hrTimeToMicroseconds, hrTimeToMilliseconds, hrTimeToNanoseconds, hrTimeToTimeStamp, internal, isAttributeKey, isAttributeValue, isTimeInput, isTimeInputHrTime, isTracingSuppressed, isUrlIgnored, isWrapped, loggingErrorHandler, merge, millisToHrTime, otperformance, parseEnvironment, parseTraceParent, sanitizeAttributes, setGlobalErrorHandler, setRPCMetadata, suppressTracing, timeInputToHrTime, unrefTimer, unsuppressTracing, urlMatches };
