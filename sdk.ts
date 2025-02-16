@@ -13,7 +13,7 @@ import {
 
 // The SDKs for each signal
 import { BasicTracerProvider, BatchSpanProcessor, SpanExporter, type IdGenerator, type Sampler } from "./opentelemetry/sdk-trace-base.js";
-import { MeterProvider, PeriodicExportingMetricReader, type View } from "./opentelemetry/sdk-metrics.js";
+import { MeterProvider, PeriodicExportingMetricReader, PushMetricExporter, type View } from "./opentelemetry/sdk-metrics.js";
 import { BatchLogRecordProcessor, LogRecordExporter, LoggerProvider } from "./opentelemetry/sdk-logs.js";
 
 // OTLP JSON exporters for each signal
@@ -56,9 +56,8 @@ export class DenoTelemetrySdk {
     sampler?: Sampler;
     metricsExportIntervalMillis?: number;
     metricsViews?: View[];
-    otlpEndpointBase?: string;
     tracesExporter?: SpanExporter;
-    // metricsExporter?: ;
+    metricsExporter?: PushMetricExporter;
     logsExporter?: LogRecordExporter;
   }) {
 
@@ -98,8 +97,8 @@ export class DenoTelemetrySdk {
       // Metrics export on a fixed timer, so make the user opt-in to them
       readers: ((props?.metricsExportIntervalMillis ?? 0) > 0) ? [
         new PeriodicExportingMetricReader({
-          exporter: new OTLPMetricExporter(),
-          exportIntervalMillis: props?.metricsExportIntervalMillis,
+          exporter: props?.metricsExporter ?? new OTLPMetricExporter(),
+          exportIntervalMillis: props.metricsExportIntervalMillis,
         })
       ] : [],
     });
