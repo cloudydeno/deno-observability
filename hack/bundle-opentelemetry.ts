@@ -254,8 +254,12 @@ export function convertLegacyHttpOptions(
 }
 `);
 
-// Delete tests that can't typetype without node-specific HttpAgent fields
 for (const file of [
+  // Delete tests that want protobuf generated files
+  'experimental/packages/otlp-transformer/test/logs.test.ts',
+  'experimental/packages/otlp-transformer/test/metrics.test.ts',
+  'experimental/packages/otlp-transformer/test/trace.test.ts',
+  // Delete tests that can't typetype without node-specific HttpAgent fields
   'experimental/packages/otlp-exporter-base/test/node/configuration/convert-legacy-node-otlp-http-options.test.ts',
   'experimental/packages/otlp-exporter-base/test/node/otlp-http-export-delegate.test.ts',
   'experimental/packages/otlp-exporter-base/test/node/http-exporter-transport.test.ts',
