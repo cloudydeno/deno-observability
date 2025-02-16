@@ -36,8 +36,10 @@ jobs:
     - name: Cache https://
       uses: actions/cache@v4
       with:
-        path: ~/.cache/deno/deps/https
-        key: deno-https/v1-${{ github.sha }}
+        path: |
+          ~/.cache/deno/deps/https
+          ~/.cache/deno/remote/https
+        key: deno/${{ matrix.deno-version }}-https/v1-${{ github.sha }}
         restore-keys: deno-https/v1-
 
     - name: Check demo.ts
