@@ -130,7 +130,11 @@ class Span {
 	setStatus(status) {
 		if (this._isSpanEnded())
 			return this;
-		this.status = status;
+		this.status = { ...status };
+		if (this.status.message != null && typeof status.message !== 'string') {
+			diag.warn(`Dropping invalid status.message of type '${typeof status.message}', expected 'string'`);
+			delete this.status.message;
+		}
 		return this;
 	}
 	updateName(name) {
@@ -158,7 +162,7 @@ class Span {
 		this._spanProcessor.onEnd(this);
 	}
 	_getTime(inp) {
-		if (typeof inp === 'number' && inp < otperformance.now()) {
+		if (typeof inp === 'number' && inp <= otperformance.now()) {
 			return hrTime(inp + this._performanceOffset);
 		}
 		if (typeof inp === 'number') {
@@ -231,7 +235,7 @@ class Span {
 		if (value.length <= limit) {
 			return value;
 		}
-		return value.substr(0, limit);
+		return value.substring(0, limit);
 	}
 	_truncateToSize(value) {
 		const limit = this._attributeValueLengthLimit;
@@ -367,6 +371,7 @@ function loadDefaultConfig() {
 			attributePerEventCountLimit: _env.OTEL_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT,
 			attributePerLinkCountLimit: _env.OTEL_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT,
 		},
+		mergeResourceWithDefaults: true,
 	};
 }
 function buildSamplerFromEnv(environment = getEnv()) {
@@ -797,17 +802,25 @@ class BasicTracerProvider {
 		this._tracers = new Map();
 		const mergedConfig = merge({}, loadDefaultConfig(), reconfigureLimits(config));
 		this.resource = mergedConfig.resource ?? Resource.empty();
-		this.resource = Resource.default().merge(this.resource);
+		if (mergedConfig.mergeResourceWithDefaults) {
+			this.resource = Resource.default().merge(this.resource);
+		}
 		this._config = Object.assign({}, mergedConfig, {
 			resource: this.resource,
 		});
-		const defaultExporter = this._buildExporterFromEnv();
-		if (defaultExporter !== undefined) {
-			const batchProcessor = new BatchSpanProcessor(defaultExporter);
-			this.activeSpanProcessor = batchProcessor;
+		if (config.spanProcessors?.length) {
+			this._registeredSpanProcessors = [...config.spanProcessors];
+			this.activeSpanProcessor = new MultiSpanProcessor(this._registeredSpanProcessors);
 		}
 		else {
-			this.activeSpanProcessor = new NoopSpanProcessor();
+			const defaultExporter = this._buildExporterFromEnv();
+			if (defaultExporter !== undefined) {
+				const batchProcessor = new BatchSpanProcessor(defaultExporter);
+				this.activeSpanProcessor = batchProcessor;
+			}
+			else {
+				this.activeSpanProcessor = new NoopSpanProcessor();
+			}
 		}
 	}
 	getTracer(name, version, options) {

@@ -1,7 +1,6 @@
 import { DiagConsoleLogger, type TextMapPropagator, diag, metrics, Attributes, DiagLogger } from "./opentelemetry/api.js";
 import { logs } from "./opentelemetry/api-logs.js";
 
-import { OTLPMetricExporterBase } from "./opentelemetry/exporter-metrics-otlp-http.js";
 import { type Instrumentation, registerInstrumentations } from "./opentelemetry/instrumentation.js";
 
 import {
@@ -17,6 +16,11 @@ import { BasicTracerProvider, BatchSpanProcessor, SpanExporter, type IdGenerator
 import { MeterProvider, PeriodicExportingMetricReader, type View } from "./opentelemetry/sdk-metrics.js";
 import { BatchLogRecordProcessor, LogRecordExporter, LoggerProvider } from "./opentelemetry/sdk-logs.js";
 
+// OTLP JSON exporters for each signal
+import { OTLPLogExporter } from "./opentelemetry/exporter-logs-otlp-http.js";
+import { OTLPMetricExporter } from "./opentelemetry/exporter-metrics-otlp-http.js";
+import { OTLPTraceExporter } from "./opentelemetry/exporter-trace-otlp-http.js";
+
 // Our Deno-specific implementations
 import {
   DenoDeployDetector,
@@ -26,11 +30,6 @@ import {
 import {
   DenoAsyncHooksContextManager,
 } from "./otel-platform/context-manager.ts";
-import {
-  OTLPTracesExporter,
-  OTLPMetricsExporter,
-  OTLPLogsExporter,
-} from "./otel-platform/otlp-json-exporters.ts";
 
 import { getEnv } from "./opentelemetry/core.js";
 import { getDenoAutoInstrumentations } from "./instrumentation/auto.ts";
@@ -91,9 +90,7 @@ export class DenoTelemetrySdk {
     });
 
     this.tracer.addSpanProcessor(new BatchSpanProcessor(props?.tracesExporter
-      ?? new OTLPTracesExporter({
-        resourceBase: props?.otlpEndpointBase,
-      })));
+      ?? new OTLPTraceExporter()));
 
     this.meter = new MeterProvider({
       resource: this.resource,
@@ -101,9 +98,7 @@ export class DenoTelemetrySdk {
       // Metrics export on a fixed timer, so make the user opt-in to them
       readers: ((props?.metricsExportIntervalMillis ?? 0) > 0) ? [
         new PeriodicExportingMetricReader({
-          exporter: new OTLPMetricExporterBase(new OTLPMetricsExporter({
-            resourceBase: props?.otlpEndpointBase,
-          })),
+          exporter: new OTLPMetricExporter(),
           exportIntervalMillis: props?.metricsExportIntervalMillis,
         })
       ] : [],
@@ -116,9 +111,7 @@ export class DenoTelemetrySdk {
     logs.setGlobalLoggerProvider(this.logger);
 
     this.logger.addLogRecordProcessor(new BatchLogRecordProcessor(props?.logsExporter
-      ?? new OTLPLogsExporter({
-        resourceBase: props?.otlpEndpointBase,
-      })));
+      ?? new OTLPLogExporter()));
 
     registerInstrumentations({
       tracerProvider: this.tracer,

@@ -363,6 +363,7 @@ const detectResourcesSync = (config = {}) => {
 			if (isPromiseLike(resourceOrPromise)) {
 				const createPromise = async () => {
 					const resolvedResource = await resourceOrPromise;
+					await resolvedResource.waitForAsyncAttributes?.();
 					return resolvedResource.attributes;
 				};
 				resource = new Resource({}, createPromise());

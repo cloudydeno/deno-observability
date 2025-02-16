@@ -56,6 +56,45 @@ class NoopLoggerProvider {
 }
 const NOOP_LOGGER_PROVIDER = new NoopLoggerProvider();
 
+class ProxyLogger {
+	constructor(_provider, name, version, options) {
+		this._provider = _provider;
+		this.name = name;
+		this.version = version;
+		this.options = options;
+	}
+	emit(logRecord) {
+		this._getLogger().emit(logRecord);
+	}
+	_getLogger() {
+		if (this._delegate) {
+			return this._delegate;
+		}
+		const logger = this._provider.getDelegateLogger(this.name, this.version, this.options);
+		if (!logger) {
+			return NOOP_LOGGER;
+		}
+		this._delegate = logger;
+		return this._delegate;
+	}
+}
+
+class ProxyLoggerProvider {
+	getLogger(name, version, options) {
+		return (this.getDelegateLogger(name, version, options) ??
+			new ProxyLogger(this, name, version, options));
+	}
+	getDelegate() {
+		return this._delegate ?? NOOP_LOGGER_PROVIDER;
+	}
+	setDelegate(delegate) {
+		this._delegate = delegate;
+	}
+	getDelegateLogger(name, version, options) {
+		return this._delegate?.getLogger(name, version, options);
+	}
+}
+
 const _globalThis = typeof globalThis === 'object' ? globalThis : global;
 
 const GLOBAL_LOGS_API_KEY = Symbol.for('io.opentelemetry.js.api.logs');
@@ -66,7 +105,9 @@ function makeGetter(requiredVersion, instance, fallback) {
 const API_BACKWARDS_COMPATIBILITY_VERSION = 1;
 
 class LogsAPI {
-	constructor() { }
+	constructor() {
+		this._proxyLoggerProvider = new ProxyLoggerProvider();
+	}
 	static getInstance() {
 		if (!this._instance) {
 			this._instance = new LogsAPI();
@@ -78,20 +119,22 @@ class LogsAPI {
 			return this.getLoggerProvider();
 		}
 		_global[GLOBAL_LOGS_API_KEY] = makeGetter(API_BACKWARDS_COMPATIBILITY_VERSION, provider, NOOP_LOGGER_PROVIDER);
+		this._proxyLoggerProvider.setDelegate(provider);
 		return provider;
 	}
 	getLoggerProvider() {
 		return (_global[GLOBAL_LOGS_API_KEY]?.(API_BACKWARDS_COMPATIBILITY_VERSION) ??
-			NOOP_LOGGER_PROVIDER);
+			this._proxyLoggerProvider);
 	}
 	getLogger(name, version, options) {
 		return this.getLoggerProvider().getLogger(name, version, options);
 	}
 	disable() {
 		delete _global[GLOBAL_LOGS_API_KEY];
+		this._proxyLoggerProvider = new ProxyLoggerProvider();
 	}
 }
 
 const logs = LogsAPI.getInstance();
 
-export { NOOP_LOGGER, NOOP_LOGGER_PROVIDER, NoopLogger, NoopLoggerProvider, SeverityNumber, logs };
+export { NOOP_LOGGER, NOOP_LOGGER_PROVIDER, NoopLogger, NoopLoggerProvider, ProxyLogger, ProxyLoggerProvider, SeverityNumber, logs };

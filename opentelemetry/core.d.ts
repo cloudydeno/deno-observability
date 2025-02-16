@@ -228,7 +228,7 @@ declare const ENVIRONMENT_NUMBERS_KEYS: readonly ["OTEL_BSP_EXPORT_TIMEOUT", "OT
 declare type ENVIRONMENT_NUMBERS = {
 	[K in (typeof ENVIRONMENT_NUMBERS_KEYS)[number]]?: number;
 };
-declare const ENVIRONMENT_LISTS_KEYS: readonly ["OTEL_NO_PATCH_MODULES", "OTEL_PROPAGATORS"];
+declare const ENVIRONMENT_LISTS_KEYS: readonly ["OTEL_NO_PATCH_MODULES", "OTEL_PROPAGATORS", "OTEL_SEMCONV_STABILITY_OPT_IN"];
 declare type ENVIRONMENT_LISTS = {
 	[K in (typeof ENVIRONMENT_LISTS_KEYS)[number]]?: string[];
 };
@@ -580,7 +580,7 @@ declare class BindOnceFuture<R, This = unknown, T extends (this: This, ...args: 
 	call(...args: Parameters<T>): Promise<R>;
 }
 
-declare const VERSION = "1.26.0";
+declare const VERSION = "1.29.0";
 
 interface Exporter<T> {
 	export(arg: T, resultCallback: (result: ExportResult) => void): void;

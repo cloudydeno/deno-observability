@@ -146,8 +146,43 @@ declare class NoopLoggerProvider implements LoggerProvider {
 }
 declare const NOOP_LOGGER_PROVIDER: NoopLoggerProvider;
 
+declare class ProxyLogger implements Logger {
+	private _provider;
+	readonly name: string;
+	readonly version?: string | undefined;
+	readonly options?: LoggerOptions | undefined;
+	private _delegate?;
+	constructor(_provider: LoggerDelegator, name: string, version?: string | undefined, options?: LoggerOptions | undefined);
+	/**
+	* Emit a log record. This method should only be used by log appenders.
+	*
+	* @param logRecord
+	*/
+	emit(logRecord: LogRecord): void;
+	/**
+	* Try to get a logger from the proxy logger provider.
+	* If the proxy logger provider has no delegate, return a noop logger.
+	*/
+	private _getLogger;
+}
+interface LoggerDelegator {
+	getDelegateLogger(name: string, version?: string, options?: LoggerOptions): Logger | undefined;
+}
+
+declare class ProxyLoggerProvider implements LoggerProvider {
+	private _delegate?;
+	getLogger(name: string, version?: string | undefined, options?: LoggerOptions | undefined): Logger;
+	getDelegate(): LoggerProvider;
+	/**
+	* Set the delegate logger provider
+	*/
+	setDelegate(delegate: LoggerProvider): void;
+	getDelegateLogger(name: string, version?: string | undefined, options?: LoggerOptions | undefined): Logger | undefined;
+}
+
 declare class LogsAPI {
 	private static _instance?;
+	private _proxyLoggerProvider;
 	private constructor();
 	static getInstance(): LogsAPI;
 	setGlobalLoggerProvider(provider: LoggerProvider): LoggerProvider;
@@ -169,4 +204,4 @@ declare class LogsAPI {
 
 declare const logs: LogsAPI;
 
-export { AnyValue, AnyValueMap, LogAttributes, LogBody, LogRecord, Logger, LoggerOptions, LoggerProvider, NOOP_LOGGER, NOOP_LOGGER_PROVIDER, NoopLogger, NoopLoggerProvider, SeverityNumber, logs };
+export { AnyValue, AnyValueMap, LogAttributes, LogBody, LogRecord, Logger, LoggerOptions, LoggerProvider, NOOP_LOGGER, NOOP_LOGGER_PROVIDER, NoopLogger, NoopLoggerProvider, ProxyLogger, ProxyLoggerProvider, SeverityNumber, logs };

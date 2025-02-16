@@ -295,6 +295,7 @@ function isEnvVarANumber(key) {
 const ENVIRONMENT_LISTS_KEYS = [
 	'OTEL_NO_PATCH_MODULES',
 	'OTEL_PROPAGATORS',
+	'OTEL_SEMCONV_STABILITY_OPT_IN',
 ];
 function isEnvVarAList(key) {
 	return ENVIRONMENT_LISTS_KEYS.indexOf(key) > -1;
@@ -381,6 +382,7 @@ const DEFAULT_ENVIRONMENT = {
 	OTEL_EXPORTER_OTLP_METRICS_PROTOCOL: 'http/protobuf',
 	OTEL_EXPORTER_OTLP_LOGS_PROTOCOL: 'http/protobuf',
 	OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE: 'cumulative',
+	OTEL_SEMCONV_STABILITY_OPT_IN: [],
 };
 function parseBoolean(key, environment, values) {
 	if (typeof values[key] === 'undefined') {
@@ -515,7 +517,7 @@ function getIdGenerator(bytes) {
 
 const otperformance = performance;
 
-const VERSION$1 = "1.26.0";
+const VERSION$1 = "1.29.0";
 
 const SDK_INFO = {
 	[SEMRESATTRS_TELEMETRY_SDK_NAME]: 'opentelemetry',
@@ -582,7 +584,7 @@ function hrTimeDuration(startTime, endTime) {
 function hrTimeToTimeStamp(time) {
 	const precision = NANOSECOND_DIGITS;
 	const tmp = `${'0'.repeat(precision)}${time[1]}Z`;
-	const nanoString = tmp.substr(tmp.length - precision - 1);
+	const nanoString = tmp.substring(tmp.length - precision - 1);
 	const date = new Date(time[0] * 1000).toISOString();
 	return date.replace('000Z', nanoString);
 }
@@ -644,7 +646,7 @@ class CompositePropagator {
 				return propagator.extract(ctx, carrier, getter);
 			}
 			catch (err) {
-				diag.warn(`Failed to inject with ${propagator.constructor.name}. Err: ${err.message}`);
+				diag.warn(`Failed to extract with ${propagator.constructor.name}. Err: ${err.message}`);
 			}
 			return ctx;
 		}, context);

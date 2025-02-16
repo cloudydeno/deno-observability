@@ -29,6 +29,9 @@ const test2 = myMeter.createHistogram('test2', { valueType: ValueType.DOUBLE });
 async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url);
   console.log(req.method, url.pathname);
+  logger.emit({
+    body: `${req.method} ${url.pathname}`,
+  });
 
   test3.add(1, {[ATTR_HTTP_METHOD]: req.method});
   test2.record(50+Math.round(Math.random()*25), {[ATTR_HTTP_METHOD]: req.method});

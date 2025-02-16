@@ -15,7 +15,7 @@
  */
 
 import * as api from './api.d.ts';
-import { SpanAttributes, TraceState, Context, SpanKind, Link, TextMapPropagator, ContextManager, HrTime, SpanContext, SpanStatus, TracerProvider, Span as Span$1, TimeInput, SpanAttributeValue, Exception } from './api.d.ts';
+import { SpanAttributes, TraceState, Context, SpanKind, Link, HrTime, SpanContext, SpanStatus, Span as Span$1, TimeInput, SpanAttributeValue, Exception, TextMapPropagator, ContextManager, TracerProvider } from './api.d.ts';
 import { InstrumentationLibrary, ExportResult } from './core.d.ts';
 import { IResource } from './resources.d.ts';
 
@@ -97,86 +97,6 @@ interface Sampler {
 }
 
 /**
- * TracerConfig provides an interface for configuring a Basic Tracer.
- */
-interface TracerConfig {
-	/**
-	* Sampler determines if a span should be recorded or should be a NoopSpan.
-	*/
-	sampler?: Sampler;
-	/** General Limits */
-	generalLimits?: GeneralLimits;
-	/** Span Limits */
-	spanLimits?: SpanLimits;
-	/** Resource associated with trace telemetry  */
-	resource?: IResource;
-	/**
-	* Generator of trace and span IDs
-	* The default idGenerator generates random ids
-	*/
-	idGenerator?: IdGenerator;
-	/**
-	* How long the forceFlush can run before it is cancelled.
-	* The default value is 30000ms
-	*/
-	forceFlushTimeoutMillis?: number;
-}
-/**
- * Configuration options for registering the API with the SDK.
- * Undefined values may be substituted for defaults, and null
- * values will not be registered.
- */
-interface SDKRegistrationConfig {
-	/** Propagator to register as the global propagator */
-	propagator?: TextMapPropagator | null;
-	/** Context manager to register as the global context manager */
-	contextManager?: ContextManager | null;
-}
-/** Global configuration limits of trace service */
-interface GeneralLimits {
-	/** attributeValueLengthLimit is maximum allowed attribute value size */
-	attributeValueLengthLimit?: number;
-	/** attributeCountLimit is number of attributes per trace */
-	attributeCountLimit?: number;
-}
-/** Global configuration of trace service */
-interface SpanLimits {
-	/** attributeValueLengthLimit is maximum allowed attribute value size */
-	attributeValueLengthLimit?: number;
-	/** attributeCountLimit is number of attributes per span */
-	attributeCountLimit?: number;
-	/** linkCountLimit is number of links per span */
-	linkCountLimit?: number;
-	/** eventCountLimit is number of message events per span */
-	eventCountLimit?: number;
-	/** attributePerEventCountLimit is the maximum number of attributes allowed per span event */
-	attributePerEventCountLimit?: number;
-	/** attributePerLinkCountLimit is the maximum number of attributes allowed per span link */
-	attributePerLinkCountLimit?: number;
-}
-/** Interface configuration for a buffer. */
-interface BufferConfig {
-	/** The maximum batch size of every export. It must be smaller or equal to
-	* maxQueueSize. The default value is 512. */
-	maxExportBatchSize?: number;
-	/** The delay interval in milliseconds between two consecutive exports.
-	*  The default value is 5000ms. */
-	scheduledDelayMillis?: number;
-	/** How long the export can run before it is cancelled.
-	* The default value is 30000ms */
-	exportTimeoutMillis?: number;
-	/** The maximum queue size. After the size is reached spans are dropped.
-	* The default value is 2048. */
-	maxQueueSize?: number;
-}
-/** Interface configuration for BatchSpanProcessor on browser */
-interface BatchSpanProcessorBrowserConfig extends BufferConfig {
-	/** Disable flush when a user navigates to a new page, closes the tab or the browser, or,
-	* on mobile, switches to a different app. Auto flush is enabled by default. */
-	disableAutoFlushOnDocumentHide?: boolean;
-}
-
-/**
  * Represents a timed event.
  * A timed event is an event with a timestamp.
  */
@@ -208,77 +128,6 @@ interface ReadableSpan {
 	readonly droppedAttributesCount: number;
 	readonly droppedEventsCount: number;
 	readonly droppedLinksCount: number;
-}
-
-/**
- * An interface that allows different tracing services to export recorded data
- * for sampled spans in their own format.
- *
- * To export data this MUST be register to the Tracer SDK using a optional
- * config.
- */
-interface SpanExporter {
-	/**
-	* Called to export sampled {@link ReadableSpan}s.
-	* @param spans the list of sampled Spans to be exported.
-	*/
-	export(spans: ReadableSpan[], resultCallback: (result: ExportResult) => void): void;
-	/** Stops the exporter. */
-	shutdown(): Promise<void>;
-	/** Immediately export all spans */
-	forceFlush?(): Promise<void>;
-}
-
-declare type PROPAGATOR_FACTORY = () => TextMapPropagator;
-declare type EXPORTER_FACTORY = () => SpanExporter;
-declare enum ForceFlushState {
-	'resolved' = 0,
-	'timeout' = 1,
-	'error' = 2,
-	'unresolved' = 3
-}
-/**
- * This class represents a basic tracer provider which platform libraries can extend
- */
-declare class BasicTracerProvider implements TracerProvider {
-	protected static readonly _registeredPropagators: Map<string, PROPAGATOR_FACTORY>;
-	protected static readonly _registeredExporters: Map<string, EXPORTER_FACTORY>;
-	private readonly _config;
-	private readonly _registeredSpanProcessors;
-	private readonly _tracers;
-	activeSpanProcessor: SpanProcessor;
-	readonly resource: IResource;
-	constructor(config?: TracerConfig);
-	getTracer(name: string, version?: string, options?: {
-		schemaUrl?: string;
-	}): Tracer;
-	/**
-	* Adds a new {@link SpanProcessor} to this tracer.
-	* @param spanProcessor the new SpanProcessor to be added.
-	*/
-	addSpanProcessor(spanProcessor: SpanProcessor): void;
-	getActiveSpanProcessor(): SpanProcessor;
-	/**
-	* Register this TracerProvider for use with the OpenTelemetry API.
-	* Undefined values may be replaced with defaults, and
-	* null values will be skipped.
-	*
-	* @param config Configuration object for SDK registration
-	*/
-	register(config?: SDKRegistrationConfig): void;
-	forceFlush(): Promise<void>;
-	shutdown(): Promise<void>;
-	/**
-	* TS cannot yet infer the type of this.constructor:
-	* https://github.com/Microsoft/TypeScript/issues/3841#issuecomment-337560146
-	* There is no need to override either of the getters in your child class.
-	* The type of the registered component maps should be the same across all
-	* classes in the inheritance tree.
-	*/
-	protected _getPropagator(name: string): TextMapPropagator | undefined;
-	protected _getSpanExporter(name: string): SpanExporter | undefined;
-	protected _buildPropagatorFromEnv(): TextMapPropagator | undefined;
-	protected _buildExporterFromEnv(): SpanExporter | undefined;
 }
 
 /**
@@ -382,6 +231,167 @@ interface SpanProcessor {
 	* opportunity for processor to do any cleanup required.
 	*/
 	shutdown(): Promise<void>;
+}
+
+/**
+ * TracerConfig provides an interface for configuring a Basic Tracer.
+ */
+interface TracerConfig {
+	/**
+	* Sampler determines if a span should be recorded or should be a NoopSpan.
+	*/
+	sampler?: Sampler;
+	/** General Limits */
+	generalLimits?: GeneralLimits;
+	/** Span Limits */
+	spanLimits?: SpanLimits;
+	/**
+	* Merge resource with {@link Resource.default()}?
+	* Default: {@code true}
+	**/
+	mergeResourceWithDefaults?: boolean;
+	/** Resource associated with trace telemetry  */
+	resource?: IResource;
+	/**
+	* Generator of trace and span IDs
+	* The default idGenerator generates random ids
+	*/
+	idGenerator?: IdGenerator;
+	/**
+	* How long the forceFlush can run before it is cancelled.
+	* The default value is 30000ms
+	*/
+	forceFlushTimeoutMillis?: number;
+	/**
+	* List of SpanProcessor for the tracer
+	*/
+	spanProcessors?: SpanProcessor[];
+}
+/**
+ * Configuration options for registering the API with the SDK.
+ * Undefined values may be substituted for defaults, and null
+ * values will not be registered.
+ */
+interface SDKRegistrationConfig {
+	/** Propagator to register as the global propagator */
+	propagator?: TextMapPropagator | null;
+	/** Context manager to register as the global context manager */
+	contextManager?: ContextManager | null;
+}
+/** Global configuration limits of trace service */
+interface GeneralLimits {
+	/** attributeValueLengthLimit is maximum allowed attribute value size */
+	attributeValueLengthLimit?: number;
+	/** attributeCountLimit is number of attributes per trace */
+	attributeCountLimit?: number;
+}
+/** Global configuration of trace service */
+interface SpanLimits {
+	/** attributeValueLengthLimit is maximum allowed attribute value size */
+	attributeValueLengthLimit?: number;
+	/** attributeCountLimit is number of attributes per span */
+	attributeCountLimit?: number;
+	/** linkCountLimit is number of links per span */
+	linkCountLimit?: number;
+	/** eventCountLimit is number of message events per span */
+	eventCountLimit?: number;
+	/** attributePerEventCountLimit is the maximum number of attributes allowed per span event */
+	attributePerEventCountLimit?: number;
+	/** attributePerLinkCountLimit is the maximum number of attributes allowed per span link */
+	attributePerLinkCountLimit?: number;
+}
+/** Interface configuration for a buffer. */
+interface BufferConfig {
+	/** The maximum batch size of every export. It must be smaller or equal to
+	* maxQueueSize. The default value is 512. */
+	maxExportBatchSize?: number;
+	/** The delay interval in milliseconds between two consecutive exports.
+	*  The default value is 5000ms. */
+	scheduledDelayMillis?: number;
+	/** How long the export can run before it is cancelled.
+	* The default value is 30000ms */
+	exportTimeoutMillis?: number;
+	/** The maximum queue size. After the size is reached spans are dropped.
+	* The default value is 2048. */
+	maxQueueSize?: number;
+}
+/** Interface configuration for BatchSpanProcessor on browser */
+interface BatchSpanProcessorBrowserConfig extends BufferConfig {
+	/** Disable flush when a user navigates to a new page, closes the tab or the browser, or,
+	* on mobile, switches to a different app. Auto flush is enabled by default. */
+	disableAutoFlushOnDocumentHide?: boolean;
+}
+
+/**
+ * An interface that allows different tracing services to export recorded data
+ * for sampled spans in their own format.
+ *
+ * To export data this MUST be register to the Tracer SDK using a optional
+ * config.
+ */
+interface SpanExporter {
+	/**
+	* Called to export sampled {@link ReadableSpan}s.
+	* @param spans the list of sampled Spans to be exported.
+	*/
+	export(spans: ReadableSpan[], resultCallback: (result: ExportResult) => void): void;
+	/** Stops the exporter. */
+	shutdown(): Promise<void>;
+	/** Immediately export all spans */
+	forceFlush?(): Promise<void>;
+}
+
+declare type PROPAGATOR_FACTORY = () => TextMapPropagator;
+declare type EXPORTER_FACTORY = () => SpanExporter;
+declare enum ForceFlushState {
+	'resolved' = 0,
+	'timeout' = 1,
+	'error' = 2,
+	'unresolved' = 3
+}
+/**
+ * This class represents a basic tracer provider which platform libraries can extend
+ */
+declare class BasicTracerProvider implements TracerProvider {
+	protected static readonly _registeredPropagators: Map<string, PROPAGATOR_FACTORY>;
+	protected static readonly _registeredExporters: Map<string, EXPORTER_FACTORY>;
+	private readonly _config;
+	private readonly _registeredSpanProcessors;
+	private readonly _tracers;
+	activeSpanProcessor: SpanProcessor;
+	readonly resource: IResource;
+	constructor(config?: TracerConfig);
+	getTracer(name: string, version?: string, options?: {
+		schemaUrl?: string;
+	}): Tracer;
+	/**
+	* @deprecated please use {@link TracerConfig} spanProcessors property
+	* Adds a new {@link SpanProcessor} to this tracer.
+	* @param spanProcessor the new SpanProcessor to be added.
+	*/
+	addSpanProcessor(spanProcessor: SpanProcessor): void;
+	getActiveSpanProcessor(): SpanProcessor;
+	/**
+	* Register this TracerProvider for use with the OpenTelemetry API.
+	* Undefined values may be replaced with defaults, and
+	* null values will be skipped.
+	*
+	* @param config Configuration object for SDK registration
+	*/
+	register(config?: SDKRegistrationConfig): void;
+	forceFlush(): Promise<void>;
+	shutdown(): Promise<void>;
+	/**
+	* TS cannot yet infer the type of this.constructor:
+	* https://github.com/Microsoft/TypeScript/issues/3841#issuecomment-337560146
+	* There is no need to override either of the getters in your child class.
+	* The type of the registered component maps should be the same across all
+	* classes in the inheritance tree.
+	*/
+	protected _getPropagator(name: string): TextMapPropagator | undefined;
+	protected _getSpanExporter(name: string): SpanExporter | undefined;
+	protected _buildPropagatorFromEnv(): TextMapPropagator | undefined;
+	protected _buildExporterFromEnv(): SpanExporter | undefined;
 }
 
 /**

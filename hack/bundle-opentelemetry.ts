@@ -10,10 +10,10 @@ import dts from 'npm:rollup-plugin-dts@4.2.3';
 async function buildModuleWithRollup(directory: string, modName: string, external: string[]) {
 
   let entrypoint = 'index';
-  // Treat semantic-conventions differently, at least for now
-  if (modName == 'semantic-conventions') {
-    entrypoint = 'index-incubating';
-  }
+  // // Treat semantic-conventions differently, at least for now
+  // if (modName == 'semantic-conventions') {
+  //   entrypoint = 'index-incubating';
+  // }
 
   const mainFile = await Deno.readTextFile(directory+'/build/esnext/'+entrypoint+'.js');
   const licenseComment = mainFile.startsWith('/*') ? mainFile.slice(0, mainFile.indexOf('*/')+3) : '';
@@ -95,6 +95,8 @@ async function buildModuleWithRollup(directory: string, modName: string, externa
     text = text.replace(` randomUUID()`, ` crypto.randomUUID()`);
     text = text.replace(`typeof process !== 'undefined' && process && process.env\n        ? parseEnvironment(process.env)\n        : parseEnvironment(_globalThis$1);`, `parseEnvironment(Deno.env.toObject())`);
     text = text.replaceAll(`(process.env)`, `(Deno.env.toObject())`);
+    text = text.replaceAll(/process\.env\[([^\]]+)\]/g, (_, x) => `Deno.env.get(${x})`);
+    text = text.replaceAll(/process\.env\.([A-Z_]+)/g, (_, x) => `Deno.env.get('${x}')`);
     text = text.replace(`os.hostname()`, `Deno.hostname?.()`);
     text = text.replace("${process.argv0}", "deno");
     text = text.replace("import * as shimmer from 'npm:shimmer';", "import shimmer from 'npm:shimmer';");
@@ -108,6 +110,7 @@ async function buildModuleWithRollup(directory: string, modName: string, externa
     text = text.replace("HOST_NAME]: hostname(),", "HOST_NAME]: Deno.hostname?.(),");
     text = text.replace("OS_VERSION]: release(),", "OS_VERSION]: Deno.osRelease?.(),");
     text = text.replace("fs.readFile(", "Deno.readTextFile(");
+    text = text.replace("http.AgentOptions | https.AgentOptions", "never"); // TODO: replace this functionality with Deno.HttpClient arg
     text = text.replaceAll(/^  +/gm, x => '\t\t\t\t\t\t\t\t'.slice(0, Math.floor(x.length / 4)));
 
     await Deno.writeTextFile('opentelemetry/'+chunk.fileName, text);
@@ -155,7 +158,7 @@ export const getMachineId = {
 
 await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-resources/src/detectors/platform/node/machine-id/execAsync.ts',
 `export async function execAsync(command: string) {
-  const [cmd, ...args] = command.replaceAll('"', '').split(' ');
+  const [cmd, ...args] = command.replace(/"/g, '').split(' ');
   // @ts-expect-error TODO: Deno types in tsc
   const output = await new Deno.Command(cmd, {
     args,
@@ -166,16 +169,18 @@ await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-resources
 }
 `);
 
-// TODO: maybe put a deno impl in there?
-await Deno.remove('hack/opentelemetry-js/experimental/packages/opentelemetry-exporter-metrics-otlp-http/src/platform', {recursive: true})
-  .catch(err => err instanceof Deno.errors.NotFound ? null : Promise.reject(err));
-await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/otlp-exporter-base/src/platform/index.ts', 'export {};');
+// // TODO: maybe put a deno impl in there?
+// await Deno.remove('hack/opentelemetry-js/experimental/packages/opentelemetry-exporter-metrics-otlp-http/src/platform', {recursive: true})
+//   .catch(err => err instanceof Deno.errors.NotFound ? null : Promise.reject(err));
+// await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/opentelemetry-exporter-metrics-otlp-http/src/platform.ts', 'export {};');
+
+// await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/otlp-exporter-base/src/platform/index.ts', ``);
 
 // Trying to avoid embedding the generated protobuf code, at least for now
 await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/otlp-transformer/src/protobuf/serializers.ts', `
 import { ISerializer } from '../common/i-serializer';
 export const MissingSerializer: ISerializer<
-  any[],
+  any,
   any
 > = {
   serializeRequest: (arg: any[]) => {throw new Error('not implemented')},
@@ -187,7 +192,6 @@ export const ProtobufMetricsSerializer = MissingSerializer;
 export const ProtobufTraceSerializer = MissingSerializer;
 `);
 
-await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/opentelemetry-exporter-metrics-otlp-http/src/platform.ts', 'export {};');
 await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/opentelemetry-instrumentation/src/platform/index.ts', `export * from './browser';`);
 
 await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-core/src/platform/node/RandomIdGenerator.ts',
@@ -200,6 +204,154 @@ await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-sdk-trace
 // TODO: does dynamic require crap
 await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-resources/src/detectors/platform/node/machine-id/getMachineId.ts',
   await Deno.readTextFile('hack/opentelemetry-js/packages/opentelemetry-resources/src/detectors/platform/node/machine-id/getMachineId-linux.ts'));
+
+await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/opentelemetry-exporter-metrics-otlp-http/src/platform/node/OTLPMetricExporter.ts',
+  await Deno.readTextFile('hack/opentelemetry-js/experimental/packages/opentelemetry-exporter-metrics-otlp-http/src/platform/node/OTLPMetricExporter.ts').then(text => text
+    .replace('@opentelemetry/otlp-exporter-base/node-http', '@opentelemetry/otlp-exporter-base')));
+
+// make sure the file exists before we replace it
+await Deno.readTextFile('hack/opentelemetry-js/experimental/packages/otlp-exporter-base/src/configuration/convert-legacy-node-http-options.ts');
+await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/otlp-exporter-base/src/configuration/convert-legacy-node-http-options.ts', `
+import { OTLPExporterNodeConfigBase } from './legacy-node-configuration';
+import {
+  getHttpConfigurationDefaults,
+  mergeOtlpHttpConfigurationWithDefaults,
+  OtlpHttpConfiguration,
+} from './otlp-http-configuration';
+import { getHttpConfigurationFromEnvironment } from './otlp-http-env-configuration';
+import { diag } from '@opentelemetry/api';
+import { wrapStaticHeadersInFunction } from './shared-configuration';
+
+/**
+ * @deprecated this will be removed in 2.0
+ * @param config
+ * @param signalIdentifier
+ * @param signalResourcePath
+ * @param requiredHeaders
+ */
+export function convertLegacyHttpOptions(
+  config: OTLPExporterNodeConfigBase,
+  signalIdentifier: string,
+  signalResourcePath: string,
+  requiredHeaders: Record<string, string>
+): OtlpHttpConfiguration {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if ((config as any).metadata) {
+    diag.warn('Metadata cannot be set when using http');
+  }
+
+  return mergeOtlpHttpConfigurationWithDefaults(
+    {
+      url: config.url,
+      headers: wrapStaticHeadersInFunction(config.headers),
+      concurrencyLimit: config.concurrencyLimit,
+      timeoutMillis: config.timeoutMillis,
+      compression: config.compression,
+    },
+    getHttpConfigurationFromEnvironment(signalIdentifier, signalResourcePath),
+    getHttpConfigurationDefaults(requiredHeaders, signalResourcePath)
+  );
+}
+`);
+
+// Delete tests that can't typetype without node-specific HttpAgent fields
+for (const file of [
+  'experimental/packages/otlp-exporter-base/test/node/configuration/convert-legacy-node-otlp-http-options.test.ts',
+  'experimental/packages/otlp-exporter-base/test/node/otlp-http-export-delegate.test.ts',
+  'experimental/packages/otlp-exporter-base/test/node/http-exporter-transport.test.ts',
+  'experimental/packages/otlp-exporter-base/test/common/configuration/otlp-http-configuration.test.ts',
+]) {
+  await Deno.remove(`hack/opentelemetry-js/${file}`).catch(err =>
+    err instanceof Deno.errors.NotFound ? null : Promise.reject(err));
+}
+
+{
+  const text = await Deno.readTextFile('hack/opentelemetry-js/experimental/packages/otlp-exporter-base/src/index.ts');
+  if (!text.includes('index-node-http')) {
+    Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/otlp-exporter-base/src/index.ts',
+      text + `\nexport * from './index-node-http';\n`);
+  }
+}
+
+{
+  const text = await Deno.readTextFile('hack/opentelemetry-js/semantic-conventions/src/index.ts');
+  if (!text.includes('experimental')) {
+    Deno.writeTextFile('hack/opentelemetry-js/semantic-conventions/src/index.ts',
+      text + `\nexport * from './experimental_attributes';\nexport * from './experimental_metrics';;\n`);
+  }
+}
+
+{
+  let text = await Deno.readTextFile('hack/opentelemetry-js/experimental/packages/otlp-exporter-base/src/configuration/otlp-http-configuration.ts');
+  text = text.replaceAll(/^import type \*/gm, x => `// ${x}`);
+  text = text.replaceAll(/^ +.+agentOptions.+$/gm, x => `// ${x}`);
+  await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/otlp-exporter-base/src/configuration/otlp-http-configuration.ts', text);
+}
+
+{
+  let text = await Deno.readTextFile('hack/opentelemetry-js/experimental/packages/otlp-exporter-base/src/configuration/legacy-node-configuration.ts');
+  text = text.replaceAll(/^import type \*/gm, x => `// ${x}`);
+  text = text.replaceAll(/^ +.+httpAgentOptions.+$/gm, x => `// ${x}`);
+  text = text.replaceAll(/^ +.+keepAlive.+$/gm, x => `// ${x}`);
+  await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/otlp-exporter-base/src/configuration/legacy-node-configuration.ts', text);
+}
+
+// A mix of experimental/packages/otlp-exporter-base/src/transport/http-exporter-transport.ts
+// and experimental/packages/otlp-exporter-base/src/transport/http-transport-utils.ts
+// but implemented with standard fetch() instead.
+// Wow so clean and portable :)
+// And that gzip support, wowie
+await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/otlp-exporter-base/src/transport/http-exporter-transport.ts', `
+import { OtlpHttpConfiguration } from '../configuration/otlp-http-configuration';
+import { ExportResponse } from '../export-response';
+import { IExporterTransport } from '../exporter-transport';
+import { isExportRetryable, parseRetryAfterToMills } from '../is-export-retryable';
+import { OTLPExporterError } from '../types';
+
+class HttpExporterTransport implements IExporterTransport {
+  constructor(private _parameters: OtlpHttpConfiguration) {}
+
+  async send(data: Uint8Array, timeoutMillis: number): Promise<ExportResponse> {
+    const headers = new Headers(this._parameters.headers());
+    //@ts-ignore TODO: Remove after experimental/v0.58.0 upgrades typescript to >=4.9.5
+    let body = ReadableStream.from([data]);
+    if (this._parameters.compression == 'gzip') {
+      headers.set('content-encoding', 'gzip');
+      //@ts-ignore TODO: Remove after typescript is happy with CompressionStream
+      body = body.pipeThrough(new CompressionStream('gzip'));
+    }
+    return await fetch(this._parameters.url, {
+      method: 'POST',
+      body, headers,
+      //@ts-ignore TODO: Remove after experimental/v0.58.0 upgrades typescript to >=4.9.5
+      signal: AbortSignal.timeout(timeoutMillis),
+    }).then<ExportResponse>(async res => {
+      if (res.ok) {
+        const data = new Uint8Array(await res.arrayBuffer());
+        return { status: 'success', data };
+      }
+      if (isExportRetryable(res.status)) {
+        const retryInMillis = parseRetryAfterToMills(res.headers.get('retry-after'));
+        return { status: 'retryable', retryInMillis };
+      }
+      const error = new OTLPExporterError(res.statusText, res.status, await res.text());
+      return { status: 'failure', error };
+    }).catch(error => ({ status: 'failure', error }));
+  }
+  shutdown() {}
+}
+export function createHttpExporterTransport(parameters: OtlpHttpConfiguration): IExporterTransport {
+  return new HttpExporterTransport(parameters);
+}
+`);
+
+{ // Reverse targetted import for specific http client
+  const json = JSON.parse(await Deno.readTextFile('hack/opentelemetry-js/experimental/packages/otlp-exporter-base/package.json'));
+  if (!json['exports']['./node-http']) throw new Error(`expected node-http export is missing`);
+  json['exports']['.']['module'] = json['exports']['.']['esnext'];
+  json['exports']['./node-http'] = json['exports']['.'];
+  await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/otlp-exporter-base/package.json', JSON.stringify(json, null, 2));
+}
 
 // tsconfig doesn't allow module/target overrides in build mode, so we patch
 await Deno.writeTextFile('hack/opentelemetry-js/tsconfig.base.esnext.json',
@@ -227,13 +379,13 @@ const packagePaths = [
   "packages/sdk-metrics",
   "experimental/packages/api-events",
   "experimental/packages/api-logs",
-  // "experimental/packages/exporter-logs-otlp-http",
+  "experimental/packages/exporter-logs-otlp-http",
   // "experimental/packages/exporter-logs-otlp-proto",
-  // "experimental/packages/exporter-trace-otlp-http",
+  "experimental/packages/exporter-trace-otlp-http",
   // "experimental/packages/exporter-trace-otlp-proto",
-  // "experimental/packages/opentelemetry-browser-detector",
   "experimental/packages/opentelemetry-exporter-metrics-otlp-http",
   // "experimental/packages/opentelemetry-exporter-metrics-otlp-proto",
+  // "experimental/packages/opentelemetry-browser-detector",
   "experimental/packages/opentelemetry-instrumentation",
   // "experimental/packages/opentelemetry-instrumentation-fetch",
   // "experimental/packages/opentelemetry-instrumentation-xml-http-request",
@@ -248,6 +400,9 @@ console.error(`Writing new tsconfig...`);
 await Deno.writeTextFile('hack/opentelemetry-js/tsconfig.esnext.deno.json', JSON.stringify({
   "extends": "./tsconfig.base.esnext.json",
   "files": [],
+  // "compilerOptions": {
+  //   "lib": ["es2021"],
+  // },
   "references": packagePaths.map(x => ({
     "path": `${x}/tsconfig.esnext.json`,
   })),
@@ -306,6 +461,7 @@ for (const mod of packagePaths) {
   await buildModuleWithRollup(path, modName, [
     ...Object.keys(dependencies ?? {}),
     ...Object.keys(peerDependencies ?? {}),
+    '@opentelemetry/otlp-exporter-base/node-http',
   ]);
 
 }

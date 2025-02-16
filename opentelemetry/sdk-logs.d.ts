@@ -16,9 +16,9 @@
 
 import { IResource } from './resources.d.ts';
 import * as logsAPI from './api-logs.d.ts';
-import { SeverityNumber, LogBody, LogAttributes, Logger } from './api-logs.d.ts';
+import { SeverityNumber, LogBody, LogAttributes, Logger, AnyValue } from './api-logs.d.ts';
 import * as api from './api.d.ts';
-import { HrTime, SpanContext, AttributeValue, Context } from './api.d.ts';
+import { HrTime, SpanContext, Context } from './api.d.ts';
 import { InstrumentationScope, ExportResult } from './core.d.ts';
 
 interface LoggerProviderConfig {
@@ -31,6 +31,11 @@ interface LoggerProviderConfig {
 	forceFlushTimeoutMillis?: number;
 	/** Log Record Limits*/
 	logRecordLimits?: LogRecordLimits;
+	/**
+	* Merge resource with {@link Resource.default()}?
+	* Default: {@code true}
+	*/
+	mergeResourceWithDefaults?: boolean;
 }
 interface LogRecordLimits {
 	/** attributeValueLengthLimit is maximum allowed attribute value size */
@@ -103,7 +108,7 @@ declare class LogRecord implements ReadableLogRecord {
 	get body(): LogBody | undefined;
 	get droppedAttributesCount(): number;
 	constructor(_sharedState: LoggerProviderSharedState, instrumentationScope: InstrumentationScope, logRecord: logsAPI.LogRecord);
-	setAttribute(key: string, value?: LogAttributes | AttributeValue): this;
+	setAttribute(key: string, value?: AnyValue): this;
 	setAttributes(attributes: LogAttributes): this;
 	setBody(body: LogBody): this;
 	setSeverityNumber(severityNumber: logsAPI.SeverityNumber): this;

@@ -430,7 +430,7 @@ const JsonTraceSerializer = {
 };
 const JsonMetricsSerializer = {
 	serializeRequest: (arg) => {
-		const request = createExportMetricsServiceRequest(arg, {
+		const request = createExportMetricsServiceRequest([arg], {
 			useLongBits: false,
 		});
 		const encoder = new TextEncoder();

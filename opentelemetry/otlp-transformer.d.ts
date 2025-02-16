@@ -609,12 +609,12 @@ interface ISerializer<Request, Response> {
 	deserializeResponse(data: Uint8Array): Response;
 }
 
-declare const ProtobufLogsSerializer: ISerializer<any[], any>;
-declare const ProtobufMetricsSerializer: ISerializer<any[], any>;
-declare const ProtobufTraceSerializer: ISerializer<any[], any>;
+declare const ProtobufLogsSerializer: ISerializer<any, any>;
+declare const ProtobufMetricsSerializer: ISerializer<any, any>;
+declare const ProtobufTraceSerializer: ISerializer<any, any>;
 
 declare const JsonTraceSerializer: ISerializer<ReadableSpan[], IExportTraceServiceResponse>;
-declare const JsonMetricsSerializer: ISerializer<ResourceMetrics[], IExportMetricsServiceResponse>;
+declare const JsonMetricsSerializer: ISerializer<ResourceMetrics, IExportMetricsServiceResponse>;
 declare const JsonLogsSerializer: ISerializer<ReadableLogRecord[], IExportLogsServiceResponse>;
 
 export { EAggregationTemporality, ESeverityNumber, ESpanKind, EStatusCode, Encoder, Fixed64, HrTimeEncodeFunction, IAnyValue, IArrayValue, IBuckets, IEvent, IExemplar, IExponentialHistogram, IExponentialHistogramDataPoint, IExportLogsPartialSuccess, IExportLogsServiceRequest, IExportLogsServiceResponse, IExportMetricsPartialSuccess, IExportMetricsServiceRequest, IExportMetricsServiceResponse, IExportTracePartialSuccess, IExportTraceServiceRequest, IExportTraceServiceResponse, IGauge, IHistogram, IHistogramDataPoint, IInstrumentationScope, IKeyValue, IKeyValueList, ILink, ILogRecord, IMetric, INumberDataPoint, IResource, IResourceLogs, IResourceMetrics, IResourceSpans, IScopeLogs, IScopeMetrics, IScopeSpans, ISerializer, ISpan, IStatus, ISum, ISummary, ISummaryDataPoint, IValueAtQuantile, JsonLogsSerializer, JsonMetricsSerializer, JsonTraceSerializer, LongBits, OptionalSpanContextEncodeFunction, OtlpEncodingOptions, ProtobufLogsSerializer, ProtobufMetricsSerializer, ProtobufTraceSerializer, SpanContextEncodeFunction, createExportLogsServiceRequest, createExportMetricsServiceRequest, createExportTraceServiceRequest, encodeAsLongBits, encodeAsString, getOtlpEncoder, hrTimeToNanos, toLongBits };

@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 
-import { OTLPExporterConfigBase, OTLPExporterBase } from './otlp-exporter-base.d.ts';
+import { OTLPExporterConfigBase, OTLPExporterBase, IOtlpExportDelegate, OTLPExporterNodeConfigBase } from './otlp-exporter-base.d.ts';
 import { AggregationTemporality, AggregationSelector, AggregationTemporalitySelector, ResourceMetrics, PushMetricExporter, InstrumentType, Aggregation } from './sdk-metrics.d.ts';
-import { ExportResult } from './core.d.ts';
 
 interface OTLPMetricExporterOptions extends OTLPExporterConfigBase {
 	temporalityPreference?: AggregationTemporalityPreference | AggregationTemporality;
@@ -31,16 +30,19 @@ declare enum AggregationTemporalityPreference {
 declare const CumulativeTemporalitySelector: AggregationTemporalitySelector;
 declare const DeltaTemporalitySelector: AggregationTemporalitySelector;
 declare const LowMemoryTemporalitySelector: AggregationTemporalitySelector;
-declare class OTLPMetricExporterBase<T extends OTLPExporterBase<OTLPMetricExporterOptions, ResourceMetrics>> implements PushMetricExporter {
-	_otlpExporter: T;
-	private _aggregationTemporalitySelector;
-	private _aggregationSelector;
-	constructor(exporter: T, config?: OTLPMetricExporterOptions);
-	export(metrics: ResourceMetrics, resultCallback: (result: ExportResult) => void): void;
-	shutdown(): Promise<void>;
-	forceFlush(): Promise<void>;
+declare class OTLPMetricExporterBase extends OTLPExporterBase<ResourceMetrics> implements PushMetricExporter {
+	private readonly _aggregationTemporalitySelector;
+	private readonly _aggregationSelector;
+	constructor(delegate: IOtlpExportDelegate<ResourceMetrics>, config?: OTLPMetricExporterOptions);
 	selectAggregation(instrumentType: InstrumentType): Aggregation;
 	selectAggregationTemporality(instrumentType: InstrumentType): AggregationTemporality;
 }
 
-export { AggregationTemporalityPreference, CumulativeTemporalitySelector, DeltaTemporalitySelector, LowMemoryTemporalitySelector, OTLPMetricExporterBase, OTLPMetricExporterOptions };
+/**
+ * OTLP Metric Exporter for Node.js
+ */
+declare class OTLPMetricExporter extends OTLPMetricExporterBase {
+	constructor(config?: OTLPExporterNodeConfigBase & OTLPMetricExporterOptions);
+}
+
+export { AggregationTemporalityPreference, CumulativeTemporalitySelector, DeltaTemporalitySelector, LowMemoryTemporalitySelector, OTLPMetricExporter, OTLPMetricExporterBase, OTLPMetricExporterOptions };
