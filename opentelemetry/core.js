@@ -16,7 +16,7 @@
 /// <reference types="./core.d.ts" />
 
 import { createContextKey, baggageEntryMetadataFromString, propagation, diag, DiagLogLevel, trace, isSpanContextValid, TraceFlags, SamplingDecision, isValidTraceId, context } from './api.js';
-import { SemanticResourceAttributes, TelemetrySdkLanguageValues } from './semantic-conventions.js';
+import { SEMRESATTRS_TELEMETRY_SDK_NAME, SEMRESATTRS_PROCESS_RUNTIME_NAME, SEMRESATTRS_TELEMETRY_SDK_LANGUAGE, TELEMETRYSDKLANGUAGEVALUES_NODEJS, SEMRESATTRS_TELEMETRY_SDK_VERSION } from './semantic-conventions.js';
 
 const SUPPRESS_TRACING_KEY = createContextKey('OpenTelemetry SDK Context Key SUPPRESS_TRACING');
 function suppressTracing(context) {
@@ -84,14 +84,6 @@ function parseKeyPairsIntoRecord(value) {
 		return headers;
 	}, {});
 }
-
-var utils = /*#__PURE__*/Object.freeze({
-	__proto__: null,
-	getKeyPairs: getKeyPairs,
-	parseKeyPairsIntoRecord: parseKeyPairsIntoRecord,
-	parsePairKeyValue: parsePairKeyValue,
-	serializeKeyPairs: serializeKeyPairs
-});
 
 class W3CBaggagePropagator {
 	inject(context, carrier, setter) {
@@ -267,16 +259,6 @@ var TracesSamplerValues;
 	TracesSamplerValues["TraceIdRatio"] = "traceidratio";
 })(TracesSamplerValues || (TracesSamplerValues = {}));
 
-const _globalThis$1 = typeof globalThis === 'object'
-	? globalThis
-	: typeof self === 'object'
-		? self
-		: typeof window === 'object'
-			? window
-			: typeof global === 'object'
-				? global
-				: {};
-
 const DEFAULT_LIST_SEPARATOR = ',';
 const ENVIRONMENT_BOOLEAN_KEYS = ['OTEL_SDK_DISABLED'];
 function isEnvVarABoolean(key) {
@@ -313,6 +295,7 @@ function isEnvVarANumber(key) {
 const ENVIRONMENT_LISTS_KEYS = [
 	'OTEL_NO_PATCH_MODULES',
 	'OTEL_PROPAGATORS',
+	'OTEL_SEMCONV_STABILITY_OPT_IN',
 ];
 function isEnvVarAList(key) {
 	return ENVIRONMENT_LISTS_KEYS.indexOf(key) > -1;
@@ -399,6 +382,7 @@ const DEFAULT_ENVIRONMENT = {
 	OTEL_EXPORTER_OTLP_METRICS_PROTOCOL: 'http/protobuf',
 	OTEL_EXPORTER_OTLP_LOGS_PROTOCOL: 'http/protobuf',
 	OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE: 'cumulative',
+	OTEL_SEMCONV_STABILITY_OPT_IN: [],
 };
 function parseBoolean(key, environment, values) {
 	if (typeof values[key] === 'undefined') {
@@ -475,13 +459,13 @@ function parseEnvironment(values) {
 	}
 	return environment;
 }
-function getEnvWithoutDefaults() {
-	return parseEnvironment(Deno.env.toObject())
-}
 
 function getEnv() {
 	const processEnv = parseEnvironment(Deno.env.toObject());
 	return Object.assign({}, DEFAULT_ENVIRONMENT, processEnv);
+}
+function getEnvWithoutDefaults() {
+	return parseEnvironment(Deno.env.toObject());
 }
 
 const _globalThis = typeof globalThis === 'object' ? globalThis : global;
@@ -533,13 +517,13 @@ function getIdGenerator(bytes) {
 
 const otperformance = performance;
 
-const VERSION$1 = "1.24.0";
+const VERSION$1 = "1.30.1";
 
 const SDK_INFO = {
-	[SemanticResourceAttributes.TELEMETRY_SDK_NAME]: 'opentelemetry',
-	[SemanticResourceAttributes.PROCESS_RUNTIME_NAME]: 'deno',
-	[SemanticResourceAttributes.TELEMETRY_SDK_LANGUAGE]: 'js',
-	[SemanticResourceAttributes.TELEMETRY_SDK_VERSION]: VERSION$1,
+	[SEMRESATTRS_TELEMETRY_SDK_NAME]: 'opentelemetry',
+	[SEMRESATTRS_PROCESS_RUNTIME_NAME]: 'deno',
+	[SEMRESATTRS_TELEMETRY_SDK_LANGUAGE]: TELEMETRYSDKLANGUAGEVALUES_NODEJS,
+	[SEMRESATTRS_TELEMETRY_SDK_VERSION]: VERSION$1,
 };
 
 function unrefTimer(timer) {
@@ -600,7 +584,7 @@ function hrTimeDuration(startTime, endTime) {
 function hrTimeToTimeStamp(time) {
 	const precision = NANOSECOND_DIGITS;
 	const tmp = `${'0'.repeat(precision)}${time[1]}Z`;
-	const nanoString = tmp.substr(tmp.length - precision - 1);
+	const nanoString = tmp.substring(tmp.length - precision - 1);
 	const date = new Date(time[0] * 1000).toISOString();
 	return date.replace('000Z', nanoString);
 }
@@ -662,7 +646,7 @@ class CompositePropagator {
 				return propagator.extract(ctx, carrier, getter);
 			}
 			catch (err) {
-				diag.warn(`Failed to inject with ${propagator.constructor.name}. Err: ${err.message}`);
+				diag.warn(`Failed to extract with ${propagator.constructor.name}. Err: ${err.message}`);
 			}
 			return ctx;
 		}, context);
@@ -1210,8 +1194,14 @@ function _export(exporter, arg) {
 	});
 }
 
+const baggageUtils = {
+	getKeyPairs,
+	serializeKeyPairs,
+	parseKeyPairsIntoRecord,
+	parsePairKeyValue,
+};
 const internal = {
 	_export,
 };
 
-export { AlwaysOffSampler, AlwaysOnSampler, AnchoredClock, BindOnceFuture, CompositePropagator, DEFAULT_ATTRIBUTE_COUNT_LIMIT, DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT, DEFAULT_ENVIRONMENT, DEFAULT_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT, DEFAULT_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT, ExportResultCode, ParentBasedSampler, RPCType, RandomIdGenerator, SDK_INFO, TRACE_PARENT_HEADER, TRACE_STATE_HEADER, TimeoutError, TraceIdRatioBasedSampler, TraceState, TracesSamplerValues, VERSION$1 as VERSION, W3CBaggagePropagator, W3CTraceContextPropagator, _globalThis, addHrTimes, utils as baggageUtils, callWithTimeout, deleteRPCMetadata, getEnv, getEnvWithoutDefaults, getRPCMetadata, getTimeOrigin, globalErrorHandler, hexToBase64, hexToBinary, hrTime, hrTimeDuration, hrTimeToMicroseconds, hrTimeToMilliseconds, hrTimeToNanoseconds, hrTimeToTimeStamp, internal, isAttributeKey, isAttributeValue, isTimeInput, isTimeInputHrTime, isTracingSuppressed, isUrlIgnored, isWrapped, loggingErrorHandler, merge, millisToHrTime, otperformance, parseEnvironment, parseTraceParent, sanitizeAttributes, setGlobalErrorHandler, setRPCMetadata, suppressTracing, timeInputToHrTime, unrefTimer, unsuppressTracing, urlMatches };
+export { AlwaysOffSampler, AlwaysOnSampler, AnchoredClock, BindOnceFuture, CompositePropagator, DEFAULT_ATTRIBUTE_COUNT_LIMIT, DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT, DEFAULT_ENVIRONMENT, DEFAULT_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT, DEFAULT_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT, ExportResultCode, ParentBasedSampler, RPCType, RandomIdGenerator, SDK_INFO, TRACE_PARENT_HEADER, TRACE_STATE_HEADER, TimeoutError, TraceIdRatioBasedSampler, TraceState, TracesSamplerValues, VERSION$1 as VERSION, W3CBaggagePropagator, W3CTraceContextPropagator, _globalThis, addHrTimes, baggageUtils, callWithTimeout, deleteRPCMetadata, getEnv, getEnvWithoutDefaults, getRPCMetadata, getTimeOrigin, globalErrorHandler, hexToBase64, hexToBinary, hrTime, hrTimeDuration, hrTimeToMicroseconds, hrTimeToMilliseconds, hrTimeToNanoseconds, hrTimeToTimeStamp, internal, isAttributeKey, isAttributeValue, isTimeInput, isTimeInputHrTime, isTracingSuppressed, isUrlIgnored, isWrapped, loggingErrorHandler, merge, millisToHrTime, otperformance, parseEnvironment, parseTraceParent, sanitizeAttributes, setGlobalErrorHandler, setRPCMetadata, suppressTracing, timeInputToHrTime, unrefTimer, unsuppressTracing, urlMatches };

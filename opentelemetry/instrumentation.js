@@ -19,23 +19,6 @@ import { trace, metrics, diag } from './api.js';
 import { logs } from './api-logs.js';
 import * as shimmer from 'https://esm.sh/shimmer@1.2.1';
 
-function parseInstrumentationOptions(options = []) {
-	let instrumentations = [];
-	for (let i = 0, j = options.length; i < j; i++) {
-		const option = options[i];
-		if (Array.isArray(option)) {
-			const results = parseInstrumentationOptions(option);
-			instrumentations = instrumentations.concat(results.instrumentations);
-		}
-		else if (typeof option === 'function') {
-			instrumentations.push(new option());
-		}
-		else if (option.instrumentationName) {
-			instrumentations.push(option);
-		}
-	}
-	return { instrumentations };
-}
 function enableInstrumentations(instrumentations, tracerProvider, meterProvider, loggerProvider) {
 	for (let i = 0, j = instrumentations.length; i < j; i++) {
 		const instrumentation = instrumentations[i];
@@ -58,10 +41,10 @@ function disableInstrumentations(instrumentations) {
 }
 
 function registerInstrumentations(options) {
-	const { instrumentations } = parseInstrumentationOptions(options.instrumentations);
 	const tracerProvider = options.tracerProvider || trace.getTracerProvider();
 	const meterProvider = options.meterProvider || metrics.getMeterProvider();
 	const loggerProvider = options.loggerProvider || logs.getLoggerProvider();
+	const instrumentations = options.instrumentations?.flat() ?? [];
 	enableInstrumentations(instrumentations, tracerProvider, meterProvider, loggerProvider);
 	return () => {
 		disableInstrumentations(instrumentations);
@@ -69,17 +52,15 @@ function registerInstrumentations(options) {
 }
 
 class InstrumentationAbstract {
-	constructor(instrumentationName, instrumentationVersion, config = {}) {
+	constructor(instrumentationName, instrumentationVersion, config) {
 		this.instrumentationName = instrumentationName;
 		this.instrumentationVersion = instrumentationVersion;
+		this._config = {};
 		this._wrap = shimmer.wrap;
 		this._unwrap = shimmer.unwrap;
 		this._massWrap = shimmer.massWrap;
 		this._massUnwrap = shimmer.massUnwrap;
-		this._config = {
-			enabled: true,
-			...config,
-		};
+		this.setConfig(config);
 		this._diag = diag.createComponentLogger({
 			namespace: instrumentationName,
 		});
@@ -114,8 +95,11 @@ class InstrumentationAbstract {
 	getConfig() {
 		return this._config;
 	}
-	setConfig(config = {}) {
-		this._config = Object.assign({}, config);
+	setConfig(config) {
+		this._config = {
+			enabled: true,
+			...config,
+		};
 	}
 	setTracerProvider(tracerProvider) {
 		this._tracer = tracerProvider.getTracer(this.instrumentationName, this.instrumentationVersion);
@@ -123,10 +107,21 @@ class InstrumentationAbstract {
 	get tracer() {
 		return this._tracer;
 	}
+	_runSpanCustomizationHook(hookHandler, triggerName, span, info) {
+		if (!hookHandler) {
+			return;
+		}
+		try {
+			hookHandler(span, info);
+		}
+		catch (e) {
+			this._diag.error(`Error running span customization hook due to exception in handler`, { triggerName }, e);
+		}
+	}
 }
 
 class InstrumentationBase extends InstrumentationAbstract {
-	constructor(instrumentationName, instrumentationVersion, config = {}) {
+	constructor(instrumentationName, instrumentationVersion, config) {
 		super(instrumentationName, instrumentationVersion, config);
 		if (this._config.enabled) {
 			this.enable();

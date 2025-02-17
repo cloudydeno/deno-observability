@@ -17,7 +17,9 @@
 
 import { getEnv } from './core.js';
 import { AggregationTemporality, InstrumentType, Aggregation } from './sdk-metrics.js';
+import { OTLPExporterBase, createOtlpHttpExportDelegate, convertLegacyHttpOptions } from './otlp-exporter-base.js';
 import { diag } from './api.js';
+import { JsonMetricsSerializer } from './otlp-transformer.js';
 
 var AggregationTemporalityPreference;
 (function (AggregationTemporalityPreference) {
@@ -88,20 +90,11 @@ function chooseAggregationSelector(config) {
 		return (_instrumentType) => Aggregation.Default();
 	}
 }
-class OTLPMetricExporterBase {
-	constructor(exporter, config) {
-		this._otlpExporter = exporter;
+class OTLPMetricExporterBase extends OTLPExporterBase {
+	constructor(delegate, config) {
+		super(delegate);
 		this._aggregationSelector = chooseAggregationSelector(config);
 		this._aggregationTemporalitySelector = chooseTemporalitySelector(config?.temporalityPreference);
-	}
-	export(metrics, resultCallback) {
-		this._otlpExporter.export([metrics], resultCallback);
-	}
-	async shutdown() {
-		await this._otlpExporter.shutdown();
-	}
-	forceFlush() {
-		return Promise.resolve();
 	}
 	selectAggregation(instrumentType) {
 		return this._aggregationSelector(instrumentType);
@@ -111,4 +104,18 @@ class OTLPMetricExporterBase {
 	}
 }
 
-export { AggregationTemporalityPreference, CumulativeTemporalitySelector, DeltaTemporalitySelector, LowMemoryTemporalitySelector, OTLPMetricExporterBase };
+const VERSION = "0.57.1";
+
+const USER_AGENT = {
+	'User-Agent': `OTel-OTLP-Exporter-JavaScript/${VERSION}`,
+};
+class OTLPMetricExporter extends OTLPMetricExporterBase {
+	constructor(config) {
+		super(createOtlpHttpExportDelegate(convertLegacyHttpOptions(config ?? {}, 'METRICS', 'v1/metrics', {
+			...USER_AGENT,
+			'Content-Type': 'application/json',
+		}), JsonMetricsSerializer), config);
+	}
+}
+
+export { AggregationTemporalityPreference, CumulativeTemporalitySelector, DeltaTemporalitySelector, LowMemoryTemporalitySelector, OTLPMetricExporter, OTLPMetricExporterBase };

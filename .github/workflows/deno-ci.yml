@@ -18,6 +18,7 @@ jobs:
         - v1.39
         - v1.43
         - v2.0
+        - v2.1
         - canary
       fail-fast: false # run each branch to completion
 
@@ -35,8 +36,10 @@ jobs:
     - name: Cache https://
       uses: actions/cache@v4
       with:
-        path: ~/.cache/deno/deps/https
-        key: deno-https/v1-${{ github.sha }}
+        path: |
+          ~/.cache/deno/deps/https
+          ~/.cache/deno/remote/https
+        key: deno/${{ matrix.deno-version }}-https/v1-${{ github.sha }}
         restore-keys: deno-https/v1-
 
     - name: Check demo.ts
@@ -44,3 +47,50 @@ jobs:
 
     # - name: Run tests
     #   run: time deno test --allow-net=localhost --allow-read=/proc/self
+
+
+  bundle:
+    runs-on: ubuntu-latest
+    name: Rebundle OpenTelemetry
+
+    steps:
+    - name: Checkout source
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Set up Deno
+      uses: denoland/setup-deno@v2
+      with:
+        deno-version: v2.1
+
+    # "https" cache: code from the Internet
+    # External sources won't change much so we use less precise keys
+    - name: Cache https://
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/deno/remote/https
+        key: deno-https/v1-${{ github.sha }}
+        restore-keys: deno-https/v1-
+
+    - name: Cache npm
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/deno/npm
+        key: deno-npm/v1-${{ github.sha }}
+        restore-keys: deno-npm/v1-
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        # cache: 'yarn'
+
+    - name: Build
+      run: time hack/bundle-opentelemetry.ts
+
+    - name: Status
+      run: git status
+
+    - name: Check demo.ts
+      run: time deno check --unstable demo.ts

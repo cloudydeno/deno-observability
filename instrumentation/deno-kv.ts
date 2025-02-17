@@ -18,7 +18,7 @@ export class DenoKvInstrumentation extends InstrumentationBase {
   moduleName = this.component;
   atomicOpClass?: typeof Deno.AtomicOperation.constructor;
 
-  constructor(config?: InstrumentationConfig) {
+  constructor(config: InstrumentationConfig = {}) {
     super('deno-kv', '0.1.0', config);
   }
 

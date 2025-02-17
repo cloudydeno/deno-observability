@@ -13,7 +13,7 @@ export class DenoRuntimeInstrumentation extends InstrumentationBase {
   readonly component: string = 'deno-runtime';
   moduleName = this.component;
 
-  constructor(config?: InstrumentationConfig) {
+  constructor(config: InstrumentationConfig = {}) {
     super('deno-runtime', '0.1.0', {enabled: false});
   }
 

@@ -15,7 +15,7 @@
  */
 
 import * as _opentelemetry_api from './api.d.ts';
-import { MetricAttributes, Context, HrTime, ValueType, MeterProvider as MeterProvider$1, MeterOptions, Meter } from './api.d.ts';
+import { MetricAttributes, Context, HrTime, Attributes, ValueType, MeterProvider as MeterProvider$1, MeterOptions, Meter } from './api.d.ts';
 import { InstrumentationScope, ExportResult } from './core.d.ts';
 import { IResource } from './resources.d.ts';
 
@@ -108,18 +108,18 @@ declare type LastValue = number;
 interface Histogram {
 	/**
 	* Buckets are implemented using two different arrays:
-	*  - boundaries: contains every finite bucket boundary, which are inclusive lower bounds
+	*  - boundaries: contains every finite bucket boundary, which are inclusive upper bounds
 	*  - counts: contains event counts for each bucket
 	*
 	* Note that we'll always have n+1 buckets, where n is the number of boundaries.
-	* This is because we need to count events that are below the lowest boundary.
+	* This is because we need to count events that are higher than the upper boundary.
 	*
 	* Example: if we measure the values: [5, 30, 5, 40, 5, 15, 15, 15, 25]
 	*  with the boundaries [ 10, 20, 30 ], we will have the following state:
 	*
 	* buckets: {
 	*	boundaries: [10, 20, 30],
-	*	counts: [3, 3, 1, 2],
+	*	counts: [3, 3, 2, 1],
 	* }
 	*/
 	buckets: {
@@ -155,7 +155,7 @@ interface Accumulation {
 	setStartTime(startTime: HrTime): void;
 	record(value: number): void;
 }
-declare type AccumulationRecord<T> = [MetricAttributes, T];
+declare type AccumulationRecord<T> = [Attributes, T];
 /**
  * Base interface for aggregators. Aggregators are responsible for holding
  * aggregated values and taking a snapshot of these values upon export.
@@ -735,6 +735,15 @@ declare type ViewOptions = {
 	*/
 	aggregation?: Aggregation;
 	/**
+	* Alters the metric stream:
+	* Sets a limit on the number of unique attribute combinations (cardinality) that can be aggregated.
+	* If not provided, the default limit will be used.
+	*
+	* @example <caption>sets the cardinality limit to 1000</caption>
+	* aggregationCardinalityLimit: 1000
+	*/
+	aggregationCardinalityLimit?: number;
+	/**
 	* Instrument selection criteria:
 	* The original type of the Instrument(s).
 	*
@@ -799,6 +808,7 @@ declare class View {
 	readonly attributesProcessor: AttributesProcessor;
 	readonly instrumentSelector: InstrumentSelector;
 	readonly meterSelector: MeterSelector;
+	readonly aggregationCardinalityLimit?: number;
 	/**
 	* Create a new {@link View} instance.
 	*
@@ -821,6 +831,10 @@ declare class View {
 	* Alters the metric stream:
 	*  If provided, the attributes that are not in the list will be ignored.
 	*  If not provided, all attribute keys will be used by default.
+	* @param viewOptions.aggregationCardinalityLimit
+	* Alters the metric stream:
+	*  Sets a limit on the number of unique attribute combinations (cardinality) that can be aggregated.
+	*  If not provided, the default limit of 2000 will be used.
 	* @param viewOptions.aggregation
 	* Alters the metric stream:
 	*  Alters the {@link Aggregation} of the metric stream.
@@ -1016,7 +1030,7 @@ interface DataPoint<T> {
 	/**
 	* The attributes associated with this DataPoint.
 	*/
-	readonly attributes: MetricAttributes;
+	readonly attributes: Attributes;
 	/**
 	* The value for this DataPoint. The type of the value is indicated by the
 	* {@link DataPointType}.
@@ -1098,6 +1112,11 @@ declare type CollectionOptions = CommonReaderOptions;
 declare type ShutdownOptions = CommonReaderOptions;
 declare type ForceFlushOptions = CommonReaderOptions;
 
+/**
+ * Cardinality Limit selector based on metric instrument types.
+ */
+declare type CardinalitySelector = (instrumentType: InstrumentType) => number;
+
 interface MetricReaderOptions {
 	/**
 	* Aggregation selector based on metric instrument types. If no views are
@@ -1110,6 +1129,11 @@ interface MetricReaderOptions {
 	* not configured, cumulative is used for all instruments.
 	*/
 	aggregationTemporalitySelector?: AggregationTemporalitySelector;
+	/**
+	* Cardinality selector based on metric instrument types. If not configured,
+	* a default value is used.
+	*/
+	cardinalitySelector?: CardinalitySelector;
 	/**
 	* **Note, this option is experimental**. Additional MetricProducers to use as a source of
 	* aggregated metric data in addition to the SDK's metric data. The resource returned by
@@ -1128,6 +1152,7 @@ declare abstract class MetricReader {
 	private _sdkMetricProducer?;
 	private readonly _aggregationTemporalitySelector;
 	private readonly _aggregationSelector;
+	private readonly _cardinalitySelector?;
 	constructor(options?: MetricReaderOptions);
 	/**
 	* Set the {@link MetricProducer} used by this instance. **This should only be called by the
@@ -1150,6 +1175,11 @@ declare abstract class MetricReader {
 	* {@link InstrumentType} for this reader.
 	*/
 	selectAggregationTemporality(instrumentType: InstrumentType): AggregationTemporality;
+	/**
+	* Select the cardinality limit for the given {@link InstrumentType} for this
+	* reader.
+	*/
+	selectCardinalityLimit(instrumentType: InstrumentType): number;
 	/**
 	* Handle once the SDK has initialized this {@link MetricReader}
 	* Overriding this method is optional.
@@ -1257,6 +1287,12 @@ declare class InMemoryMetricExporter implements PushMetricExporter {
 interface ConsoleMetricExporterOptions {
 	temporalitySelector?: AggregationTemporalitySelector;
 }
+/**
+ * This is an implementation of {@link PushMetricExporter} that prints metrics to the
+ * console. This class can be used for diagnostic purposes.
+ *
+ * NOTE: This {@link PushMetricExporter} is intended for diagnostics use only, output rendered to the console may change at any time.
+ */
 declare class ConsoleMetricExporter implements PushMetricExporter {
 	protected _shutdown: boolean;
 	protected _temporalitySelector: AggregationTemporalitySelector;
@@ -1276,6 +1312,11 @@ interface MeterProviderOptions {
 	resource?: IResource;
 	views?: View[];
 	readers?: MetricReader[];
+	/**
+	* Merge resource with {@link Resource.default()}?
+	* Default: {@code true}
+	*/
+	mergeResourceWithDefaults?: boolean;
 }
 /**
  * This class implements the {@link MeterProvider} interface.
@@ -1302,7 +1343,7 @@ declare class MeterProvider implements MeterProvider$1 {
 	*/
 	addMetricReader(metricReader: MetricReader): void;
 	/**
-	* Flush all buffered data and shut down the MeterProvider and all registered
+	* Shut down the MeterProvider and all registered
 	* MetricReaders.
 	*
 	* Returns a promise which is resolved when all flushes are complete.

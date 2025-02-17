@@ -1,17 +1,17 @@
 import {
-  NETTRANSPORTVALUES_IP_TCP,
-  SEMATTRS_HTTP_HOST,
-  SEMATTRS_HTTP_METHOD,
-  SEMATTRS_HTTP_RESPONSE_CONTENT_LENGTH_UNCOMPRESSED,
-  SEMATTRS_HTTP_ROUTE,
-  SEMATTRS_HTTP_SCHEME,
-  SEMATTRS_HTTP_STATUS_CODE,
-  SEMATTRS_HTTP_URL,
-  SEMATTRS_HTTP_USER_AGENT,
-  SEMATTRS_NET_HOST_NAME,
-  SEMATTRS_NET_PEER_IP,
-  SEMATTRS_NET_PEER_PORT,
-  SEMATTRS_NET_TRANSPORT,
+  NET_TRANSPORT_VALUE_IP_TCP,
+  ATTR_HTTP_HOST,
+  ATTR_HTTP_METHOD,
+  ATTR_HTTP_RESPONSE_CONTENT_LENGTH_UNCOMPRESSED,
+  ATTR_HTTP_ROUTE,
+  ATTR_HTTP_SCHEME,
+  ATTR_HTTP_STATUS_CODE,
+  ATTR_HTTP_URL,
+  ATTR_HTTP_USER_AGENT,
+  ATTR_NET_HOST_NAME,
+  ATTR_NET_PEER_IP,
+  ATTR_NET_PEER_PORT,
+  ATTR_NET_TRANSPORT,
 } from "../opentelemetry/semantic-conventions.js";
 import {
   metrics,
@@ -45,9 +45,9 @@ export function httpTracer(inner: Deno.ServeHandler, opts?: {
     const url = new URL(req.url);
 
     const reqMetricAttrs = {
-      [SEMATTRS_HTTP_SCHEME]: url.protocol.split(':')[0],
-      [SEMATTRS_HTTP_METHOD]: req.method,
-      [SEMATTRS_NET_HOST_NAME]: url.host, // not sure why metrics spec wants it this way
+      [ATTR_HTTP_SCHEME]: url.protocol.split(':')[0],
+      [ATTR_HTTP_METHOD]: req.method,
+      [ATTR_NET_HOST_NAME]: url.host, // not sure why metrics spec wants it this way
     };
     inflightMetric.add(1, reqMetricAttrs);
 
@@ -58,12 +58,12 @@ export function httpTracer(inner: Deno.ServeHandler, opts?: {
     return tracer.startActiveSpan(`${req.method} ${url.pathname}`, {
       kind: SpanKind.SERVER,
       attributes: {
-        [SEMATTRS_HTTP_SCHEME]: url.protocol.split(':')[0],
-        [SEMATTRS_HTTP_METHOD]: req.method,
-        [SEMATTRS_HTTP_URL]: req.url,
-        [SEMATTRS_HTTP_HOST]: url.host,
-        [SEMATTRS_HTTP_USER_AGENT]: req.headers.get('user-agent') ?? undefined,
-        [SEMATTRS_HTTP_ROUTE]: url.pathname, // for datadog
+        [ATTR_HTTP_SCHEME]: url.protocol.split(':')[0],
+        [ATTR_HTTP_METHOD]: req.method,
+        [ATTR_HTTP_URL]: req.url,
+        [ATTR_HTTP_HOST]: url.host,
+        [ATTR_HTTP_USER_AGENT]: req.headers.get('user-agent') ?? undefined,
+        [ATTR_HTTP_ROUTE]: url.pathname, // for datadog
         // 'http.request_content_length': '/http/request/size',
       },
     }, ctx, async (serverSpan) => {
@@ -71,15 +71,15 @@ export function httpTracer(inner: Deno.ServeHandler, opts?: {
 
         if (connInfo.remoteAddr.transport == 'tcp') {
           serverSpan.setAttributes({
-            [SEMATTRS_NET_TRANSPORT]: NETTRANSPORTVALUES_IP_TCP,
-            [SEMATTRS_NET_PEER_IP]: connInfo.remoteAddr.hostname,
-            [SEMATTRS_NET_PEER_PORT]: connInfo.remoteAddr.port,
+            [ATTR_NET_TRANSPORT]: NET_TRANSPORT_VALUE_IP_TCP,
+            [ATTR_NET_PEER_IP]: connInfo.remoteAddr.hostname,
+            [ATTR_NET_PEER_PORT]: connInfo.remoteAddr.port,
             ['net.sock.family']: connInfo.remoteAddr.hostname.includes(':') ? 'inet6' : 'inet',
           })
         // Unix sockets are currently behind --unstable so we can't just ref Deno.ServeUnixHandler today
         // } else if (connInfo.localAddr.transport == 'unix' || connInfo.localAddr.transport == 'unixpacket') {
         //   serverSpan.setAttributes({
-        //     [SEMATTRS_NET_TRANSPORT]: NetTransportValues.UNIX,
+        //     [ATTR_NET_TRANSPORT]: NetTransportValues.UNIX,
         //     ['net.sock.family']: 'unix',
         //   })
         }
@@ -88,7 +88,7 @@ export function httpTracer(inner: Deno.ServeHandler, opts?: {
         const resp = await inner(req, connInfo);
 
         serverSpan.addEvent('returned-http-response');
-        serverSpan.setAttribute(SEMATTRS_HTTP_STATUS_CODE, resp.status);
+        serverSpan.setAttribute(ATTR_HTTP_STATUS_CODE, resp.status);
         if (resp.statusText) {
           serverSpan.setAttribute('http.status_text', resp.statusText);
         }
@@ -102,7 +102,7 @@ export function httpTracer(inner: Deno.ServeHandler, opts?: {
 
         const respSnoop = snoopStream(resp.body);
         respSnoop.finalSize.then(size => {
-          serverSpan.setAttribute(SEMATTRS_HTTP_RESPONSE_CONTENT_LENGTH_UNCOMPRESSED, size);
+          serverSpan.setAttribute(ATTR_HTTP_RESPONSE_CONTENT_LENGTH_UNCOMPRESSED, size);
         }).catch(err => {
           // NOTE: err can be "resource closed" when the client walks away mid-response.
           serverSpan.recordException(err);

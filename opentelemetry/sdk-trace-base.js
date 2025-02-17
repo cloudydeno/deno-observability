@@ -17,8 +17,8 @@
 
 import * as api from './api.js';
 import { SpanStatusCode, diag, trace, isSpanContextValid, TraceFlags, isValidTraceId, context, propagation } from './api.js';
-import { otperformance, getTimeOrigin, isAttributeValue, isTimeInput, sanitizeAttributes, hrTimeDuration, hrTime, millisToHrTime, isTimeInputHrTime, addHrTimes, globalErrorHandler, getEnv, TracesSamplerValues, getEnvWithoutDefaults, DEFAULT_ATTRIBUTE_COUNT_LIMIT, DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT, BindOnceFuture, suppressTracing, unrefTimer, ExportResultCode, isTracingSuppressed, merge, CompositePropagator, W3CTraceContextPropagator, W3CBaggagePropagator, hrTimeToMicroseconds, internal } from './core.js';
-import { SemanticAttributes } from './semantic-conventions.js';
+import { otperformance, getTimeOrigin, isAttributeValue, isTimeInput, sanitizeAttributes, hrTimeDuration, hrTime, millisToHrTime, isTimeInputHrTime, addHrTimes, globalErrorHandler, TracesSamplerValues, getEnv, getEnvWithoutDefaults, DEFAULT_ATTRIBUTE_COUNT_LIMIT, DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT, BindOnceFuture, suppressTracing, unrefTimer, ExportResultCode, isTracingSuppressed, merge, CompositePropagator, W3CTraceContextPropagator, W3CBaggagePropagator, hrTimeToMicroseconds, internal } from './core.js';
+import { SEMATTRS_EXCEPTION_TYPE, SEMATTRS_EXCEPTION_MESSAGE, SEMATTRS_EXCEPTION_STACKTRACE } from './semantic-conventions.js';
 import { Resource } from './resources.js';
 
 const ExceptionEventName = 'exception';
@@ -119,10 +119,22 @@ class Span {
 		});
 		return this;
 	}
+	addLink(link) {
+		this.links.push(link);
+		return this;
+	}
+	addLinks(links) {
+		this.links.push(...links);
+		return this;
+	}
 	setStatus(status) {
 		if (this._isSpanEnded())
 			return this;
-		this.status = status;
+		this.status = { ...status };
+		if (this.status.message != null && typeof status.message !== 'string') {
+			diag.warn(`Dropping invalid status.message of type '${typeof status.message}', expected 'string'`);
+			delete this.status.message;
+		}
 		return this;
 	}
 	updateName(name) {
@@ -150,7 +162,7 @@ class Span {
 		this._spanProcessor.onEnd(this);
 	}
 	_getTime(inp) {
-		if (typeof inp === 'number' && inp < otperformance.now()) {
+		if (typeof inp === 'number' && inp <= otperformance.now()) {
 			return hrTime(inp + this._performanceOffset);
 		}
 		if (typeof inp === 'number') {
@@ -174,25 +186,24 @@ class Span {
 	recordException(exception, time) {
 		const attributes = {};
 		if (typeof exception === 'string') {
-			attributes[SemanticAttributes.EXCEPTION_MESSAGE] = exception;
+			attributes[SEMATTRS_EXCEPTION_MESSAGE] = exception;
 		}
 		else if (exception) {
 			if (exception.code) {
-				attributes[SemanticAttributes.EXCEPTION_TYPE] =
-					exception.code.toString();
+				attributes[SEMATTRS_EXCEPTION_TYPE] = exception.code.toString();
 			}
 			else if (exception.name) {
-				attributes[SemanticAttributes.EXCEPTION_TYPE] = exception.name;
+				attributes[SEMATTRS_EXCEPTION_TYPE] = exception.name;
 			}
 			if (exception.message) {
-				attributes[SemanticAttributes.EXCEPTION_MESSAGE] = exception.message;
+				attributes[SEMATTRS_EXCEPTION_MESSAGE] = exception.message;
 			}
 			if (exception.stack) {
-				attributes[SemanticAttributes.EXCEPTION_STACKTRACE] = exception.stack;
+				attributes[SEMATTRS_EXCEPTION_STACKTRACE] = exception.stack;
 			}
 		}
-		if (attributes[SemanticAttributes.EXCEPTION_TYPE] ||
-			attributes[SemanticAttributes.EXCEPTION_MESSAGE]) {
+		if (attributes[SEMATTRS_EXCEPTION_TYPE] ||
+			attributes[SEMATTRS_EXCEPTION_MESSAGE]) {
 			this.addEvent(ExceptionEventName, attributes, time);
 		}
 		else {
@@ -224,7 +235,7 @@ class Span {
 		if (value.length <= limit) {
 			return value;
 		}
-		return value.substr(0, limit);
+		return value.substring(0, limit);
 	}
 	_truncateToSize(value) {
 		const limit = this._attributeValueLengthLimit;
@@ -340,25 +351,26 @@ class TraceIdRatioBasedSampler {
 	}
 }
 
-const env = getEnv();
 const FALLBACK_OTEL_TRACES_SAMPLER = TracesSamplerValues.AlwaysOn;
 const DEFAULT_RATIO = 1;
 function loadDefaultConfig() {
+	const env = getEnv();
 	return {
 		sampler: buildSamplerFromEnv(env),
 		forceFlushTimeoutMillis: 30000,
 		generalLimits: {
-			attributeValueLengthLimit: getEnv().OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT,
-			attributeCountLimit: getEnv().OTEL_ATTRIBUTE_COUNT_LIMIT,
+			attributeValueLengthLimit: env.OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT,
+			attributeCountLimit: env.OTEL_ATTRIBUTE_COUNT_LIMIT,
 		},
 		spanLimits: {
-			attributeValueLengthLimit: getEnv().OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT,
-			attributeCountLimit: getEnv().OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT,
-			linkCountLimit: getEnv().OTEL_SPAN_LINK_COUNT_LIMIT,
-			eventCountLimit: getEnv().OTEL_SPAN_EVENT_COUNT_LIMIT,
-			attributePerEventCountLimit: getEnv().OTEL_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT,
-			attributePerLinkCountLimit: getEnv().OTEL_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT,
+			attributeValueLengthLimit: env.OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT,
+			attributeCountLimit: env.OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT,
+			linkCountLimit: env.OTEL_SPAN_LINK_COUNT_LIMIT,
+			eventCountLimit: env.OTEL_SPAN_EVENT_COUNT_LIMIT,
+			attributePerEventCountLimit: env.OTEL_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT,
+			attributePerLinkCountLimit: env.OTEL_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT,
 		},
+		mergeResourceWithDefaults: true,
 	};
 }
 function buildSamplerFromEnv(environment = getEnv()) {
@@ -789,17 +801,25 @@ class BasicTracerProvider {
 		this._tracers = new Map();
 		const mergedConfig = merge({}, loadDefaultConfig(), reconfigureLimits(config));
 		this.resource = mergedConfig.resource ?? Resource.empty();
-		this.resource = Resource.default().merge(this.resource);
+		if (mergedConfig.mergeResourceWithDefaults) {
+			this.resource = Resource.default().merge(this.resource);
+		}
 		this._config = Object.assign({}, mergedConfig, {
 			resource: this.resource,
 		});
-		const defaultExporter = this._buildExporterFromEnv();
-		if (defaultExporter !== undefined) {
-			const batchProcessor = new BatchSpanProcessor(defaultExporter);
-			this.activeSpanProcessor = batchProcessor;
+		if (config.spanProcessors?.length) {
+			this._registeredSpanProcessors = [...config.spanProcessors];
+			this.activeSpanProcessor = new MultiSpanProcessor(this._registeredSpanProcessors);
 		}
 		else {
-			this.activeSpanProcessor = new NoopSpanProcessor();
+			const defaultExporter = this._buildExporterFromEnv();
+			if (defaultExporter !== undefined) {
+				const batchProcessor = new BatchSpanProcessor(defaultExporter);
+				this.activeSpanProcessor = batchProcessor;
+			}
+			else {
+				this.activeSpanProcessor = new NoopSpanProcessor();
+			}
 		}
 	}
 	getTracer(name, version, options) {
@@ -941,6 +961,7 @@ class ConsoleSpanExporter {
 			resource: {
 				attributes: span.resource.attributes,
 			},
+			instrumentationScope: span.instrumentationLibrary,
 			traceId: span.spanContext().traceId,
 			parentId: span.parentSpanId,
 			traceState: span.spanContext().traceState?.serialize(),

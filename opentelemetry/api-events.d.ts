@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-import { Attributes } from './api.d.ts';
-import { AnyValue } from './api-logs.d.ts';
+import { TimeInput, Attributes, Context } from './api.d.ts';
+import { AnyValue, SeverityNumber } from './api-logs.d.ts';
 
 interface Event {
 	/**
 	* The time when the event occurred as UNIX Epoch time in nanoseconds.
 	*/
-	timestamp?: number;
+	timestamp?: TimeInput;
 	/**
 	* The name of the event.
 	*/
@@ -36,17 +36,13 @@ interface Event {
 	*/
 	attributes?: Attributes;
 	/**
-	* 8 least significant bits are the trace flags as defined in W3C Trace Context specification.
+	* Numerical value of the severity.
 	*/
-	traceFlags?: number;
+	severityNumber?: SeverityNumber;
 	/**
-	* A unique identifier for a trace.
+	* The Context associated with the Event.
 	*/
-	traceId?: string;
-	/**
-	* A unique identifier for a span within a trace.
-	*/
-	spanId?: string;
+	context?: Context;
 }
 
 interface EventLogger {

@@ -14,7 +14,49 @@
  * limitations under the License.
  */
 
-import { BindOnceFuture, ExportResult } from './core.d.ts';
+import { ExportResult } from './core.d.ts';
+import { ISerializer } from './otlp-transformer.d.ts';
+
+interface ExportResponseSuccess {
+	status: 'success';
+	data?: Uint8Array;
+}
+interface ExportResponseFailure {
+	status: 'failure';
+	error: Error;
+}
+interface ExportResponseRetryable {
+	status: 'retryable';
+	retryInMillis?: number;
+}
+declare type ExportResponse = ExportResponseSuccess | ExportResponseFailure | ExportResponseRetryable;
+
+interface IExporterTransport {
+	send(data: Uint8Array, timeoutMillis: number): Promise<ExportResponse>;
+	shutdown(): void;
+}
+
+/**
+ * Internally shared export logic for OTLP.
+ */
+interface IOtlpExportDelegate<Internal> {
+	export(internalRepresentation: Internal, resultCallback: (result: ExportResult) => void): void;
+	forceFlush(): Promise<void>;
+	shutdown(): Promise<void>;
+}
+
+declare class OTLPExporterBase<Internal> {
+	private _delegate;
+	constructor(_delegate: IOtlpExportDelegate<Internal>);
+	/**
+	* Export items.
+	* @param items
+	* @param resultCallback
+	*/
+	export(items: Internal, resultCallback: (result: ExportResult) => void): void;
+	forceFlush(): Promise<void>;
+	shutdown(): Promise<void>;
+}
 
 /**
  * Interface for handling error
@@ -25,25 +67,30 @@ declare class OTLPExporterError extends Error {
 	readonly data?: string;
 	constructor(message?: string, code?: number, data?: string);
 }
+
 /**
- * Interface for handling export service errors
+ * Configuration shared across all OTLP exporters
+ *
+ * Implementation note: anything added here MUST be
+ * - platform-agnostic
+ * - signal-agnostic
+ * - transport-agnostic
  */
-interface ExportServiceError {
-	name: string;
-	code: number;
-	details: string;
-	metadata: {
-		[key: string]: unknown;
-	};
-	message: string;
-	stack: string;
+interface OtlpSharedConfiguration {
+	timeoutMillis: number;
+	concurrencyLimit: number;
+	compression: 'gzip' | 'none';
 }
 /**
- * Collector Exporter base config
+ * @param userProvidedConfiguration  Configuration options provided by the user in code.
+ * @param fallbackConfiguration Fallback to use when the {@link userProvidedConfiguration} does not specify an option.
+ * @param defaultConfiguration The defaults as defined by the exporter specification
  */
+declare function mergeOtlpSharedConfigurationWithDefaults(userProvidedConfiguration: Partial<OtlpSharedConfiguration>, fallbackConfiguration: Partial<OtlpSharedConfiguration>, defaultConfiguration: OtlpSharedConfiguration): OtlpSharedConfiguration;
+declare function getSharedConfigurationDefaults(): OtlpSharedConfiguration;
+
 interface OTLPExporterConfigBase {
-	headers?: Partial<Record<string, unknown>>;
-	hostname?: string;
+	headers?: Record<string, string>;
 	url?: string;
 	concurrencyLimit?: number;
 	/** Maximum time the OTLP exporter will wait for each batch export.
@@ -52,69 +99,34 @@ interface OTLPExporterConfigBase {
 }
 
 /**
- * Collector Exporter abstract base class
+ * Collector Exporter node base config
  */
-declare abstract class OTLPExporterBase<T extends OTLPExporterConfigBase, ExportItem, ServiceRequest> {
-	readonly url: string;
-	readonly hostname: string | undefined;
-	readonly timeoutMillis: number;
-	protected _concurrencyLimit: number;
-	protected _sendingPromises: Promise<unknown>[];
-	protected _shutdownOnce: BindOnceFuture<void>;
-	/**
-	* @param config
-	*/
-	constructor(config?: T);
-	/**
-	* Export items.
-	* @param items
-	* @param resultCallback
-	*/
-	export(items: ExportItem[], resultCallback: (result: ExportResult) => void): void;
-	private _export;
-	/**
-	* Shutdown the exporter.
-	*/
-	shutdown(): Promise<void>;
-	/**
-	* Exports any pending spans in the exporter
-	*/
-	forceFlush(): Promise<void>;
-	/**
-	* Called by _shutdownOnce with BindOnceFuture
-	*/
-	private _shutdown;
-	abstract onShutdown(): void;
-	abstract onInit(config: T): void;
-	abstract send(items: ExportItem[], onSuccess: () => void, onError: (error: OTLPExporterError) => void): void;
-	abstract getDefaultUrl(config: T): string;
-	abstract convert(objects: ExportItem[]): ServiceRequest;
+interface OTLPExporterNodeConfigBase extends OTLPExporterConfigBase {
+	compression?: CompressionAlgorithm;
+}
+declare enum CompressionAlgorithm {
+	NONE = "none",
+	GZIP = "gzip"
 }
 
-/**
- * Parses headers from config leaving only those that have defined values
- * @param partialHeaders
- */
-declare function parseHeaders(partialHeaders?: Partial<Record<string, unknown>>): Record<string, string>;
-/**
- * Adds path (version + signal) to a no per-signal endpoint
- * @param url
- * @param path
- * @returns url + path
- */
-declare function appendResourcePathToUrl(url: string, path: string): string;
-/**
- * Adds root path to signal specific endpoint when endpoint contains no path part and no root path
- * @param url
- * @returns url
- */
-declare function appendRootPathToUrlIfNeeded(url: string): string;
-/**
- * Configure exporter trace timeout value from passed in value or environment variables
- * @param timeoutMillis
- * @returns timeout value in milliseconds
- */
-declare function configureExporterTimeout(timeoutMillis: number | undefined): number;
-declare function invalidTimeout(timeout: number, defaultTimeout: number): number;
+declare function createOtlpNetworkExportDelegate<Internal, Response>(options: OtlpSharedConfiguration, serializer: ISerializer<Internal, Response>, transport: IExporterTransport): IOtlpExportDelegate<Internal>;
 
-export { ExportServiceError, OTLPExporterBase, OTLPExporterConfigBase, OTLPExporterError, appendResourcePathToUrl, appendRootPathToUrlIfNeeded, configureExporterTimeout, invalidTimeout, parseHeaders };
+interface OtlpHttpConfiguration extends OtlpSharedConfiguration {
+	url: string;
+	headers: () => Record<string, string>;
+}
+
+declare function createOtlpHttpExportDelegate<Internal, Response>(options: OtlpHttpConfiguration, serializer: ISerializer<Internal, Response>): IOtlpExportDelegate<Internal>;
+
+declare function getSharedConfigurationFromEnvironment(signalIdentifier: string): Partial<OtlpSharedConfiguration>;
+
+/**
+ * @deprecated this will be removed in 2.0
+ * @param config
+ * @param signalIdentifier
+ * @param signalResourcePath
+ * @param requiredHeaders
+ */
+declare function convertLegacyHttpOptions(config: OTLPExporterNodeConfigBase, signalIdentifier: string, signalResourcePath: string, requiredHeaders: Record<string, string>): OtlpHttpConfiguration;
+
+export { CompressionAlgorithm, ExportResponse, ExportResponseFailure, ExportResponseRetryable, ExportResponseSuccess, IExporterTransport, IOtlpExportDelegate, OTLPExporterBase, OTLPExporterConfigBase, OTLPExporterError, OTLPExporterNodeConfigBase, OtlpSharedConfiguration, convertLegacyHttpOptions, createOtlpHttpExportDelegate, createOtlpNetworkExportDelegate, getSharedConfigurationDefaults, getSharedConfigurationFromEnvironment, mergeOtlpSharedConfigurationWithDefaults };

@@ -15,9 +15,146 @@
  */
 
 import * as api from './api.d.ts';
-import { SpanAttributes, TraceState, Context, SpanKind, Link, TextMapPropagator, ContextManager, HrTime, SpanContext, SpanStatus, TracerProvider, Span as Span$1, TimeInput, SpanAttributeValue, Exception } from './api.d.ts';
+import { HrTime, SpanAttributes, SpanKind, SpanContext, SpanStatus, Link, Span as Span$1, Context, TimeInput, SpanAttributeValue, Exception, TraceState, TextMapPropagator, ContextManager, TracerProvider } from './api.d.ts';
 import { InstrumentationLibrary, ExportResult } from './core.d.ts';
 import { IResource } from './resources.d.ts';
+
+/**
+ * Represents a timed event.
+ * A timed event is an event with a timestamp.
+ */
+interface TimedEvent {
+	time: HrTime;
+	/** The name of the event. */
+	name: string;
+	/** The attributes of the event. */
+	attributes?: SpanAttributes;
+	/** Count of attributes of the event that were dropped due to collection limits */
+	droppedAttributesCount?: number;
+}
+
+interface ReadableSpan {
+	readonly name: string;
+	readonly kind: SpanKind;
+	readonly spanContext: () => SpanContext;
+	readonly parentSpanId?: string;
+	readonly startTime: HrTime;
+	readonly endTime: HrTime;
+	readonly status: SpanStatus;
+	readonly attributes: SpanAttributes;
+	readonly links: Link[];
+	readonly events: TimedEvent[];
+	readonly duration: HrTime;
+	readonly ended: boolean;
+	readonly resource: IResource;
+	readonly instrumentationLibrary: InstrumentationLibrary;
+	readonly droppedAttributesCount: number;
+	readonly droppedEventsCount: number;
+	readonly droppedLinksCount: number;
+}
+
+/**
+ * This class represents a span.
+ */
+declare class Span implements Span$1, ReadableSpan {
+	private readonly _spanContext;
+	readonly kind: SpanKind;
+	readonly parentSpanId?: string;
+	readonly attributes: SpanAttributes;
+	readonly links: Link[];
+	readonly events: TimedEvent[];
+	readonly startTime: HrTime;
+	readonly resource: IResource;
+	readonly instrumentationLibrary: InstrumentationLibrary;
+	private _droppedAttributesCount;
+	private _droppedEventsCount;
+	private _droppedLinksCount;
+	name: string;
+	status: SpanStatus;
+	endTime: HrTime;
+	private _ended;
+	private _duration;
+	private readonly _spanProcessor;
+	private readonly _spanLimits;
+	private readonly _attributeValueLengthLimit;
+	private readonly _performanceStartTime;
+	private readonly _performanceOffset;
+	private readonly _startTimeProvided;
+	/**
+	* Constructs a new Span instance.
+	*
+	* @deprecated calling Span constructor directly is not supported. Please use tracer.startSpan.
+	* */
+	constructor(parentTracer: Tracer, context: Context, spanName: string, spanContext: SpanContext, kind: SpanKind, parentSpanId?: string, links?: Link[], startTime?: TimeInput, _deprecatedClock?: unknown, // keeping this argument even though it is unused to ensure backwards compatibility
+	attributes?: SpanAttributes);
+	spanContext(): SpanContext;
+	setAttribute(key: string, value?: SpanAttributeValue): this;
+	setAttributes(attributes: SpanAttributes): this;
+	/**
+	*
+	* @param name Span Name
+	* @param [attributesOrStartTime] Span attributes or start time
+	*     if type is {@type TimeInput} and 3rd param is undefined
+	* @param [timeStamp] Specified time stamp for the event
+	*/
+	addEvent(name: string, attributesOrStartTime?: SpanAttributes | TimeInput, timeStamp?: TimeInput): this;
+	addLink(link: Link): this;
+	addLinks(links: Link[]): this;
+	setStatus(status: SpanStatus): this;
+	updateName(name: string): this;
+	end(endTime?: TimeInput): void;
+	private _getTime;
+	isRecording(): boolean;
+	recordException(exception: Exception, time?: TimeInput): void;
+	get duration(): HrTime;
+	get ended(): boolean;
+	get droppedAttributesCount(): number;
+	get droppedEventsCount(): number;
+	get droppedLinksCount(): number;
+	private _isSpanEnded;
+	private _truncateToLimitUtil;
+	/**
+	* If the given attribute value is of type string and has more characters than given {@code attributeValueLengthLimit} then
+	* return string with truncated to {@code attributeValueLengthLimit} characters
+	*
+	* If the given attribute value is array of strings then
+	* return new array of strings with each element truncated to {@code attributeValueLengthLimit} characters
+	*
+	* Otherwise return same Attribute {@code value}
+	*
+	* @param value Attribute value
+	* @returns truncated attribute value if required, otherwise same value
+	*/
+	private _truncateToSize;
+}
+
+/**
+ * SpanProcessor is the interface Tracer SDK uses to allow synchronous hooks
+ * for when a {@link Span} is started or when a {@link Span} is ended.
+ */
+interface SpanProcessor {
+	/**
+	* Forces to export all finished spans
+	*/
+	forceFlush(): Promise<void>;
+	/**
+	* Called when a {@link Span} is started, if the `span.isRecording()`
+	* returns true.
+	* @param span the Span that just started.
+	*/
+	onStart(span: Span, parentContext: Context): void;
+	/**
+	* Called when a {@link ReadableSpan} is ended, if the `span.isRecording()`
+	* returns true.
+	* @param span the Span that just ended.
+	*/
+	onEnd(span: ReadableSpan): void;
+	/**
+	* Shuts down the processor. Called when SDK is shut down. This is an
+	* opportunity for processor to do any cleanup required.
+	*/
+	shutdown(): Promise<void>;
+}
 
 /** IdGenerator provides an interface for generating Trace Id and Span Id */
 interface IdGenerator {
@@ -108,6 +245,11 @@ interface TracerConfig {
 	generalLimits?: GeneralLimits;
 	/** Span Limits */
 	spanLimits?: SpanLimits;
+	/**
+	* Merge resource with {@link Resource.default()}?
+	* Default: {@code true}
+	**/
+	mergeResourceWithDefaults?: boolean;
 	/** Resource associated with trace telemetry  */
 	resource?: IResource;
 	/**
@@ -120,6 +262,10 @@ interface TracerConfig {
 	* The default value is 30000ms
 	*/
 	forceFlushTimeoutMillis?: number;
+	/**
+	* List of SpanProcessor for the tracer
+	*/
+	spanProcessors?: SpanProcessor[];
 }
 /**
  * Configuration options for registering the API with the SDK.
@@ -177,40 +323,6 @@ interface BatchSpanProcessorBrowserConfig extends BufferConfig {
 }
 
 /**
- * Represents a timed event.
- * A timed event is an event with a timestamp.
- */
-interface TimedEvent {
-	time: HrTime;
-	/** The name of the event. */
-	name: string;
-	/** The attributes of the event. */
-	attributes?: SpanAttributes;
-	/** Count of attributes of the event that were dropped due to collection limits */
-	droppedAttributesCount?: number;
-}
-
-interface ReadableSpan {
-	readonly name: string;
-	readonly kind: SpanKind;
-	readonly spanContext: () => SpanContext;
-	readonly parentSpanId?: string;
-	readonly startTime: HrTime;
-	readonly endTime: HrTime;
-	readonly status: SpanStatus;
-	readonly attributes: SpanAttributes;
-	readonly links: Link[];
-	readonly events: TimedEvent[];
-	readonly duration: HrTime;
-	readonly ended: boolean;
-	readonly resource: IResource;
-	readonly instrumentationLibrary: InstrumentationLibrary;
-	readonly droppedAttributesCount: number;
-	readonly droppedEventsCount: number;
-	readonly droppedLinksCount: number;
-}
-
-/**
  * An interface that allows different tracing services to export recorded data
  * for sampled spans in their own format.
  *
@@ -253,6 +365,7 @@ declare class BasicTracerProvider implements TracerProvider {
 		schemaUrl?: string;
 	}): Tracer;
 	/**
+	* @deprecated please use {@link TracerConfig} spanProcessors property
 	* Adds a new {@link SpanProcessor} to this tracer.
 	* @param spanProcessor the new SpanProcessor to be added.
 	*/
@@ -279,107 +392,6 @@ declare class BasicTracerProvider implements TracerProvider {
 	protected _getSpanExporter(name: string): SpanExporter | undefined;
 	protected _buildPropagatorFromEnv(): TextMapPropagator | undefined;
 	protected _buildExporterFromEnv(): SpanExporter | undefined;
-}
-
-/**
- * This class represents a span.
- */
-declare class Span implements Span$1, ReadableSpan {
-	private readonly _spanContext;
-	readonly kind: SpanKind;
-	readonly parentSpanId?: string;
-	readonly attributes: SpanAttributes;
-	readonly links: Link[];
-	readonly events: TimedEvent[];
-	readonly startTime: HrTime;
-	readonly resource: IResource;
-	readonly instrumentationLibrary: InstrumentationLibrary;
-	private _droppedAttributesCount;
-	private _droppedEventsCount;
-	private _droppedLinksCount;
-	name: string;
-	status: SpanStatus;
-	endTime: HrTime;
-	private _ended;
-	private _duration;
-	private readonly _spanProcessor;
-	private readonly _spanLimits;
-	private readonly _attributeValueLengthLimit;
-	private readonly _performanceStartTime;
-	private readonly _performanceOffset;
-	private readonly _startTimeProvided;
-	/**
-	* Constructs a new Span instance.
-	*
-	* @deprecated calling Span constructor directly is not supported. Please use tracer.startSpan.
-	* */
-	constructor(parentTracer: Tracer, context: Context, spanName: string, spanContext: SpanContext, kind: SpanKind, parentSpanId?: string, links?: Link[], startTime?: TimeInput, _deprecatedClock?: unknown, // keeping this argument even though it is unused to ensure backwards compatibility
-	attributes?: SpanAttributes);
-	spanContext(): SpanContext;
-	setAttribute(key: string, value?: SpanAttributeValue): this;
-	setAttributes(attributes: SpanAttributes): this;
-	/**
-	*
-	* @param name Span Name
-	* @param [attributesOrStartTime] Span attributes or start time
-	*     if type is {@type TimeInput} and 3rd param is undefined
-	* @param [timeStamp] Specified time stamp for the event
-	*/
-	addEvent(name: string, attributesOrStartTime?: SpanAttributes | TimeInput, timeStamp?: TimeInput): this;
-	setStatus(status: SpanStatus): this;
-	updateName(name: string): this;
-	end(endTime?: TimeInput): void;
-	private _getTime;
-	isRecording(): boolean;
-	recordException(exception: Exception, time?: TimeInput): void;
-	get duration(): HrTime;
-	get ended(): boolean;
-	get droppedAttributesCount(): number;
-	get droppedEventsCount(): number;
-	get droppedLinksCount(): number;
-	private _isSpanEnded;
-	private _truncateToLimitUtil;
-	/**
-	* If the given attribute value is of type string and has more characters than given {@code attributeValueLengthLimit} then
-	* return string with truncated to {@code attributeValueLengthLimit} characters
-	*
-	* If the given attribute value is array of strings then
-	* return new array of strings with each element truncated to {@code attributeValueLengthLimit} characters
-	*
-	* Otherwise return same Attribute {@code value}
-	*
-	* @param value Attribute value
-	* @returns truncated attribute value if required, otherwise same value
-	*/
-	private _truncateToSize;
-}
-
-/**
- * SpanProcessor is the interface Tracer SDK uses to allow synchronous hooks
- * for when a {@link Span} is started or when a {@link Span} is ended.
- */
-interface SpanProcessor {
-	/**
-	* Forces to export all finished spans
-	*/
-	forceFlush(): Promise<void>;
-	/**
-	* Called when a {@link Span} is started, if the `span.isRecording()`
-	* returns true.
-	* @param span the Span that just started.
-	*/
-	onStart(span: Span, parentContext: Context): void;
-	/**
-	* Called when a {@link ReadableSpan} is ended, if the `span.isRecording()`
-	* returns true.
-	* @param span the Span that just ended.
-	*/
-	onEnd(span: ReadableSpan): void;
-	/**
-	* Shuts down the processor. Called when SDK is shut down. This is an
-	* opportunity for processor to do any cleanup required.
-	*/
-	shutdown(): Promise<void>;
 }
 
 /**
@@ -510,6 +522,8 @@ declare class RandomIdGenerator implements IdGenerator {
 /**
  * This is implementation of {@link SpanExporter} that prints spans to the
  * console. This class can be used for diagnostic purposes.
+ *
+ * NOTE: This {@link SpanExporter} is intended for diagnostics use only, output rendered to the console may change at any time.
  */
 declare class ConsoleSpanExporter implements SpanExporter {
 	/**
@@ -566,6 +580,8 @@ declare class InMemorySpanExporter implements SpanExporter {
  * to {@link ReadableSpan} and passes it to the configured exporter.
  *
  * Only spans that are sampled are converted.
+ *
+ * NOTE: This {@link SpanProcessor} exports every ended span individually instead of batching spans together, which causes significant performance overhead with most exporters. For production use, please consider using the {@link BatchSpanProcessor} instead.
  */
 declare class SimpleSpanProcessor implements SpanProcessor {
 	private readonly _exporter;

@@ -182,6 +182,7 @@ function loadDefaultConfig() {
 			attributeCountLimit: getEnv().OTEL_LOGRECORD_ATTRIBUTE_COUNT_LIMIT,
 		},
 		includeTraceContext: true,
+		mergeResourceWithDefaults: true,
 	};
 }
 function reconfigureLimits(logRecordLimits) {
@@ -237,10 +238,17 @@ class LoggerProviderSharedState {
 }
 
 const DEFAULT_LOGGER_NAME = 'unknown';
+function prepareResource(mergeWithDefaults, providedResource) {
+	const resource = providedResource ?? Resource.empty();
+	if (mergeWithDefaults) {
+		return Resource.default().merge(resource);
+	}
+	return resource;
+}
 class LoggerProvider {
 	constructor(config = {}) {
 		const mergedConfig = merge({}, loadDefaultConfig(), config);
-		const resource = Resource.default().merge(mergedConfig.resource ?? Resource.empty());
+		const resource = prepareResource(mergedConfig.mergeResourceWithDefaults, config.resource);
 		this._sharedState = new LoggerProviderSharedState(resource, mergedConfig.forceFlushTimeoutMillis, reconfigureLimits(mergedConfig.logRecordLimits));
 		this._shutdownOnce = new BindOnceFuture(this._shutdown, this);
 	}
@@ -296,6 +304,10 @@ class ConsoleLogRecordExporter {
 	}
 	_exportInfo(logRecord) {
 		return {
+			resource: {
+				attributes: logRecord.resource.attributes,
+			},
+			instrumentationScope: logRecord.instrumentationScope,
 			timestamp: hrTimeToMicroseconds(logRecord.hrTime),
 			traceId: logRecord.spanContext?.traceId,
 			spanId: logRecord.spanContext?.spanId,

@@ -16,7 +16,7 @@
 /// <reference types="./resources.d.ts" />
 
 import { diag } from './api.js';
-import { SemanticResourceAttributes, SEMRESATTRS_SERVICE_INSTANCE_ID, SEMRESATTRS_SERVICE_NAME, SEMRESATTRS_TELEMETRY_SDK_LANGUAGE, SEMRESATTRS_TELEMETRY_SDK_NAME, SEMRESATTRS_TELEMETRY_SDK_VERSION } from './semantic-conventions.js';
+import { SEMRESATTRS_SERVICE_NAME, SEMRESATTRS_TELEMETRY_SDK_LANGUAGE, SEMRESATTRS_TELEMETRY_SDK_NAME, SEMRESATTRS_TELEMETRY_SDK_VERSION, SEMRESATTRS_HOST_NAME, SEMRESATTRS_HOST_ARCH, SEMRESATTRS_HOST_ID, SEMRESATTRS_OS_TYPE, SEMRESATTRS_OS_VERSION, SEMRESATTRS_PROCESS_PID, SEMRESATTRS_PROCESS_EXECUTABLE_NAME, SEMRESATTRS_PROCESS_EXECUTABLE_PATH, SEMRESATTRS_PROCESS_COMMAND_ARGS, SEMRESATTRS_PROCESS_RUNTIME_VERSION, SEMRESATTRS_PROCESS_RUNTIME_NAME, SEMRESATTRS_PROCESS_RUNTIME_DESCRIPTION, SEMRESATTRS_PROCESS_OWNER, SEMRESATTRS_PROCESS_COMMAND, SEMRESATTRS_SERVICE_INSTANCE_ID } from './semantic-conventions.js';
 import { SDK_INFO, getEnv } from './core.js';
 
 
@@ -26,118 +26,6 @@ import { SDK_INFO, getEnv } from './core.js';
 function defaultServiceName() {
 	return `unknown_service:deno`;
 }
-
-const normalizeArch = (archString) => ({
-	'x64_64': 'amd64',
-	'aarch64': 'arm64',
-})[archString] ?? archString;
-const normalizeType = (os) => os;
-
-async function getMachineId() {
-	const paths = ['/etc/machine-id', '/var/lib/dbus/machine-id'];
-	for (const path of paths) {
-		try {
-			const result = await Deno.readTextFile(path);
-			return result.trim();
-		}
-		catch (e) {
-			diag.debug(`error reading machine id: ${e}`);
-		}
-	}
-	return '';
-}
-
-class HostDetectorSync {
-	detect(_config) {
-		const attributes = {
-			[SemanticResourceAttributes.HOST_NAME]: Deno.hostname?.(),
-			[SemanticResourceAttributes.HOST_ARCH]: normalizeArch(Deno.build.arch),
-		};
-		return new Resource(attributes, this._getAsyncAttributes());
-	}
-	_getAsyncAttributes() {
-		return getMachineId().then(machineId => {
-			const attributes = {};
-			if (machineId) {
-				attributes[SemanticResourceAttributes.HOST_ID] = machineId;
-			}
-			return attributes;
-		});
-	}
-}
-const hostDetectorSync = new HostDetectorSync();
-
-class HostDetector {
-	detect(_config) {
-		return Promise.resolve(hostDetectorSync.detect(_config));
-	}
-}
-const hostDetector = new HostDetector();
-
-class OSDetectorSync {
-	detect(_config) {
-		const attributes = {
-			[SemanticResourceAttributes.OS_TYPE]: Deno.build.os,
-			[SemanticResourceAttributes.OS_VERSION]: Deno.osRelease?.(),
-		};
-		return new Resource(attributes);
-	}
-}
-const osDetectorSync = new OSDetectorSync();
-
-class OSDetector {
-	detect(_config) {
-		return Promise.resolve(osDetectorSync.detect(_config));
-	}
-}
-const osDetector = new OSDetector();
-
-class ProcessDetectorSync {
-	detect(_config) {
-		const attributes = {
-			[SemanticResourceAttributes.PROCESS_PID]: process.pid,
-			[SemanticResourceAttributes.PROCESS_EXECUTABLE_NAME]: process.title,
-			[SemanticResourceAttributes.PROCESS_EXECUTABLE_PATH]: process.execPath,
-			[SemanticResourceAttributes.PROCESS_COMMAND_ARGS]: [
-				process.argv[0],
-				...process.execArgv,
-				...process.argv.slice(1),
-			],
-			[SemanticResourceAttributes.PROCESS_RUNTIME_VERSION]: process.versions.node,
-			[SemanticResourceAttributes.PROCESS_RUNTIME_NAME]: 'nodejs',
-			[SemanticResourceAttributes.PROCESS_RUNTIME_DESCRIPTION]: 'Node.js',
-		};
-		if (process.argv.length > 1) {
-			attributes[SemanticResourceAttributes.PROCESS_COMMAND] = process.argv[1];
-		}
-		try {
-			const userInfo = os.userInfo();
-			attributes[SemanticResourceAttributes.PROCESS_OWNER] = userInfo.username;
-		}
-		catch (e) {
-			diag.debug(`error obtaining process owner: ${e}`);
-		}
-		return new Resource(attributes);
-	}
-}
-const processDetectorSync = new ProcessDetectorSync();
-
-class ProcessDetector {
-	detect(config) {
-		return Promise.resolve(processDetectorSync.detect(config));
-	}
-}
-const processDetector = new ProcessDetector();
-
-class ServiceInstanceIdDetectorSync {
-	detect(_config) {
-		const attributes = {
-			[SEMRESATTRS_SERVICE_INSTANCE_ID]: crypto.randomUUID(),
-		};
-		return new Resource(attributes);
-	}
-}
-const serviceInstanceIdDetectorSync = new ServiceInstanceIdDetectorSync();
 
 class Resource {
 	constructor(
@@ -203,6 +91,164 @@ class Resource {
 	}
 }
 Resource.EMPTY = new Resource({});
+
+const normalizeArch = (nodeArchString) => {
+	switch (nodeArchString) {
+		case 'arm':
+			return 'arm32';
+		case 'ppc':
+			return 'ppc32';
+		case 'x64':
+			return 'amd64';
+		default:
+			return nodeArchString;
+	}
+};
+const normalizeType = (nodePlatform) => {
+	switch (nodePlatform) {
+		case 'sunos':
+			return 'solaris';
+		case 'win32':
+			return 'windows';
+		default:
+			return nodePlatform;
+	}
+};
+
+async function getMachineId() {
+	const paths = ['/etc/machine-id', '/var/lib/dbus/machine-id'];
+	for (const path of paths) {
+		try {
+			const result = await Deno.readTextFile(path);
+			return result.trim();
+		}
+		catch (e) {
+			diag.debug(`error reading machine id: ${e}`);
+		}
+	}
+	return '';
+}
+
+class HostDetectorSync {
+	detect(_config) {
+		const attributes = {
+			[SEMRESATTRS_HOST_NAME]: Deno.hostname?.(),
+			[SEMRESATTRS_HOST_ARCH]: normalizeArch(Deno.build.arch),
+		};
+		return new Resource(attributes, this._getAsyncAttributes());
+	}
+	_getAsyncAttributes() {
+		return getMachineId().then(machineId => {
+			const attributes = {};
+			if (machineId) {
+				attributes[SEMRESATTRS_HOST_ID] = machineId;
+			}
+			return attributes;
+		});
+	}
+}
+const hostDetectorSync = new HostDetectorSync();
+
+class HostDetector {
+	detect(_config) {
+		return Promise.resolve(hostDetectorSync.detect(_config));
+	}
+}
+const hostDetector = new HostDetector();
+
+class OSDetectorSync {
+	detect(_config) {
+		const attributes = {
+			[SEMRESATTRS_OS_TYPE]: Deno.build.os,
+			[SEMRESATTRS_OS_VERSION]: Deno.osRelease?.(),
+		};
+		return new Resource(attributes);
+	}
+}
+const osDetectorSync = new OSDetectorSync();
+
+class OSDetector {
+	detect(_config) {
+		return Promise.resolve(osDetectorSync.detect(_config));
+	}
+}
+const osDetector = new OSDetector();
+
+class ProcessDetectorSync {
+	detect(_config) {
+		const attributes = {
+			[SEMRESATTRS_PROCESS_PID]: process.pid,
+			[SEMRESATTRS_PROCESS_EXECUTABLE_NAME]: process.title,
+			[SEMRESATTRS_PROCESS_EXECUTABLE_PATH]: process.execPath,
+			[SEMRESATTRS_PROCESS_COMMAND_ARGS]: [
+				process.argv[0],
+				...process.execArgv,
+				...process.argv.slice(1),
+			],
+			[SEMRESATTRS_PROCESS_RUNTIME_VERSION]: process.versions.node,
+			[SEMRESATTRS_PROCESS_RUNTIME_NAME]: 'nodejs',
+			[SEMRESATTRS_PROCESS_RUNTIME_DESCRIPTION]: 'Node.js',
+		};
+		if (process.argv.length > 1) {
+			attributes[SEMRESATTRS_PROCESS_COMMAND] = process.argv[1];
+		}
+		try {
+			const userInfo = os.userInfo();
+			attributes[SEMRESATTRS_PROCESS_OWNER] = userInfo.username;
+		}
+		catch (e) {
+			diag.debug(`error obtaining process owner: ${e}`);
+		}
+		return new Resource(attributes);
+	}
+}
+const processDetectorSync = new ProcessDetectorSync();
+
+class ProcessDetector {
+	detect(config) {
+		return Promise.resolve(processDetectorSync.detect(config));
+	}
+}
+const processDetector = new ProcessDetector();
+
+class ServiceInstanceIdDetectorSync {
+	detect(_config) {
+		const attributes = {
+			[SEMRESATTRS_SERVICE_INSTANCE_ID]: crypto.randomUUID(),
+		};
+		return new Resource(attributes);
+	}
+}
+const serviceInstanceIdDetectorSync = new ServiceInstanceIdDetectorSync();
+
+class BrowserDetectorSync {
+	detect(config) {
+		const isBrowser = typeof navigator !== 'undefined' &&
+			global.process?.versions?.node === undefined &&
+			global.Bun?.version === undefined;
+		if (!isBrowser) {
+			return Resource.empty();
+		}
+		const browserResource = {
+			[SEMRESATTRS_PROCESS_RUNTIME_NAME]: 'browser',
+			[SEMRESATTRS_PROCESS_RUNTIME_DESCRIPTION]: 'Web Browser',
+			[SEMRESATTRS_PROCESS_RUNTIME_VERSION]: navigator.userAgent,
+		};
+		return this._getResourceAttributes(browserResource, config);
+	}
+	_getResourceAttributes(browserResource, _config) {
+		if (browserResource[SEMRESATTRS_PROCESS_RUNTIME_VERSION] === '') {
+			diag.debug('BrowserDetector failed: Unable to find required browser resources. ');
+			return Resource.empty();
+		}
+		else {
+			return new Resource({
+				...browserResource,
+			});
+		}
+	}
+}
+const browserDetectorSync = new BrowserDetectorSync();
 
 class BrowserDetector {
 	detect(config) {
@@ -290,35 +336,6 @@ class EnvDetector {
 }
 const envDetector = new EnvDetector();
 
-class BrowserDetectorSync {
-	detect(config) {
-		const isBrowser = typeof navigator !== 'undefined' &&
-			global.process?.versions?.node === undefined &&
-			global.Bun?.version === undefined;
-		if (!isBrowser) {
-			return Resource.empty();
-		}
-		const browserResource = {
-			[SemanticResourceAttributes.PROCESS_RUNTIME_NAME]: 'browser',
-			[SemanticResourceAttributes.PROCESS_RUNTIME_DESCRIPTION]: 'Web Browser',
-			[SemanticResourceAttributes.PROCESS_RUNTIME_VERSION]: navigator.userAgent,
-		};
-		return this._getResourceAttributes(browserResource, config);
-	}
-	_getResourceAttributes(browserResource, _config) {
-		if (browserResource[SemanticResourceAttributes.PROCESS_RUNTIME_VERSION] === '') {
-			diag.debug('BrowserDetector failed: Unable to find required browser resources. ');
-			return Resource.empty();
-		}
-		else {
-			return new Resource({
-				...browserResource,
-			});
-		}
-	}
-}
-const browserDetectorSync = new BrowserDetectorSync();
-
 const isPromiseLike = (val) => {
 	return (val !== null && typeof val === 'object' && typeof val.then === 'function');
 };
@@ -346,6 +363,7 @@ const detectResourcesSync = (config = {}) => {
 			if (isPromiseLike(resourceOrPromise)) {
 				const createPromise = async () => {
 					const resolvedResource = await resourceOrPromise;
+					await resolvedResource.waitForAsyncAttributes?.();
 					return resolvedResource.attributes;
 				};
 				resource = new Resource({}, createPromise());
