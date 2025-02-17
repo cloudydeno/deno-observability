@@ -517,7 +517,7 @@ function getIdGenerator(bytes) {
 
 const otperformance = performance;
 
-const VERSION$1 = "1.29.0";
+const VERSION$1 = "1.30.0";
 
 const SDK_INFO = {
 	[SEMRESATTRS_TELEMETRY_SDK_NAME]: 'opentelemetry',

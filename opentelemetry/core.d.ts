@@ -580,7 +580,7 @@ declare class BindOnceFuture<R, This = unknown, T extends (this: This, ...args: 
 	call(...args: Parameters<T>): Promise<R>;
 }
 
-declare const VERSION = "1.29.0";
+declare const VERSION = "1.30.0";
 
 interface Exporter<T> {
 	export(arg: T, resultCallback: (result: ExportResult) => void): void;

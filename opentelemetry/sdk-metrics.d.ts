@@ -1343,7 +1343,7 @@ declare class MeterProvider implements MeterProvider$1 {
 	*/
 	addMetricReader(metricReader: MetricReader): void;
 	/**
-	* Flush all buffered data and shut down the MeterProvider and all registered
+	* Shut down the MeterProvider and all registered
 	* MetricReaders.
 	*
 	* Returns a promise which is resolved when all flushes are complete.

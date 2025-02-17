@@ -17,7 +17,7 @@
 
 import * as api from './api.js';
 import { SpanStatusCode, diag, trace, isSpanContextValid, TraceFlags, isValidTraceId, context, propagation } from './api.js';
-import { otperformance, getTimeOrigin, isAttributeValue, isTimeInput, sanitizeAttributes, hrTimeDuration, hrTime, millisToHrTime, isTimeInputHrTime, addHrTimes, globalErrorHandler, getEnv, TracesSamplerValues, getEnvWithoutDefaults, DEFAULT_ATTRIBUTE_COUNT_LIMIT, DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT, BindOnceFuture, suppressTracing, unrefTimer, ExportResultCode, isTracingSuppressed, merge, CompositePropagator, W3CTraceContextPropagator, W3CBaggagePropagator, hrTimeToMicroseconds, internal } from './core.js';
+import { otperformance, getTimeOrigin, isAttributeValue, isTimeInput, sanitizeAttributes, hrTimeDuration, hrTime, millisToHrTime, isTimeInputHrTime, addHrTimes, globalErrorHandler, TracesSamplerValues, getEnv, getEnvWithoutDefaults, DEFAULT_ATTRIBUTE_COUNT_LIMIT, DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT, BindOnceFuture, suppressTracing, unrefTimer, ExportResultCode, isTracingSuppressed, merge, CompositePropagator, W3CTraceContextPropagator, W3CBaggagePropagator, hrTimeToMicroseconds, internal } from './core.js';
 import { SEMATTRS_EXCEPTION_TYPE, SEMATTRS_EXCEPTION_MESSAGE, SEMATTRS_EXCEPTION_STACKTRACE } from './semantic-conventions.js';
 import { Resource } from './resources.js';
 
@@ -351,25 +351,24 @@ class TraceIdRatioBasedSampler {
 	}
 }
 
-const env = getEnv();
 const FALLBACK_OTEL_TRACES_SAMPLER = TracesSamplerValues.AlwaysOn;
 const DEFAULT_RATIO = 1;
 function loadDefaultConfig() {
-	const _env = getEnv();
+	const env = getEnv();
 	return {
 		sampler: buildSamplerFromEnv(env),
 		forceFlushTimeoutMillis: 30000,
 		generalLimits: {
-			attributeValueLengthLimit: _env.OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT,
-			attributeCountLimit: _env.OTEL_ATTRIBUTE_COUNT_LIMIT,
+			attributeValueLengthLimit: env.OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT,
+			attributeCountLimit: env.OTEL_ATTRIBUTE_COUNT_LIMIT,
 		},
 		spanLimits: {
-			attributeValueLengthLimit: _env.OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT,
-			attributeCountLimit: _env.OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT,
-			linkCountLimit: _env.OTEL_SPAN_LINK_COUNT_LIMIT,
-			eventCountLimit: _env.OTEL_SPAN_EVENT_COUNT_LIMIT,
-			attributePerEventCountLimit: _env.OTEL_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT,
-			attributePerLinkCountLimit: _env.OTEL_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT,
+			attributeValueLengthLimit: env.OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT,
+			attributeCountLimit: env.OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT,
+			linkCountLimit: env.OTEL_SPAN_LINK_COUNT_LIMIT,
+			eventCountLimit: env.OTEL_SPAN_EVENT_COUNT_LIMIT,
+			attributePerEventCountLimit: env.OTEL_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT,
+			attributePerLinkCountLimit: env.OTEL_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT,
 		},
 		mergeResourceWithDefaults: true,
 	};

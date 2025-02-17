@@ -19,6 +19,24 @@ import { hexToBinary, hrTimeToNanoseconds } from './core.js';
 import { ValueType } from './api.js';
 import { DataPointType, AggregationTemporality } from './sdk-metrics.js';
 
+const MissingSerializer$2 = {
+	serializeRequest: (arg) => { throw new Error('not implemented'); },
+	deserializeResponse: (arg) => { throw new Error('not implemented'); },
+};
+const ProtobufLogsSerializer = MissingSerializer$2;
+
+const MissingSerializer$1 = {
+	serializeRequest: (arg) => { throw new Error('not implemented'); },
+	deserializeResponse: (arg) => { throw new Error('not implemented'); },
+};
+const ProtobufMetricsSerializer = MissingSerializer$1;
+
+const MissingSerializer = {
+	serializeRequest: (arg) => { throw new Error('not implemented'); },
+	deserializeResponse: (arg) => { throw new Error('not implemented'); },
+};
+const ProtobufTraceSerializer = MissingSerializer;
+
 function hrTimeToNanos(hrTime) {
 	const NANOSECONDS = BigInt(1000000000);
 	return BigInt(hrTime[0]) * NANOSECONDS + BigInt(hrTime[1]);
@@ -63,16 +81,12 @@ function getOtlpEncoder(options) {
 	};
 }
 
-var ESpanKind;
-(function (ESpanKind) {
-	ESpanKind[ESpanKind["SPAN_KIND_UNSPECIFIED"] = 0] = "SPAN_KIND_UNSPECIFIED";
-	ESpanKind[ESpanKind["SPAN_KIND_INTERNAL"] = 1] = "SPAN_KIND_INTERNAL";
-	ESpanKind[ESpanKind["SPAN_KIND_SERVER"] = 2] = "SPAN_KIND_SERVER";
-	ESpanKind[ESpanKind["SPAN_KIND_CLIENT"] = 3] = "SPAN_KIND_CLIENT";
-	ESpanKind[ESpanKind["SPAN_KIND_PRODUCER"] = 4] = "SPAN_KIND_PRODUCER";
-	ESpanKind[ESpanKind["SPAN_KIND_CONSUMER"] = 5] = "SPAN_KIND_CONSUMER";
-})(ESpanKind || (ESpanKind = {}));
-
+function createResource(resource) {
+	return {
+		attributes: toAttributes(resource.attributes),
+		droppedAttributesCount: 0,
+	};
+}
 function createInstrumentationScope(scope) {
 	return {
 		name: scope.name,
@@ -112,113 +126,80 @@ function toAnyValue(value) {
 	return {};
 }
 
-function sdkSpanToOtlpSpan(span, encoder) {
-	const ctx = span.spanContext();
-	const status = span.status;
-	return {
-		traceId: encoder.encodeSpanContext(ctx.traceId),
-		spanId: encoder.encodeSpanContext(ctx.spanId),
-		parentSpanId: encoder.encodeOptionalSpanContext(span.parentSpanId),
-		traceState: ctx.traceState?.serialize(),
-		name: span.name,
-		kind: span.kind == null ? 0 : span.kind + 1,
-		startTimeUnixNano: encoder.encodeHrTime(span.startTime),
-		endTimeUnixNano: encoder.encodeHrTime(span.endTime),
-		attributes: toAttributes(span.attributes),
-		droppedAttributesCount: span.droppedAttributesCount,
-		events: span.events.map(event => toOtlpSpanEvent(event, encoder)),
-		droppedEventsCount: span.droppedEventsCount,
-		status: {
-			code: status.code,
-			message: status.message,
-		},
-		links: span.links.map(link => toOtlpLink(link, encoder)),
-		droppedLinksCount: span.droppedLinksCount,
-	};
-}
-function toOtlpLink(link, encoder) {
-	return {
-		attributes: link.attributes ? toAttributes(link.attributes) : [],
-		spanId: encoder.encodeSpanContext(link.context.spanId),
-		traceId: encoder.encodeSpanContext(link.context.traceId),
-		traceState: link.context.traceState?.serialize(),
-		droppedAttributesCount: link.droppedAttributesCount || 0,
-	};
-}
-function toOtlpSpanEvent(timedEvent, encoder) {
-	return {
-		attributes: timedEvent.attributes
-			? toAttributes(timedEvent.attributes)
-			: [],
-		name: timedEvent.name,
-		timeUnixNano: encoder.encodeHrTime(timedEvent.time),
-		droppedAttributesCount: timedEvent.droppedAttributesCount || 0,
-	};
-}
-
-function createResource(resource) {
-	return {
-		attributes: toAttributes(resource.attributes),
-		droppedAttributesCount: 0,
-	};
-}
-
-function createExportTraceServiceRequest(spans, options) {
+function createExportLogsServiceRequest(logRecords, options) {
 	const encoder = getOtlpEncoder(options);
 	return {
-		resourceSpans: spanRecordsToResourceSpans(spans, encoder),
+		resourceLogs: logRecordsToResourceLogs(logRecords, encoder),
 	};
 }
-function createResourceMap$1(readableSpans) {
+function createResourceMap$1(logRecords) {
 	const resourceMap = new Map();
-	for (const record of readableSpans) {
-		let ilmMap = resourceMap.get(record.resource);
-		if (!ilmMap) {
-			ilmMap = new Map();
-			resourceMap.set(record.resource, ilmMap);
+	for (const record of logRecords) {
+		const { resource, instrumentationScope: { name, version = '', schemaUrl = '' }, } = record;
+		let ismMap = resourceMap.get(resource);
+		if (!ismMap) {
+			ismMap = new Map();
+			resourceMap.set(resource, ismMap);
 		}
-		const instrumentationLibraryKey = `${record.instrumentationLibrary.name}@${record.instrumentationLibrary.version || ''}:${record.instrumentationLibrary.schemaUrl || ''}`;
-		let records = ilmMap.get(instrumentationLibraryKey);
+		const ismKey = `${name}@${version}:${schemaUrl}`;
+		let records = ismMap.get(ismKey);
 		if (!records) {
 			records = [];
-			ilmMap.set(instrumentationLibraryKey, records);
+			ismMap.set(ismKey, records);
 		}
 		records.push(record);
 	}
 	return resourceMap;
 }
-function spanRecordsToResourceSpans(readableSpans, encoder) {
-	const resourceMap = createResourceMap$1(readableSpans);
-	const out = [];
-	const entryIterator = resourceMap.entries();
-	let entry = entryIterator.next();
-	while (!entry.done) {
-		const [resource, ilmMap] = entry.value;
-		const scopeResourceSpans = [];
-		const ilmIterator = ilmMap.values();
-		let ilmEntry = ilmIterator.next();
-		while (!ilmEntry.done) {
-			const scopeSpans = ilmEntry.value;
-			if (scopeSpans.length > 0) {
-				const spans = scopeSpans.map(readableSpan => sdkSpanToOtlpSpan(readableSpan, encoder));
-				scopeResourceSpans.push({
-					scope: createInstrumentationScope(scopeSpans[0].instrumentationLibrary),
-					spans: spans,
-					schemaUrl: scopeSpans[0].instrumentationLibrary.schemaUrl,
-				});
-			}
-			ilmEntry = ilmIterator.next();
-		}
-		const transformedSpans = {
-			resource: createResource(resource),
-			scopeSpans: scopeResourceSpans,
-			schemaUrl: undefined,
-		};
-		out.push(transformedSpans);
-		entry = entryIterator.next();
-	}
-	return out;
+function logRecordsToResourceLogs(logRecords, encoder) {
+	const resourceMap = createResourceMap$1(logRecords);
+	return Array.from(resourceMap, ([resource, ismMap]) => ({
+		resource: createResource(resource),
+		scopeLogs: Array.from(ismMap, ([, scopeLogs]) => {
+			return {
+				scope: createInstrumentationScope(scopeLogs[0].instrumentationScope),
+				logRecords: scopeLogs.map(log => toLogRecord(log, encoder)),
+				schemaUrl: scopeLogs[0].instrumentationScope.schemaUrl,
+			};
+		}),
+		schemaUrl: undefined,
+	}));
 }
+function toLogRecord(log, encoder) {
+	return {
+		timeUnixNano: encoder.encodeHrTime(log.hrTime),
+		observedTimeUnixNano: encoder.encodeHrTime(log.hrTimeObserved),
+		severityNumber: toSeverityNumber(log.severityNumber),
+		severityText: log.severityText,
+		body: toAnyValue(log.body),
+		attributes: toLogAttributes(log.attributes),
+		droppedAttributesCount: log.droppedAttributesCount,
+		flags: log.spanContext?.traceFlags,
+		traceId: encoder.encodeOptionalSpanContext(log.spanContext?.traceId),
+		spanId: encoder.encodeOptionalSpanContext(log.spanContext?.spanId),
+	};
+}
+function toSeverityNumber(severityNumber) {
+	return severityNumber;
+}
+function toLogAttributes(attributes) {
+	return Object.keys(attributes).map(key => toKeyValue(key, attributes[key]));
+}
+
+const JsonLogsSerializer = {
+	serializeRequest: (arg) => {
+		const request = createExportLogsServiceRequest(arg, {
+			useHex: true,
+			useLongBits: false,
+		});
+		const encoder = new TextEncoder();
+		return encoder.encode(JSON.stringify(request));
+	},
+	deserializeResponse: (arg) => {
+		const decoder = new TextDecoder();
+		return JSON.parse(decoder.decode(arg));
+	},
+};
 
 function toResourceMetrics(resourceMetrics, options) {
 	const encoder = getOtlpEncoder(options);
@@ -339,80 +320,125 @@ function toAggregationTemporality(temporality) {
 			return 2 ;
 	}
 }
-
 function createExportMetricsServiceRequest(resourceMetrics, options) {
 	return {
 		resourceMetrics: resourceMetrics.map(metrics => toResourceMetrics(metrics, options)),
 	};
 }
 
-function createExportLogsServiceRequest(logRecords, options) {
-	const encoder = getOtlpEncoder(options);
+const JsonMetricsSerializer = {
+	serializeRequest: (arg) => {
+		const request = createExportMetricsServiceRequest([arg], {
+			useLongBits: false,
+		});
+		const encoder = new TextEncoder();
+		return encoder.encode(JSON.stringify(request));
+	},
+	deserializeResponse: (arg) => {
+		const decoder = new TextDecoder();
+		return JSON.parse(decoder.decode(arg));
+	},
+};
+
+function sdkSpanToOtlpSpan(span, encoder) {
+	const ctx = span.spanContext();
+	const status = span.status;
 	return {
-		resourceLogs: logRecordsToResourceLogs(logRecords, encoder),
+		traceId: encoder.encodeSpanContext(ctx.traceId),
+		spanId: encoder.encodeSpanContext(ctx.spanId),
+		parentSpanId: encoder.encodeOptionalSpanContext(span.parentSpanId),
+		traceState: ctx.traceState?.serialize(),
+		name: span.name,
+		kind: span.kind == null ? 0 : span.kind + 1,
+		startTimeUnixNano: encoder.encodeHrTime(span.startTime),
+		endTimeUnixNano: encoder.encodeHrTime(span.endTime),
+		attributes: toAttributes(span.attributes),
+		droppedAttributesCount: span.droppedAttributesCount,
+		events: span.events.map(event => toOtlpSpanEvent(event, encoder)),
+		droppedEventsCount: span.droppedEventsCount,
+		status: {
+			code: status.code,
+			message: status.message,
+		},
+		links: span.links.map(link => toOtlpLink(link, encoder)),
+		droppedLinksCount: span.droppedLinksCount,
 	};
 }
-function createResourceMap(logRecords) {
+function toOtlpLink(link, encoder) {
+	return {
+		attributes: link.attributes ? toAttributes(link.attributes) : [],
+		spanId: encoder.encodeSpanContext(link.context.spanId),
+		traceId: encoder.encodeSpanContext(link.context.traceId),
+		traceState: link.context.traceState?.serialize(),
+		droppedAttributesCount: link.droppedAttributesCount || 0,
+	};
+}
+function toOtlpSpanEvent(timedEvent, encoder) {
+	return {
+		attributes: timedEvent.attributes
+			? toAttributes(timedEvent.attributes)
+			: [],
+		name: timedEvent.name,
+		timeUnixNano: encoder.encodeHrTime(timedEvent.time),
+		droppedAttributesCount: timedEvent.droppedAttributesCount || 0,
+	};
+}
+function createExportTraceServiceRequest(spans, options) {
+	const encoder = getOtlpEncoder(options);
+	return {
+		resourceSpans: spanRecordsToResourceSpans(spans, encoder),
+	};
+}
+function createResourceMap(readableSpans) {
 	const resourceMap = new Map();
-	for (const record of logRecords) {
-		const { resource, instrumentationScope: { name, version = '', schemaUrl = '' }, } = record;
-		let ismMap = resourceMap.get(resource);
-		if (!ismMap) {
-			ismMap = new Map();
-			resourceMap.set(resource, ismMap);
+	for (const record of readableSpans) {
+		let ilmMap = resourceMap.get(record.resource);
+		if (!ilmMap) {
+			ilmMap = new Map();
+			resourceMap.set(record.resource, ilmMap);
 		}
-		const ismKey = `${name}@${version}:${schemaUrl}`;
-		let records = ismMap.get(ismKey);
+		const instrumentationLibraryKey = `${record.instrumentationLibrary.name}@${record.instrumentationLibrary.version || ''}:${record.instrumentationLibrary.schemaUrl || ''}`;
+		let records = ilmMap.get(instrumentationLibraryKey);
 		if (!records) {
 			records = [];
-			ismMap.set(ismKey, records);
+			ilmMap.set(instrumentationLibraryKey, records);
 		}
 		records.push(record);
 	}
 	return resourceMap;
 }
-function logRecordsToResourceLogs(logRecords, encoder) {
-	const resourceMap = createResourceMap(logRecords);
-	return Array.from(resourceMap, ([resource, ismMap]) => ({
-		resource: createResource(resource),
-		scopeLogs: Array.from(ismMap, ([, scopeLogs]) => {
-			return {
-				scope: createInstrumentationScope(scopeLogs[0].instrumentationScope),
-				logRecords: scopeLogs.map(log => toLogRecord(log, encoder)),
-				schemaUrl: scopeLogs[0].instrumentationScope.schemaUrl,
-			};
-		}),
-		schemaUrl: undefined,
-	}));
+function spanRecordsToResourceSpans(readableSpans, encoder) {
+	const resourceMap = createResourceMap(readableSpans);
+	const out = [];
+	const entryIterator = resourceMap.entries();
+	let entry = entryIterator.next();
+	while (!entry.done) {
+		const [resource, ilmMap] = entry.value;
+		const scopeResourceSpans = [];
+		const ilmIterator = ilmMap.values();
+		let ilmEntry = ilmIterator.next();
+		while (!ilmEntry.done) {
+			const scopeSpans = ilmEntry.value;
+			if (scopeSpans.length > 0) {
+				const spans = scopeSpans.map(readableSpan => sdkSpanToOtlpSpan(readableSpan, encoder));
+				scopeResourceSpans.push({
+					scope: createInstrumentationScope(scopeSpans[0].instrumentationLibrary),
+					spans: spans,
+					schemaUrl: scopeSpans[0].instrumentationLibrary.schemaUrl,
+				});
+			}
+			ilmEntry = ilmIterator.next();
+		}
+		const transformedSpans = {
+			resource: createResource(resource),
+			scopeSpans: scopeResourceSpans,
+			schemaUrl: undefined,
+		};
+		out.push(transformedSpans);
+		entry = entryIterator.next();
+	}
+	return out;
 }
-function toLogRecord(log, encoder) {
-	return {
-		timeUnixNano: encoder.encodeHrTime(log.hrTime),
-		observedTimeUnixNano: encoder.encodeHrTime(log.hrTimeObserved),
-		severityNumber: toSeverityNumber(log.severityNumber),
-		severityText: log.severityText,
-		body: toAnyValue(log.body),
-		attributes: toLogAttributes(log.attributes),
-		droppedAttributesCount: log.droppedAttributesCount,
-		flags: log.spanContext?.traceFlags,
-		traceId: encoder.encodeOptionalSpanContext(log.spanContext?.traceId),
-		spanId: encoder.encodeOptionalSpanContext(log.spanContext?.spanId),
-	};
-}
-function toSeverityNumber(severityNumber) {
-	return severityNumber;
-}
-function toLogAttributes(attributes) {
-	return Object.keys(attributes).map(key => toKeyValue(key, attributes[key]));
-}
-
-const MissingSerializer = {
-	serializeRequest: (arg) => { throw new Error('not implemented'); },
-	deserializeResponse: (arg) => { throw new Error('not implemented'); },
-};
-const ProtobufLogsSerializer = MissingSerializer;
-const ProtobufMetricsSerializer = MissingSerializer;
-const ProtobufTraceSerializer = MissingSerializer;
 
 const JsonTraceSerializer = {
 	serializeRequest: (arg) => {
@@ -428,32 +454,5 @@ const JsonTraceSerializer = {
 		return JSON.parse(decoder.decode(arg));
 	},
 };
-const JsonMetricsSerializer = {
-	serializeRequest: (arg) => {
-		const request = createExportMetricsServiceRequest([arg], {
-			useLongBits: false,
-		});
-		const encoder = new TextEncoder();
-		return encoder.encode(JSON.stringify(request));
-	},
-	deserializeResponse: (arg) => {
-		const decoder = new TextDecoder();
-		return JSON.parse(decoder.decode(arg));
-	},
-};
-const JsonLogsSerializer = {
-	serializeRequest: (arg) => {
-		const request = createExportLogsServiceRequest(arg, {
-			useHex: true,
-			useLongBits: false,
-		});
-		const encoder = new TextEncoder();
-		return encoder.encode(JSON.stringify(request));
-	},
-	deserializeResponse: (arg) => {
-		const decoder = new TextDecoder();
-		return JSON.parse(decoder.decode(arg));
-	},
-};
 
-export { ESpanKind, JsonLogsSerializer, JsonMetricsSerializer, JsonTraceSerializer, ProtobufLogsSerializer, ProtobufMetricsSerializer, ProtobufTraceSerializer, createExportLogsServiceRequest, createExportMetricsServiceRequest, createExportTraceServiceRequest, encodeAsLongBits, encodeAsString, getOtlpEncoder, hrTimeToNanos, toLongBits };
+export { JsonLogsSerializer, JsonMetricsSerializer, JsonTraceSerializer, ProtobufLogsSerializer, ProtobufMetricsSerializer, ProtobufTraceSerializer };

@@ -177,8 +177,13 @@ await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-resources
 // await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/otlp-exporter-base/src/platform/index.ts', ``);
 
 // Trying to avoid embedding the generated protobuf code, at least for now
-await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/otlp-transformer/src/protobuf/serializers.ts', `
-import { ISerializer } from '../common/i-serializer';
+for (const file of [
+  'hack/opentelemetry-js/experimental/packages/otlp-transformer/src/logs/protobuf/logs.ts',
+  'hack/opentelemetry-js/experimental/packages/otlp-transformer/src/metrics/protobuf/metrics.ts',
+  'hack/opentelemetry-js/experimental/packages/otlp-transformer/src/trace/protobuf/trace.ts',
+]) {
+  await Deno.writeTextFile(file, `
+import { ISerializer } from '../../i-serializer';
 export const MissingSerializer: ISerializer<
   any,
   any
@@ -191,6 +196,7 @@ export const ProtobufLogsSerializer = MissingSerializer;
 export const ProtobufMetricsSerializer = MissingSerializer;
 export const ProtobufTraceSerializer = MissingSerializer;
 `);
+}
 
 await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/opentelemetry-instrumentation/src/platform/index.ts', `export * from './browser';`);
 
