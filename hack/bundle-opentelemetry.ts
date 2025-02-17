@@ -8,13 +8,7 @@ import cleanup from 'npm:rollup-plugin-cleanup@3.2.1';
 import dts from 'npm:rollup-plugin-dts@4.2.3';
 
 async function buildModuleWithRollup(directory: string, modName: string, external: string[]) {
-
-  let entrypoint = 'index';
-  // // Treat semantic-conventions differently, at least for now
-  // if (modName == 'semantic-conventions') {
-  //   entrypoint = 'index-incubating';
-  // }
-
+  const entrypoint = 'index';
   const mainFile = await Deno.readTextFile(directory+'/build/esnext/'+entrypoint+'.js');
   const licenseComment = mainFile.startsWith('/*') ? mainFile.slice(0, mainFile.indexOf('*/')+3) : '';
 
@@ -111,6 +105,7 @@ async function buildModuleWithRollup(directory: string, modName: string, externa
     text = text.replace("OS_VERSION]: release(),", "OS_VERSION]: Deno.osRelease?.(),");
     text = text.replace("fs.readFile(", "Deno.readTextFile(");
     text = text.replace("http.AgentOptions | https.AgentOptions", "never"); // TODO: replace this functionality with Deno.HttpClient arg
+    text = text.replace("'User-Agent': `OTel-", "'User-Agent': `Deno/${Deno.version.deno} OTel-");
     text = text.replaceAll(/^  +/gm, x => '\t\t\t\t\t\t\t\t'.slice(0, Math.floor(x.length / 4)));
 
     await Deno.writeTextFile('opentelemetry/'+chunk.fileName, text);
@@ -168,13 +163,6 @@ await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-resources
   return { stdout: new TextDecoder().decode(output.stdout) };
 }
 `);
-
-// // TODO: maybe put a deno impl in there?
-// await Deno.remove('hack/opentelemetry-js/experimental/packages/opentelemetry-exporter-metrics-otlp-http/src/platform', {recursive: true})
-//   .catch(err => err instanceof Deno.errors.NotFound ? null : Promise.reject(err));
-// await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/opentelemetry-exporter-metrics-otlp-http/src/platform.ts', 'export {};');
-
-// await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/otlp-exporter-base/src/platform/index.ts', ``);
 
 // Trying to avoid embedding the generated protobuf code, at least for now
 for (const file of [
@@ -376,16 +364,11 @@ await Deno.writeTextFile('hack/opentelemetry-js/tsconfig.base.json',
 const packagePaths = [
   "api",
   "semantic-conventions",
-  // "packages/opentelemetry-context-zone",
-  // "packages/opentelemetry-context-zone-peer-dep",
   "packages/opentelemetry-core",
-  // "packages/opentelemetry-exporter-zipkin",
   "packages/opentelemetry-propagator-b3",
   "packages/opentelemetry-propagator-jaeger",
   "packages/opentelemetry-resources",
   "packages/opentelemetry-sdk-trace-base",
-  // "packages/opentelemetry-sdk-trace-web",
-  // "packages/propagator-aws-xray",
   "packages/sdk-metrics",
   "experimental/packages/api-events",
   "experimental/packages/api-logs",
@@ -395,10 +378,7 @@ const packagePaths = [
   // "experimental/packages/exporter-trace-otlp-proto",
   "experimental/packages/opentelemetry-exporter-metrics-otlp-http",
   // "experimental/packages/opentelemetry-exporter-metrics-otlp-proto",
-  // "experimental/packages/opentelemetry-browser-detector",
   "experimental/packages/opentelemetry-instrumentation",
-  // "experimental/packages/opentelemetry-instrumentation-fetch",
-  // "experimental/packages/opentelemetry-instrumentation-xml-http-request",
   "experimental/packages/otlp-exporter-base",
   // "experimental/packages/otlp-proto-exporter-base",
   "experimental/packages/otlp-transformer",
@@ -410,9 +390,6 @@ console.error(`Writing new tsconfig...`);
 await Deno.writeTextFile('hack/opentelemetry-js/tsconfig.esnext.deno.json', JSON.stringify({
   "extends": "./tsconfig.base.esnext.json",
   "files": [],
-  // "compilerOptions": {
-  //   "lib": ["es2021"],
-  // },
   "references": packagePaths.map(x => ({
     "path": `${x}/tsconfig.esnext.json`,
   })),

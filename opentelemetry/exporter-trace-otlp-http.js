@@ -24,7 +24,7 @@ const VERSION = "0.57.1";
 class OTLPTraceExporter extends OTLPExporterBase {
 	constructor(config = {}) {
 		super(createOtlpHttpExportDelegate(convertLegacyHttpOptions(config, 'TRACES', 'v1/traces', {
-			'User-Agent': `OTel-OTLP-Exporter-JavaScript/${VERSION}`,
+			'User-Agent': `Deno/${Deno.version.deno} OTel-OTLP-Exporter-JavaScript/${VERSION}`,
 			'Content-Type': 'application/json',
 		}), JsonTraceSerializer));
 	}

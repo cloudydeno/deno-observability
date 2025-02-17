@@ -24,7 +24,7 @@ const VERSION = "0.57.1";
 class OTLPLogExporter extends OTLPExporterBase {
 	constructor(config = {}) {
 		super(createOtlpHttpExportDelegate(convertLegacyHttpOptions(config, 'LOGS', 'v1/logs', {
-			'User-Agent': `OTel-OTLP-Exporter-JavaScript/${VERSION}`,
+			'User-Agent': `Deno/${Deno.version.deno} OTel-OTLP-Exporter-JavaScript/${VERSION}`,
 			'Content-Type': 'application/json',
 		}), JsonLogsSerializer));
 	}
