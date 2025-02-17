@@ -98,7 +98,7 @@ export class DenoTelemetrySdk {
       readers: ((props?.metricsExportIntervalMillis ?? 0) > 0) ? [
         new PeriodicExportingMetricReader({
           exporter: props?.metricsExporter ?? new OTLPMetricExporter(),
-          exportIntervalMillis: props.metricsExportIntervalMillis,
+          exportIntervalMillis: props?.metricsExportIntervalMillis,
         })
       ] : [],
     });
