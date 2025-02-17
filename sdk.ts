@@ -82,14 +82,15 @@ export class DenoTelemetrySdk {
       resource: this.resource,
       idGenerator: props?.idGenerator,
       sampler: props?.sampler,
+      spanProcessors: [
+        new BatchSpanProcessor(props?.tracesExporter
+          ?? new OTLPTraceExporter()),
+      ],
     });
     this.tracer.register({
       contextManager: new DenoAsyncHooksContextManager().enable(),
       propagator: props?.propagator,
     });
-
-    this.tracer.addSpanProcessor(new BatchSpanProcessor(props?.tracesExporter
-      ?? new OTLPTraceExporter()));
 
     this.meter = new MeterProvider({
       resource: this.resource,
