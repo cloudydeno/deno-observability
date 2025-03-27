@@ -652,21 +652,16 @@ class RandomIdGenerator {
 	generateTraceId = getIdGenerator(TRACE_ID_BYTES);
 	generateSpanId = getIdGenerator(SPAN_ID_BYTES);
 }
-const SHARED_BUFFER = Buffer.allocUnsafe(TRACE_ID_BYTES);
+const SHARED_CHAR_CODES_ARRAY = Array(32);
 function getIdGenerator(bytes) {
 	return function generateId() {
-		for (let i = 0; i < bytes / 4; i++) {
-			SHARED_BUFFER.writeUInt32BE((Math.random() * 2 ** 32) >>> 0, i * 4);
-		}
-		for (let i = 0; i < bytes; i++) {
-			if (SHARED_BUFFER[i] > 0) {
-				break;
-			}
-			else if (i === bytes - 1) {
-				SHARED_BUFFER[bytes - 1] = 1;
+		for (let i = 0; i < bytes * 2; i++) {
+			SHARED_CHAR_CODES_ARRAY[i] = Math.floor(Math.random() * 16) + 48;
+			if (SHARED_CHAR_CODES_ARRAY[i] >= 58) {
+				SHARED_CHAR_CODES_ARRAY[i] += 39;
 			}
 		}
-		return SHARED_BUFFER.toString('hex', 0, bytes);
+		return String.fromCharCode.apply(null, SHARED_CHAR_CODES_ARRAY.slice(0, bytes * 2));
 	};
 }
 

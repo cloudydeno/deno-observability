@@ -188,6 +188,9 @@ export const ProtobufTraceSerializer = MissingSerializer;
 
 await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/opentelemetry-instrumentation/src/platform/index.ts', `export * from './browser';`);
 
+await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-sdk-trace-base/src/platform/node/RandomIdGenerator.ts',
+  await Deno.readTextFile('hack/opentelemetry-js/packages/opentelemetry-sdk-trace-base/src/platform/browser/RandomIdGenerator.ts'));
+
 // TODO: does dynamic require crap
 await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-resources/src/detectors/platform/node/machine-id/getMachineId.ts',
   await Deno.readTextFile('hack/opentelemetry-js/packages/opentelemetry-resources/src/detectors/platform/node/machine-id/getMachineId-linux.ts'));
