@@ -1,20 +1,36 @@
 import {
+  context,
   diag,
   DiagConsoleLogger,
   DiagLogger,
   metrics,
+  propagation,
+  trace,
   type Attributes,
   type TextMapPropagator,
 } from "./opentelemetry/api.js";
 import { logs } from "./opentelemetry/api-logs.js";
-import { getEnv } from "./opentelemetry/core.js";
-import { type Instrumentation, registerInstrumentations } from "./opentelemetry/instrumentation.js";
 import {
-  type DetectorSync, IResource, Resource,
-  detectResourcesSync,
-  envDetectorSync,
-  hostDetectorSync,
-  osDetectorSync,
+  CompositePropagator,
+  diagLogLevelFromString,
+  getBooleanFromEnv,
+  getNumberFromEnv,
+  getStringFromEnv,
+  W3CBaggagePropagator,
+  W3CTraceContextPropagator,
+} from "./opentelemetry/core.js";
+import {
+  type Instrumentation,
+  registerInstrumentations,
+} from "./opentelemetry/instrumentation.js";
+import {
+  detectResources,
+  envDetector,
+  hostDetector,
+  osDetector,
+  resourceFromAttributes,
+  type Resource,
+  type ResourceDetector,
 } from "./opentelemetry/resources.js";
 
 // The SDKs for each signal
@@ -33,8 +49,8 @@ import {
   ConsoleMetricExporter,
   MeterProvider,
   PeriodicExportingMetricReader,
-  type MetricReader,
-  type View,
+  type IMetricReader,
+  type ViewOptions,
 } from "./opentelemetry/sdk-metrics.js";
 import {
   BatchLogRecordProcessor,
@@ -77,9 +93,6 @@ function getEnvExporters(key: string, defaultVal: string, label: string) {
   }
   return list;
 }
-function getEnvInt(key: string) {
-  return [Deno.env.get(key)].flatMap(x => x ? [parseInt(x, 10)] : []).at(0);
-}
 
 /**
  * A one-stop shop to provide a tracer, a meter, and a logger.
@@ -105,11 +118,11 @@ export class DenoTelemetrySdk {
     // contextManager excluded, deno-specific is always used
     textMapPropagator?: TextMapPropagator;
     logRecordProcessors?: Array<LogRecordProcessor>;
-    metricReader?: MetricReader;
-    views?: Array<View>;
+    metricReader?: IMetricReader;
+    views?: Array<ViewOptions>;
     instrumentations?: (Instrumentation | Instrumentation[])[];
-    resource?: IResource;
-    resourceDetectors?: Array<DetectorSync>;
+    resource?: Resource;
+    resourceDetectors?: Array<ResourceDetector>;
     mergeResourceWithDefaults?: boolean;
     sampler?: Sampler;
     // serviceName excluded, seems to duplicate resourceAttrs
@@ -118,23 +131,24 @@ export class DenoTelemetrySdk {
     spanLimits?: SpanLimits;
     idGenerator?: IdGenerator;
   } = {}) {
-    const env = getEnv();
+    // const env = getEnv();
 
-    if (Deno.env.has('OTEL_LOG_LEVEL')) {
-      diag.setLogger(props.diagLogger ?? new DiagConsoleLogger(), env.OTEL_LOG_LEVEL);
+    const logLevel = getStringFromEnv('OTEL_LOG_LEVEL');
+    if (props.diagLogger || logLevel) {
+      diag.setLogger(props.diagLogger ?? new DiagConsoleLogger(), diagLogLevelFromString(logLevel));
     }
 
-    this.resource = detectResourcesSync({
+    this.resource = detectResources({
       detectors: props.resourceDetectors ?? getDefaultDetectors(),
     });
     if (props.resource) {
       this.resource = this.resource.merge(props.resource);
     }
     if (props.resourceAttrs) {
-      this.resource = this.resource.merge(new Resource(props.resourceAttrs));
+      this.resource = this.resource.merge(resourceFromAttributes(props.resourceAttrs));
     }
 
-    if (env.OTEL_SDK_DISABLED) {
+    if (getBooleanFromEnv('OTEL_SDK_DISABLED')) {
       return this;
     }
 
@@ -160,14 +174,15 @@ export class DenoTelemetrySdk {
 
     // Only register if there is a span processor
     if (spanProcessors.length) {
-      this.tracer.register({
-        contextManager: new DenoAsyncHooksContextManager().enable(),
-        propagator: props.textMapPropagator,
-      });
+      trace.setGlobalTracerProvider(this.tracer);
+      context.setGlobalContextManager(new DenoAsyncHooksContextManager().enable());
+      propagation.setGlobalPropagator(props.textMapPropagator ?? new CompositePropagator({
+        propagators: [new W3CTraceContextPropagator(), new W3CBaggagePropagator()],
+      }));
     }
 
-    const exportIntervalMillis = props.metricsExportIntervalMillis ?? getEnvInt('OTEL_METRIC_EXPORT_INTERVAL');
-    const exportTimeoutMillis = getEnvInt('OTEL_METRIC_EXPORT_TIMEOUT');
+    const exportIntervalMillis = props.metricsExportIntervalMillis ?? getNumberFromEnv('OTEL_METRIC_EXPORT_INTERVAL');
+    const exportTimeoutMillis = getNumberFromEnv('OTEL_METRIC_EXPORT_TIMEOUT');
     // Metrics export on a fixed timer, so make the user opt-in to them
     // If there aren't any parameters or envvars for metrics we'll default to 'none'
     const readerDefault = exportIntervalMillis ? 'otlp' : 'none';
@@ -239,21 +254,21 @@ export class DenoTelemetrySdk {
   }
 }
 
-function getDefaultDetectors(): DetectorSync[] {
+function getDefaultDetectors(): Array<ResourceDetector> {
   // We first check for Deno Deploy then decide what we want to detect based on that
   const denoDeployDetector = new DenoDeployDetector();
   const runtimeDetectors =
-    Object.keys(denoDeployDetector.detect().attributes).length
+    Object.keys(denoDeployDetector.detect()?.attributes ?? {}).length
       ? [denoDeployDetector]
       : [
           new DenoProcessDetector(),
-          hostDetectorSync,
-          osDetectorSync,
+          hostDetector,
+          osDetector,
         ];
 
   return [
     new DenoRuntimeDetector(),
     ...runtimeDetectors,
-    envDetectorSync,
+    envDetector,
   ];
 }

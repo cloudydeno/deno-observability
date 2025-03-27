@@ -15,50 +15,62 @@
  */
 /// <reference types="./sdk-trace-base.d.ts" />
 
+import { otperformance, getTimeOrigin, isAttributeValue, isTimeInput, sanitizeAttributes, hrTimeDuration, hrTime, millisToHrTime, isTimeInputHrTime, addHrTimes, globalErrorHandler, getNumberFromEnv, getStringFromEnv, BindOnceFuture, suppressTracing, unrefTimer, ExportResultCode, isTracingSuppressed, merge, hrTimeToMicroseconds, internal } from './core.js';
+import { defaultResource } from './resources.js';
 import * as api from './api.js';
-import { SpanStatusCode, diag, trace, isSpanContextValid, TraceFlags, isValidTraceId, context, propagation } from './api.js';
-import { otperformance, getTimeOrigin, isAttributeValue, isTimeInput, sanitizeAttributes, hrTimeDuration, hrTime, millisToHrTime, isTimeInputHrTime, addHrTimes, globalErrorHandler, TracesSamplerValues, getEnv, getEnvWithoutDefaults, DEFAULT_ATTRIBUTE_COUNT_LIMIT, DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT, BindOnceFuture, suppressTracing, unrefTimer, ExportResultCode, isTracingSuppressed, merge, CompositePropagator, W3CTraceContextPropagator, W3CBaggagePropagator, hrTimeToMicroseconds, internal } from './core.js';
+import { SpanStatusCode, diag, trace, isSpanContextValid, TraceFlags, isValidTraceId, context } from './api.js';
 import { SEMATTRS_EXCEPTION_TYPE, SEMATTRS_EXCEPTION_MESSAGE, SEMATTRS_EXCEPTION_STACKTRACE } from './semantic-conventions.js';
-import { Resource } from './resources.js';
 
 const ExceptionEventName = 'exception';
 
-class Span {
-	constructor(parentTracer, context, spanName, spanContext, kind, parentSpanId, links = [], startTime, _deprecatedClock,
-	attributes) {
-		this.attributes = {};
-		this.links = [];
-		this.events = [];
-		this._droppedAttributesCount = 0;
-		this._droppedEventsCount = 0;
-		this._droppedLinksCount = 0;
-		this.status = {
-			code: SpanStatusCode.UNSET,
-		};
-		this.endTime = [0, 0];
-		this._ended = false;
-		this._duration = [-1, -1];
-		this.name = spanName;
-		this._spanContext = spanContext;
-		this.parentSpanId = parentSpanId;
-		this.kind = kind;
-		this.links = links;
+class SpanImpl {
+	_spanContext;
+	kind;
+	parentSpanContext;
+	attributes = {};
+	links = [];
+	events = [];
+	startTime;
+	resource;
+	instrumentationScope;
+	_droppedAttributesCount = 0;
+	_droppedEventsCount = 0;
+	_droppedLinksCount = 0;
+	name;
+	status = {
+		code: SpanStatusCode.UNSET,
+	};
+	endTime = [0, 0];
+	_ended = false;
+	_duration = [-1, -1];
+	_spanProcessor;
+	_spanLimits;
+	_attributeValueLengthLimit;
+	_performanceStartTime;
+	_performanceOffset;
+	_startTimeProvided;
+	constructor(opts) {
 		const now = Date.now();
+		this._spanContext = opts.spanContext;
 		this._performanceStartTime = otperformance.now();
 		this._performanceOffset =
 			now - (this._performanceStartTime + getTimeOrigin());
-		this._startTimeProvided = startTime != null;
-		this.startTime = this._getTime(startTime ?? now);
-		this.resource = parentTracer.resource;
-		this.instrumentationLibrary = parentTracer.instrumentationLibrary;
-		this._spanLimits = parentTracer.getSpanLimits();
+		this._startTimeProvided = opts.startTime != null;
+		this._spanLimits = opts.spanLimits;
 		this._attributeValueLengthLimit =
 			this._spanLimits.attributeValueLengthLimit || 0;
-		if (attributes != null) {
-			this.setAttributes(attributes);
+		this._spanProcessor = opts.spanProcessor;
+		this.name = opts.name;
+		this.parentSpanContext = opts.parentSpanContext;
+		this.kind = opts.kind;
+		this.links = opts.links || [];
+		this.startTime = this._getTime(opts.startTime ?? now);
+		this.resource = opts.resource;
+		this.instrumentationScope = opts.scope;
+		if (opts.attributes != null) {
+			this.setAttributes(opts.attributes);
 		}
-		this._spanProcessor = parentTracer.getActiveSpanProcessor();
-		this._spanProcessor.onStart(this, context);
+		this._spanProcessor.onStart(this, opts.context);
 	}
 	spanContext() {
 		return this._spanContext;
@@ -74,8 +86,9 @@ class Span {
 			diag.warn(`Invalid attribute value set for key: ${key}`);
 			return this;
 		}
-		if (Object.keys(this.attributes).length >=
-			this._spanLimits.attributeCountLimit &&
+		const { attributeCountLimit } = this._spanLimits;
+		if (attributeCountLimit !== undefined &&
+			Object.keys(this.attributes).length >= attributeCountLimit &&
 			!Object.prototype.hasOwnProperty.call(this.attributes, key)) {
 			this._droppedAttributesCount++;
 			return this;
@@ -92,12 +105,14 @@ class Span {
 	addEvent(name, attributesOrStartTime, timeStamp) {
 		if (this._isSpanEnded())
 			return this;
-		if (this._spanLimits.eventCountLimit === 0) {
+		const { eventCountLimit } = this._spanLimits;
+		if (eventCountLimit === 0) {
 			diag.warn('No events allowed.');
 			this._droppedEventsCount++;
 			return this;
 		}
-		if (this.events.length >= this._spanLimits.eventCountLimit) {
+		if (eventCountLimit !== undefined &&
+			this.events.length >= eventCountLimit) {
 			if (this._droppedEventsCount === 0) {
 				diag.debug('Dropping extra events.');
 			}
@@ -227,7 +242,8 @@ class Span {
 	}
 	_isSpanEnded() {
 		if (this._ended) {
-			diag.warn(`Can not execute the operation on ended Span {traceId: ${this._spanContext.traceId}, spanId: ${this._spanContext.spanId}}`);
+			const error = new Error(`Operation attempted on ended Span {traceId: ${this._spanContext.traceId}, spanId: ${this._spanContext.spanId}}`);
+			diag.warn(`Cannot execute the operation on ended Span {traceId: ${this._spanContext.traceId}, spanId: ${this._spanContext.spanId}}`, error);
 		}
 		return this._ended;
 	}
@@ -283,6 +299,11 @@ class AlwaysOnSampler {
 }
 
 class ParentBasedSampler {
+	_root;
+	_remoteParentSampled;
+	_remoteParentNotSampled;
+	_localParentSampled;
+	_localParentNotSampled;
 	constructor(config) {
 		this._root = config.root;
 		if (!this._root) {
@@ -320,6 +341,8 @@ class ParentBasedSampler {
 }
 
 class TraceIdRatioBasedSampler {
+	_ratio;
+	_upperBound;
 	constructor(_ratio = 0) {
 		this._ratio = _ratio;
 		this._ratio = this._normalize(_ratio);
@@ -351,71 +374,69 @@ class TraceIdRatioBasedSampler {
 	}
 }
 
-const FALLBACK_OTEL_TRACES_SAMPLER = TracesSamplerValues.AlwaysOn;
 const DEFAULT_RATIO = 1;
 function loadDefaultConfig() {
-	const env = getEnv();
 	return {
-		sampler: buildSamplerFromEnv(env),
+		sampler: buildSamplerFromEnv(),
 		forceFlushTimeoutMillis: 30000,
 		generalLimits: {
-			attributeValueLengthLimit: env.OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT,
-			attributeCountLimit: env.OTEL_ATTRIBUTE_COUNT_LIMIT,
+			attributeValueLengthLimit: getNumberFromEnv('OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT') ?? Infinity,
+			attributeCountLimit: getNumberFromEnv('OTEL_ATTRIBUTE_COUNT_LIMIT') ?? 128,
 		},
 		spanLimits: {
-			attributeValueLengthLimit: env.OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT,
-			attributeCountLimit: env.OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT,
-			linkCountLimit: env.OTEL_SPAN_LINK_COUNT_LIMIT,
-			eventCountLimit: env.OTEL_SPAN_EVENT_COUNT_LIMIT,
-			attributePerEventCountLimit: env.OTEL_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT,
-			attributePerLinkCountLimit: env.OTEL_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT,
+			attributeValueLengthLimit: getNumberFromEnv('OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT') ?? Infinity,
+			attributeCountLimit: getNumberFromEnv('OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT') ?? 128,
+			linkCountLimit: getNumberFromEnv('OTEL_SPAN_LINK_COUNT_LIMIT') ?? 128,
+			eventCountLimit: getNumberFromEnv('OTEL_SPAN_EVENT_COUNT_LIMIT') ?? 128,
+			attributePerEventCountLimit: getNumberFromEnv('OTEL_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT') ?? 128,
+			attributePerLinkCountLimit: getNumberFromEnv('OTEL_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT') ?? 128,
 		},
-		mergeResourceWithDefaults: true,
 	};
 }
-function buildSamplerFromEnv(environment = getEnv()) {
-	switch (environment.OTEL_TRACES_SAMPLER) {
-		case TracesSamplerValues.AlwaysOn:
+function buildSamplerFromEnv() {
+	const sampler = getStringFromEnv('OTEL_TRACES_SAMPLER') ??
+		"parentbased_always_on" ;
+	switch (sampler) {
+		case "always_on" :
 			return new AlwaysOnSampler();
-		case TracesSamplerValues.AlwaysOff:
+		case "always_off" :
 			return new AlwaysOffSampler();
-		case TracesSamplerValues.ParentBasedAlwaysOn:
+		case "parentbased_always_on" :
 			return new ParentBasedSampler({
 				root: new AlwaysOnSampler(),
 			});
-		case TracesSamplerValues.ParentBasedAlwaysOff:
+		case "parentbased_always_off" :
 			return new ParentBasedSampler({
 				root: new AlwaysOffSampler(),
 			});
-		case TracesSamplerValues.TraceIdRatio:
-			return new TraceIdRatioBasedSampler(getSamplerProbabilityFromEnv(environment));
-		case TracesSamplerValues.ParentBasedTraceIdRatio:
+		case "traceidratio" :
+			return new TraceIdRatioBasedSampler(getSamplerProbabilityFromEnv());
+		case "parentbased_traceidratio" :
 			return new ParentBasedSampler({
-				root: new TraceIdRatioBasedSampler(getSamplerProbabilityFromEnv(environment)),
+				root: new TraceIdRatioBasedSampler(getSamplerProbabilityFromEnv()),
 			});
 		default:
-			diag.error(`OTEL_TRACES_SAMPLER value "${environment.OTEL_TRACES_SAMPLER} invalid, defaulting to ${FALLBACK_OTEL_TRACES_SAMPLER}".`);
-			return new AlwaysOnSampler();
+			diag.error(`OTEL_TRACES_SAMPLER value "${sampler}" invalid, defaulting to "${"parentbased_always_on" }".`);
+			return new ParentBasedSampler({
+				root: new AlwaysOnSampler(),
+			});
 	}
 }
-function getSamplerProbabilityFromEnv(environment) {
-	if (environment.OTEL_TRACES_SAMPLER_ARG === undefined ||
-		environment.OTEL_TRACES_SAMPLER_ARG === '') {
+function getSamplerProbabilityFromEnv() {
+	const probability = getNumberFromEnv('OTEL_TRACES_SAMPLER_ARG');
+	if (probability == null) {
 		diag.error(`OTEL_TRACES_SAMPLER_ARG is blank, defaulting to ${DEFAULT_RATIO}.`);
 		return DEFAULT_RATIO;
 	}
-	const probability = Number(environment.OTEL_TRACES_SAMPLER_ARG);
-	if (isNaN(probability)) {
-		diag.error(`OTEL_TRACES_SAMPLER_ARG=${environment.OTEL_TRACES_SAMPLER_ARG} was given, but it is invalid, defaulting to ${DEFAULT_RATIO}.`);
-		return DEFAULT_RATIO;
-	}
 	if (probability < 0 || probability > 1) {
-		diag.error(`OTEL_TRACES_SAMPLER_ARG=${environment.OTEL_TRACES_SAMPLER_ARG} was given, but it is out of range ([0..1]), defaulting to ${DEFAULT_RATIO}.`);
+		diag.error(`OTEL_TRACES_SAMPLER_ARG=${probability} was given, but it is out of range ([0..1]), defaulting to ${DEFAULT_RATIO}.`);
 		return DEFAULT_RATIO;
 	}
 	return probability;
 }
 
+const DEFAULT_ATTRIBUTE_COUNT_LIMIT = 128;
+const DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT = Infinity;
 function mergeConfig(userConfig) {
 	const perInstanceDefaults = {
 		sampler: buildSamplerFromEnv(),
@@ -428,45 +449,50 @@ function mergeConfig(userConfig) {
 }
 function reconfigureLimits(userConfig) {
 	const spanLimits = Object.assign({}, userConfig.spanLimits);
-	const parsedEnvConfig = getEnvWithoutDefaults();
 	spanLimits.attributeCountLimit =
 		userConfig.spanLimits?.attributeCountLimit ??
 			userConfig.generalLimits?.attributeCountLimit ??
-			parsedEnvConfig.OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT ??
-			parsedEnvConfig.OTEL_ATTRIBUTE_COUNT_LIMIT ??
+			getNumberFromEnv('OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT') ??
+			getNumberFromEnv('OTEL_ATTRIBUTE_COUNT_LIMIT') ??
 			DEFAULT_ATTRIBUTE_COUNT_LIMIT;
 	spanLimits.attributeValueLengthLimit =
 		userConfig.spanLimits?.attributeValueLengthLimit ??
 			userConfig.generalLimits?.attributeValueLengthLimit ??
-			parsedEnvConfig.OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT ??
-			parsedEnvConfig.OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT ??
+			getNumberFromEnv('OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT') ??
+			getNumberFromEnv('OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT') ??
 			DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT;
 	return Object.assign({}, userConfig, { spanLimits });
 }
 
 class BatchSpanProcessorBase {
+	_exporter;
+	_maxExportBatchSize;
+	_maxQueueSize;
+	_scheduledDelayMillis;
+	_exportTimeoutMillis;
+	_isExporting = false;
+	_finishedSpans = [];
+	_timer;
+	_shutdownOnce;
+	_droppedSpansCount = 0;
 	constructor(_exporter, config) {
 		this._exporter = _exporter;
-		this._isExporting = false;
-		this._finishedSpans = [];
-		this._droppedSpansCount = 0;
-		const env = getEnv();
 		this._maxExportBatchSize =
 			typeof config?.maxExportBatchSize === 'number'
 				? config.maxExportBatchSize
-				: env.OTEL_BSP_MAX_EXPORT_BATCH_SIZE;
+				: (getNumberFromEnv('OTEL_BSP_MAX_EXPORT_BATCH_SIZE') ?? 512);
 		this._maxQueueSize =
 			typeof config?.maxQueueSize === 'number'
 				? config.maxQueueSize
-				: env.OTEL_BSP_MAX_QUEUE_SIZE;
+				: (getNumberFromEnv('OTEL_BSP_MAX_QUEUE_SIZE') ?? 2048);
 		this._scheduledDelayMillis =
 			typeof config?.scheduledDelayMillis === 'number'
 				? config.scheduledDelayMillis
-				: env.OTEL_BSP_SCHEDULE_DELAY;
+				: (getNumberFromEnv('OTEL_BSP_SCHEDULE_DELAY') ?? 5000);
 		this._exportTimeoutMillis =
 			typeof config?.exportTimeoutMillis === 'number'
 				? config.exportTimeoutMillis
-				: env.OTEL_BSP_EXPORT_TIMEOUT;
+				: (getNumberFromEnv('OTEL_BSP_EXPORT_TIMEOUT') ?? 30000);
 		this._shutdownOnce = new BindOnceFuture(this._shutdown, this);
 		if (this._maxExportBatchSize > this._maxQueueSize) {
 			diag.warn('BatchSpanProcessor: maxExportBatchSize must be smaller or equal to maxQueueSize, setting maxExportBatchSize to match maxQueueSize');
@@ -623,10 +649,8 @@ class BatchSpanProcessor extends BatchSpanProcessorBase {
 const SPAN_ID_BYTES = 8;
 const TRACE_ID_BYTES = 16;
 class RandomIdGenerator {
-	constructor() {
-		this.generateTraceId = getIdGenerator(TRACE_ID_BYTES);
-		this.generateSpanId = getIdGenerator(SPAN_ID_BYTES);
-	}
+	generateTraceId = getIdGenerator(TRACE_ID_BYTES);
+	generateSpanId = getIdGenerator(SPAN_ID_BYTES);
 }
 const SHARED_CHAR_CODES_ARRAY = Array(32);
 function getIdGenerator(bytes) {
@@ -642,15 +666,22 @@ function getIdGenerator(bytes) {
 }
 
 class Tracer {
-	constructor(instrumentationLibrary, config, _tracerProvider) {
-		this._tracerProvider = _tracerProvider;
+	_sampler;
+	_generalLimits;
+	_spanLimits;
+	_idGenerator;
+	instrumentationScope;
+	_resource;
+	_spanProcessor;
+	constructor(instrumentationScope, config, resource, spanProcessor) {
 		const localConfig = mergeConfig(config);
 		this._sampler = localConfig.sampler;
 		this._generalLimits = localConfig.generalLimits;
 		this._spanLimits = localConfig.spanLimits;
 		this._idGenerator = config.idGenerator || new RandomIdGenerator();
-		this.resource = _tracerProvider.resource;
-		this.instrumentationLibrary = instrumentationLibrary;
+		this._resource = resource;
+		this._spanProcessor = spanProcessor;
+		this.instrumentationScope = instrumentationScope;
 	}
 	startSpan(name, options = {}, context = api.context.active()) {
 		if (options.root) {
@@ -664,9 +695,9 @@ class Tracer {
 		}
 		const parentSpanContext = parentSpan?.spanContext();
 		const spanId = this._idGenerator.generateSpanId();
+		let validParentSpanContext;
 		let traceId;
 		let traceState;
-		let parentSpanId;
 		if (!parentSpanContext ||
 			!api.trace.isSpanContextValid(parentSpanContext)) {
 			traceId = this._idGenerator.generateTraceId();
@@ -674,7 +705,7 @@ class Tracer {
 		else {
 			traceId = parentSpanContext.traceId;
 			traceState = parentSpanContext.traceState;
-			parentSpanId = parentSpanContext.spanId;
+			validParentSpanContext = parentSpanContext;
 		}
 		const spanKind = options.kind ?? api.SpanKind.INTERNAL;
 		const links = (options.links ?? []).map(link => {
@@ -696,7 +727,20 @@ class Tracer {
 			return nonRecordingSpan;
 		}
 		const initAttributes = sanitizeAttributes(Object.assign(attributes, samplingResult.attributes));
-		const span = new Span(this, context, name, spanContext, spanKind, parentSpanId, links, options.startTime, undefined, initAttributes);
+		const span = new SpanImpl({
+			resource: this._resource,
+			scope: this.instrumentationScope,
+			context,
+			spanContext,
+			name,
+			kind: spanKind,
+			links,
+			parentSpanContext: validParentSpanContext,
+			attributes: initAttributes,
+			startTime: options.startTime,
+			spanProcessor: this._spanProcessor,
+			spanLimits: this._spanLimits,
+		});
 		return span;
 	}
 	startActiveSpan(name, arg2, arg3, arg4) {
@@ -729,12 +773,10 @@ class Tracer {
 	getSpanLimits() {
 		return this._spanLimits;
 	}
-	getActiveSpanProcessor() {
-		return this._tracerProvider.getActiveSpanProcessor();
-	}
 }
 
 class MultiSpanProcessor {
+	_spanProcessors;
 	constructor(_spanProcessors) {
 		this._spanProcessors = _spanProcessors;
 	}
@@ -777,17 +819,6 @@ class MultiSpanProcessor {
 	}
 }
 
-class NoopSpanProcessor {
-	onStart(_span, _context) { }
-	onEnd(_span) { }
-	shutdown() {
-		return Promise.resolve();
-	}
-	forceFlush() {
-		return Promise.resolve();
-	}
-}
-
 var ForceFlushState;
 (function (ForceFlushState) {
 	ForceFlushState[ForceFlushState["resolved"] = 0] = "resolved";
@@ -796,66 +827,32 @@ var ForceFlushState;
 	ForceFlushState[ForceFlushState["unresolved"] = 3] = "unresolved";
 })(ForceFlushState || (ForceFlushState = {}));
 class BasicTracerProvider {
+	_config;
+	_tracers = new Map();
+	_resource;
+	_activeSpanProcessor;
 	constructor(config = {}) {
-		this._registeredSpanProcessors = [];
-		this._tracers = new Map();
 		const mergedConfig = merge({}, loadDefaultConfig(), reconfigureLimits(config));
-		this.resource = mergedConfig.resource ?? Resource.empty();
-		if (mergedConfig.mergeResourceWithDefaults) {
-			this.resource = Resource.default().merge(this.resource);
-		}
+		this._resource = mergedConfig.resource ?? defaultResource();
 		this._config = Object.assign({}, mergedConfig, {
-			resource: this.resource,
+			resource: this._resource,
 		});
+		const spanProcessors = [];
 		if (config.spanProcessors?.length) {
-			this._registeredSpanProcessors = [...config.spanProcessors];
-			this.activeSpanProcessor = new MultiSpanProcessor(this._registeredSpanProcessors);
+			spanProcessors.push(...config.spanProcessors);
 		}
-		else {
-			const defaultExporter = this._buildExporterFromEnv();
-			if (defaultExporter !== undefined) {
-				const batchProcessor = new BatchSpanProcessor(defaultExporter);
-				this.activeSpanProcessor = batchProcessor;
-			}
-			else {
-				this.activeSpanProcessor = new NoopSpanProcessor();
-			}
-		}
+		this._activeSpanProcessor = new MultiSpanProcessor(spanProcessors);
 	}
 	getTracer(name, version, options) {
 		const key = `${name}@${version || ''}:${options?.schemaUrl || ''}`;
 		if (!this._tracers.has(key)) {
-			this._tracers.set(key, new Tracer({ name, version, schemaUrl: options?.schemaUrl }, this._config, this));
+			this._tracers.set(key, new Tracer({ name, version, schemaUrl: options?.schemaUrl }, this._config, this._resource, this._activeSpanProcessor));
 		}
 		return this._tracers.get(key);
 	}
-	addSpanProcessor(spanProcessor) {
-		if (this._registeredSpanProcessors.length === 0) {
-			this.activeSpanProcessor
-				.shutdown()
-				.catch(err => diag.error('Error while trying to shutdown current span processor', err));
-		}
-		this._registeredSpanProcessors.push(spanProcessor);
-		this.activeSpanProcessor = new MultiSpanProcessor(this._registeredSpanProcessors);
-	}
-	getActiveSpanProcessor() {
-		return this.activeSpanProcessor;
-	}
-	register(config = {}) {
-		trace.setGlobalTracerProvider(this);
-		if (config.propagator === undefined) {
-			config.propagator = this._buildPropagatorFromEnv();
-		}
-		if (config.contextManager) {
-			context.setGlobalContextManager(config.contextManager);
-		}
-		if (config.propagator) {
-			propagation.setGlobalPropagator(config.propagator);
-		}
-	}
 	forceFlush() {
 		const timeout = this._config.forceFlushTimeoutMillis;
-		const promises = this._registeredSpanProcessors.map((spanProcessor) => {
+		const promises = this._activeSpanProcessor['_spanProcessors'].map((spanProcessor) => {
 			return new Promise(resolve => {
 				let state;
 				const timeoutInterval = setTimeout(() => {
@@ -893,57 +890,9 @@ class BasicTracerProvider {
 		});
 	}
 	shutdown() {
-		return this.activeSpanProcessor.shutdown();
-	}
-	_getPropagator(name) {
-		return this.constructor._registeredPropagators.get(name)?.();
-	}
-	_getSpanExporter(name) {
-		return this.constructor._registeredExporters.get(name)?.();
-	}
-	_buildPropagatorFromEnv() {
-		const uniquePropagatorNames = Array.from(new Set(getEnv().OTEL_PROPAGATORS));
-		const propagators = uniquePropagatorNames.map(name => {
-			const propagator = this._getPropagator(name);
-			if (!propagator) {
-				diag.warn(`Propagator "${name}" requested through environment variable is unavailable.`);
-			}
-			return propagator;
-		});
-		const validPropagators = propagators.reduce((list, item) => {
-			if (item) {
-				list.push(item);
-			}
-			return list;
-		}, []);
-		if (validPropagators.length === 0) {
-			return;
-		}
-		else if (uniquePropagatorNames.length === 1) {
-			return validPropagators[0];
-		}
-		else {
-			return new CompositePropagator({
-				propagators: validPropagators,
-			});
-		}
-	}
-	_buildExporterFromEnv() {
-		const exporterName = getEnv().OTEL_TRACES_EXPORTER;
-		if (exporterName === 'none' || exporterName === '')
-			return;
-		const exporter = this._getSpanExporter(exporterName);
-		if (!exporter) {
-			diag.error(`Exporter "${exporterName}" requested through environment variable is unavailable.`);
-		}
-		return exporter;
+		return this._activeSpanProcessor.shutdown();
 	}
 }
-BasicTracerProvider._registeredPropagators = new Map([
-	['tracecontext', () => new W3CTraceContextPropagator()],
-	['baggage', () => new W3CBaggagePropagator()],
-]);
-BasicTracerProvider._registeredExporters = new Map();
 
 class ConsoleSpanExporter {
 	export(spans, resultCallback) {
@@ -961,9 +910,9 @@ class ConsoleSpanExporter {
 			resource: {
 				attributes: span.resource.attributes,
 			},
-			instrumentationScope: span.instrumentationLibrary,
+			instrumentationScope: span.instrumentationScope,
 			traceId: span.spanContext().traceId,
-			parentId: span.parentSpanId,
+			parentSpanContext: span.parentSpanContext,
 			traceState: span.spanContext().traceState?.serialize(),
 			name: span.name,
 			id: span.spanContext().spanId,
@@ -987,10 +936,8 @@ class ConsoleSpanExporter {
 }
 
 class InMemorySpanExporter {
-	constructor() {
-		this._finishedSpans = [];
-		this._stopped = false;
-	}
+	_finishedSpans = [];
+	_stopped = false;
 	export(spans, resultCallback) {
 		if (this._stopped)
 			return resultCallback({
@@ -1017,13 +964,16 @@ class InMemorySpanExporter {
 }
 
 class SimpleSpanProcessor {
+	_exporter;
+	_shutdownOnce;
+	_pendingExports;
 	constructor(_exporter) {
 		this._exporter = _exporter;
 		this._shutdownOnce = new BindOnceFuture(this._shutdown, this);
-		this._unresolvedExports = new Set();
+		this._pendingExports = new Set();
 	}
 	async forceFlush() {
-		await Promise.all(Array.from(this._unresolvedExports));
+		await Promise.all(Array.from(this._pendingExports));
 		if (this._exporter.forceFlush) {
 			await this._exporter.forceFlush();
 		}
@@ -1036,32 +986,18 @@ class SimpleSpanProcessor {
 		if ((span.spanContext().traceFlags & TraceFlags.SAMPLED) === 0) {
 			return;
 		}
-		const doExport = () => internal
-			._export(this._exporter, [span])
-			.then((result) => {
-			if (result.code !== ExportResultCode.SUCCESS) {
-				globalErrorHandler(result.error ??
-					new Error(`SimpleSpanProcessor: span export failed (status ${result})`));
-			}
-		})
-			.catch(error => {
-			globalErrorHandler(error);
-		});
+		const pendingExport = this._doExport(span).catch(err => globalErrorHandler(err));
+		this._pendingExports.add(pendingExport);
+		pendingExport.finally(() => this._pendingExports.delete(pendingExport));
+	}
+	async _doExport(span) {
 		if (span.resource.asyncAttributesPending) {
-			const exportPromise = span.resource
-				.waitForAsyncAttributes?.()
-				.then(() => {
-				if (exportPromise != null) {
-					this._unresolvedExports.delete(exportPromise);
-				}
-				return doExport();
-			}, err => globalErrorHandler(err));
-			if (exportPromise != null) {
-				this._unresolvedExports.add(exportPromise);
-			}
+			await span.resource.waitForAsyncAttributes?.();
 		}
-		else {
-			void doExport();
+		const result = await internal._export(this._exporter, [span]);
+		if (result.code !== ExportResultCode.SUCCESS) {
+			throw (result.error ??
+				new Error(`SimpleSpanProcessor: span export failed (status ${result})`));
 		}
 	}
 	shutdown() {
@@ -1072,4 +1008,15 @@ class SimpleSpanProcessor {
 	}
 }
 
-export { AlwaysOffSampler, AlwaysOnSampler, BasicTracerProvider, BatchSpanProcessor, ConsoleSpanExporter, ForceFlushState, InMemorySpanExporter, NoopSpanProcessor, ParentBasedSampler, RandomIdGenerator, SamplingDecision, SimpleSpanProcessor, Span, TraceIdRatioBasedSampler, Tracer };
+class NoopSpanProcessor {
+	onStart(_span, _context) { }
+	onEnd(_span) { }
+	shutdown() {
+		return Promise.resolve();
+	}
+	forceFlush() {
+		return Promise.resolve();
+	}
+}
+
+export { AlwaysOffSampler, AlwaysOnSampler, BasicTracerProvider, BatchSpanProcessor, ConsoleSpanExporter, InMemorySpanExporter, NoopSpanProcessor, ParentBasedSampler, RandomIdGenerator, SamplingDecision, SimpleSpanProcessor, TraceIdRatioBasedSampler };

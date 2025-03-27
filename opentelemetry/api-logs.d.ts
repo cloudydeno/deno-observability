@@ -16,8 +16,8 @@
 
 import { TimeInput, Context, Attributes } from './api.d.ts';
 
-declare type AnyValueScalar = string | number | boolean;
-declare type AnyValueArray = Array<AnyValue>;
+type AnyValueScalar = string | number | boolean;
+type AnyValueArray = Array<AnyValue>;
 /**
  * AnyValueMap is a map from string to AnyValue (attribute value or a nested map)
  */
@@ -32,10 +32,10 @@ interface AnyValueMap {
  * - map from string to any value
  * - empty value
  */
-declare type AnyValue = AnyValueScalar | Uint8Array | AnyValueArray | AnyValueMap | null | undefined;
+type AnyValue = AnyValueScalar | Uint8Array | AnyValueArray | AnyValueMap | null | undefined;
 
-declare type LogBody = AnyValue;
-declare type LogAttributes = AnyValueMap;
+type LogBody = AnyValue;
+type LogAttributes = AnyValueMap;
 declare enum SeverityNumber {
 	UNSPECIFIED = 0,
 	TRACE = 1,

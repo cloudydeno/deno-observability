@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { IResource } from './resources.d.ts';
+import { Resource } from './resources.d.ts';
 import * as logsAPI from './api-logs.d.ts';
 import { SeverityNumber, LogBody, LogAttributes, Logger, AnyValue } from './api-logs.d.ts';
 import * as api from './api.d.ts';
@@ -23,7 +23,7 @@ import { InstrumentationScope, ExportResult } from './core.d.ts';
 
 interface LoggerProviderConfig {
 	/** Resource associated with trace telemetry  */
-	resource?: IResource;
+	resource?: Resource;
 	/**
 	* How long the forceFlush can run before it is cancelled.
 	* The default value is 30000ms
@@ -31,11 +31,6 @@ interface LoggerProviderConfig {
 	forceFlushTimeoutMillis?: number;
 	/** Log Record Limits*/
 	logRecordLimits?: LogRecordLimits;
-	/**
-	* Merge resource with {@link Resource.default()}?
-	* Default: {@code true}
-	*/
-	mergeResourceWithDefaults?: boolean;
 }
 interface LogRecordLimits {
 	/** attributeValueLengthLimit is maximum allowed attribute value size */
@@ -71,27 +66,27 @@ interface ReadableLogRecord {
 	readonly severityText?: string;
 	readonly severityNumber?: SeverityNumber;
 	readonly body?: LogBody;
-	readonly resource: IResource;
+	readonly resource: Resource;
 	readonly instrumentationScope: InstrumentationScope;
 	readonly attributes: LogAttributes;
 	readonly droppedAttributesCount: number;
 }
 
 declare class LoggerProviderSharedState {
-	readonly resource: IResource;
+	readonly resource: Resource;
 	readonly forceFlushTimeoutMillis: number;
 	readonly logRecordLimits: Required<LogRecordLimits>;
 	readonly loggers: Map<string, Logger>;
 	activeProcessor: LogRecordProcessor;
 	readonly registeredLogRecordProcessors: LogRecordProcessor[];
-	constructor(resource: IResource, forceFlushTimeoutMillis: number, logRecordLimits: Required<LogRecordLimits>);
+	constructor(resource: Resource, forceFlushTimeoutMillis: number, logRecordLimits: Required<LogRecordLimits>);
 }
 
 declare class LogRecord implements ReadableLogRecord {
 	readonly hrTime: api.HrTime;
 	readonly hrTimeObserved: api.HrTime;
 	readonly spanContext?: api.SpanContext;
-	readonly resource: IResource;
+	readonly resource: Resource;
 	readonly instrumentationScope: InstrumentationScope;
 	readonly attributes: logsAPI.LogAttributes;
 	private _severityText?;

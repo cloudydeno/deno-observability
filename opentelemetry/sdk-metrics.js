@@ -18,7 +18,7 @@
 import * as api from './api.js';
 import { diag, ValueType, context, createNoopMeter } from './api.js';
 import { hrTimeToMicroseconds, millisToHrTime, globalErrorHandler, internal, ExportResultCode, unrefTimer } from './core.js';
-import { Resource } from './resources.js';
+import { defaultResource } from './resources.js';
 
 var AggregationTemporality;
 (function (AggregationTemporality) {
@@ -26,6 +26,16 @@ var AggregationTemporality;
 	AggregationTemporality[AggregationTemporality["CUMULATIVE"] = 1] = "CUMULATIVE";
 })(AggregationTemporality || (AggregationTemporality = {}));
 
+var InstrumentType;
+(function (InstrumentType) {
+	InstrumentType["COUNTER"] = "COUNTER";
+	InstrumentType["GAUGE"] = "GAUGE";
+	InstrumentType["HISTOGRAM"] = "HISTOGRAM";
+	InstrumentType["UP_DOWN_COUNTER"] = "UP_DOWN_COUNTER";
+	InstrumentType["OBSERVABLE_COUNTER"] = "OBSERVABLE_COUNTER";
+	InstrumentType["OBSERVABLE_GAUGE"] = "OBSERVABLE_GAUGE";
+	InstrumentType["OBSERVABLE_UP_DOWN_COUNTER"] = "OBSERVABLE_UP_DOWN_COUNTER";
+})(InstrumentType || (InstrumentType = {}));
 var DataPointType;
 (function (DataPointType) {
 	DataPointType[DataPointType["HISTOGRAM"] = 0] = "HISTOGRAM";
@@ -136,9 +146,7 @@ var AggregatorKind;
 })(AggregatorKind || (AggregatorKind = {}));
 
 class DropAggregator {
-	constructor() {
-		this.kind = AggregatorKind.DROP;
-	}
+	kind = AggregatorKind.DROP;
 	createAccumulation() {
 		return undefined;
 	}
@@ -151,50 +159,6 @@ class DropAggregator {
 	toMetricData(_descriptor, _aggregationTemporality, _accumulationByAttributes, _endTime) {
 		return undefined;
 	}
-}
-
-var InstrumentType;
-(function (InstrumentType) {
-	InstrumentType["COUNTER"] = "COUNTER";
-	InstrumentType["GAUGE"] = "GAUGE";
-	InstrumentType["HISTOGRAM"] = "HISTOGRAM";
-	InstrumentType["UP_DOWN_COUNTER"] = "UP_DOWN_COUNTER";
-	InstrumentType["OBSERVABLE_COUNTER"] = "OBSERVABLE_COUNTER";
-	InstrumentType["OBSERVABLE_GAUGE"] = "OBSERVABLE_GAUGE";
-	InstrumentType["OBSERVABLE_UP_DOWN_COUNTER"] = "OBSERVABLE_UP_DOWN_COUNTER";
-})(InstrumentType || (InstrumentType = {}));
-function createInstrumentDescriptor(name, type, options) {
-	if (!isValidName(name)) {
-		diag.warn(`Invalid metric name: "${name}". The metric name should be a ASCII string with a length no greater than 255 characters.`);
-	}
-	return {
-		name,
-		type,
-		description: options?.description ?? '',
-		unit: options?.unit ?? '',
-		valueType: options?.valueType ?? ValueType.DOUBLE,
-		advice: options?.advice ?? {},
-	};
-}
-function createInstrumentDescriptorWithView(view, instrument) {
-	return {
-		name: view.name ?? instrument.name,
-		description: view.description ?? instrument.description,
-		type: instrument.type,
-		unit: instrument.unit,
-		valueType: instrument.valueType,
-		advice: instrument.advice,
-	};
-}
-function isDescriptorCompatibleWith(descriptor, otherDescriptor) {
-	return (equalsCaseInsensitive(descriptor.name, otherDescriptor.name) &&
-		descriptor.unit === otherDescriptor.unit &&
-		descriptor.type === otherDescriptor.type &&
-		descriptor.valueType === otherDescriptor.valueType);
-}
-const NAME_REGEXP = /^[a-z][a-z0-9_.\-/]{0,254}$/i;
-function isValidName(name) {
-	return name.match(NAME_REGEXP) != null;
 }
 
 function createNewEmptyCheckpoint(boundaries) {
@@ -213,6 +177,10 @@ function createNewEmptyCheckpoint(boundaries) {
 	};
 }
 class HistogramAccumulation {
+	startTime;
+	_boundaries;
+	_recordMinMax;
+	_current;
 	constructor(startTime, _boundaries, _recordMinMax = true, _current = createNewEmptyCheckpoint(_boundaries)) {
 		this.startTime = startTime;
 		this._boundaries = _boundaries;
@@ -241,10 +209,12 @@ class HistogramAccumulation {
 	}
 }
 class HistogramAggregator {
+	_boundaries;
+	_recordMinMax;
+	kind = AggregatorKind.HISTOGRAM;
 	constructor(_boundaries, _recordMinMax) {
 		this._boundaries = _boundaries;
 		this._recordMinMax = _recordMinMax;
-		this.kind = AggregatorKind.HISTOGRAM;
 	}
 	createAccumulation(startTime) {
 		return new HistogramAccumulation(startTime, this._boundaries, this._recordMinMax);
@@ -337,6 +307,10 @@ class HistogramAggregator {
 }
 
 class Buckets {
+	backing;
+	indexBase;
+	indexStart;
+	indexEnd;
 	constructor(backing = new BucketsBacking(), indexBase = 0, indexStart = 0, indexEnd = 0) {
 		this.backing = backing;
 		this.indexBase = indexBase;
@@ -440,6 +414,7 @@ class Buckets {
 	}
 }
 class BucketsBacking {
+	_counts;
 	constructor(_counts = [0]) {
 		this._counts = _counts;
 	}
@@ -531,6 +506,7 @@ class MappingError extends Error {
 }
 
 class ExponentMapping {
+	_shift;
 	constructor(scale) {
 		this._shift = -scale;
 	}
@@ -575,6 +551,9 @@ class ExponentMapping {
 }
 
 class LogarithmMapping {
+	_scale;
+	_scaleFactor;
+	_inverseFactor;
 	constructor(scale) {
 		this._scale = scale;
 		this._scaleFactor = ldexp(Math.LOG2E, scale);
@@ -642,18 +621,31 @@ function getMapping(scale) {
 }
 
 class HighLow {
+	low;
+	high;
+	static combine(h1, h2) {
+		return new HighLow(Math.min(h1.low, h2.low), Math.max(h1.high, h2.high));
+	}
 	constructor(low, high) {
 		this.low = low;
 		this.high = high;
-	}
-	static combine(h1, h2) {
-		return new HighLow(Math.min(h1.low, h2.low), Math.max(h1.high, h2.high));
 	}
 }
 const MAX_SCALE = 20;
 const DEFAULT_MAX_SIZE = 160;
 const MIN_MAX_SIZE = 2;
 class ExponentialHistogramAccumulation {
+	startTime;
+	_maxSize;
+	_recordMinMax;
+	_sum;
+	_count;
+	_zeroCount;
+	_min;
+	_max;
+	_positive;
+	_negative;
+	_mapping;
 	constructor(startTime = startTime, _maxSize = DEFAULT_MAX_SIZE, _recordMinMax = true, _sum = 0, _count = 0, _zeroCount = 0, _min = Number.POSITIVE_INFINITY, _max = Number.NEGATIVE_INFINITY, _positive = new Buckets(), _negative = new Buckets(), _mapping = getMapping(MAX_SCALE)) {
 		this.startTime = startTime;
 		this._maxSize = _maxSize;
@@ -906,10 +898,12 @@ class ExponentialHistogramAccumulation {
 	}
 }
 class ExponentialHistogramAggregator {
+	_maxSize;
+	_recordMinMax;
+	kind = AggregatorKind.EXPONENTIAL_HISTOGRAM;
 	constructor(_maxSize, _recordMinMax) {
 		this._maxSize = _maxSize;
 		this._recordMinMax = _recordMinMax;
-		this.kind = AggregatorKind.EXPONENTIAL_HISTOGRAM;
 	}
 	createAccumulation(startTime) {
 		return new ExponentialHistogramAccumulation(startTime, this._maxSize, this._recordMinMax);
@@ -962,6 +956,9 @@ class ExponentialHistogramAggregator {
 }
 
 class LastValueAccumulation {
+	startTime;
+	_current;
+	sampleTime;
 	constructor(startTime, _current = 0, sampleTime = [0, 0]) {
 		this.startTime = startTime;
 		this._current = _current;
@@ -979,9 +976,7 @@ class LastValueAccumulation {
 	}
 }
 class LastValueAggregator {
-	constructor() {
-		this.kind = AggregatorKind.LAST_VALUE;
-	}
+	kind = AggregatorKind.LAST_VALUE;
 	createAccumulation(startTime) {
 		return new LastValueAccumulation(startTime);
 	}
@@ -1017,6 +1012,10 @@ class LastValueAggregator {
 }
 
 class SumAccumulation {
+	startTime;
+	monotonic;
+	_current;
+	reset;
 	constructor(startTime, monotonic, _current = 0, reset = false) {
 		this.startTime = startTime;
 		this.monotonic = monotonic;
@@ -1037,9 +1036,10 @@ class SumAccumulation {
 	}
 }
 class SumAggregator {
+	monotonic;
+	kind = AggregatorKind.SUM;
 	constructor(monotonic) {
 		this.monotonic = monotonic;
-		this.kind = AggregatorKind.SUM;
 	}
 	createAccumulation(startTime) {
 		return new SumAccumulation(startTime, this.monotonic);
@@ -1078,33 +1078,15 @@ class SumAggregator {
 	}
 }
 
-class Aggregation {
-	static Drop() {
-		return DROP_AGGREGATION;
-	}
-	static Sum() {
-		return SUM_AGGREGATION;
-	}
-	static LastValue() {
-		return LAST_VALUE_AGGREGATION;
-	}
-	static Histogram() {
-		return HISTOGRAM_AGGREGATION;
-	}
-	static ExponentialHistogram() {
-		return EXPONENTIAL_HISTOGRAM_AGGREGATION;
-	}
-	static Default() {
-		return DEFAULT_AGGREGATION;
-	}
-}
-class DropAggregation extends Aggregation {
+class DropAggregation {
+	static DEFAULT_INSTANCE = new DropAggregator();
 	createAggregator(_instrument) {
 		return DropAggregation.DEFAULT_INSTANCE;
 	}
 }
-DropAggregation.DEFAULT_INSTANCE = new DropAggregator();
-class SumAggregation extends Aggregation {
+class SumAggregation {
+	static MONOTONIC_INSTANCE = new SumAggregator(true);
+	static NON_MONOTONIC_INSTANCE = new SumAggregator(false);
 	createAggregator(instrument) {
 		switch (instrument.type) {
 			case InstrumentType.COUNTER:
@@ -1118,23 +1100,22 @@ class SumAggregation extends Aggregation {
 		}
 	}
 }
-SumAggregation.MONOTONIC_INSTANCE = new SumAggregator(true);
-SumAggregation.NON_MONOTONIC_INSTANCE = new SumAggregator(false);
-class LastValueAggregation extends Aggregation {
+class LastValueAggregation {
+	static DEFAULT_INSTANCE = new LastValueAggregator();
 	createAggregator(_instrument) {
 		return LastValueAggregation.DEFAULT_INSTANCE;
 	}
 }
-LastValueAggregation.DEFAULT_INSTANCE = new LastValueAggregator();
-class HistogramAggregation extends Aggregation {
+class HistogramAggregation {
+	static DEFAULT_INSTANCE = new HistogramAggregator([0, 5, 10, 25, 50, 75, 100, 250, 500, 750, 1000, 2500, 5000, 7500, 10000], true);
 	createAggregator(_instrument) {
 		return HistogramAggregation.DEFAULT_INSTANCE;
 	}
 }
-HistogramAggregation.DEFAULT_INSTANCE = new HistogramAggregator([0, 5, 10, 25, 50, 75, 100, 250, 500, 750, 1000, 2500, 5000, 7500, 10000], true);
-class ExplicitBucketHistogramAggregation extends Aggregation {
+class ExplicitBucketHistogramAggregation {
+	_recordMinMax;
+	_boundaries;
 	constructor(boundaries, _recordMinMax = true) {
-		super();
 		this._recordMinMax = _recordMinMax;
 		if (boundaries == null) {
 			throw new Error('ExplicitBucketHistogramAggregation should be created with explicit boundaries, if a single bucket histogram is required, please pass an empty array');
@@ -1152,9 +1133,10 @@ class ExplicitBucketHistogramAggregation extends Aggregation {
 		return new HistogramAggregator(this._boundaries, this._recordMinMax);
 	}
 }
-class ExponentialHistogramAggregation extends Aggregation {
+class ExponentialHistogramAggregation {
+	_maxSize;
+	_recordMinMax;
 	constructor(_maxSize = 160, _recordMinMax = true) {
-		super();
 		this._maxSize = _maxSize;
 		this._recordMinMax = _recordMinMax;
 	}
@@ -1162,7 +1144,7 @@ class ExponentialHistogramAggregation extends Aggregation {
 		return new ExponentialHistogramAggregator(this._maxSize, this._recordMinMax);
 	}
 }
-class DefaultAggregation extends Aggregation {
+class DefaultAggregation {
 	_resolve(instrument) {
 		switch (instrument.type) {
 			case InstrumentType.COUNTER:
@@ -1193,15 +1175,60 @@ const DROP_AGGREGATION = new DropAggregation();
 const SUM_AGGREGATION = new SumAggregation();
 const LAST_VALUE_AGGREGATION = new LastValueAggregation();
 const HISTOGRAM_AGGREGATION = new HistogramAggregation();
-const EXPONENTIAL_HISTOGRAM_AGGREGATION = new ExponentialHistogramAggregation();
 const DEFAULT_AGGREGATION = new DefaultAggregation();
 
-const DEFAULT_AGGREGATION_SELECTOR = _instrumentType => Aggregation.Default();
+var AggregationType;
+(function (AggregationType) {
+	AggregationType[AggregationType["DEFAULT"] = 0] = "DEFAULT";
+	AggregationType[AggregationType["DROP"] = 1] = "DROP";
+	AggregationType[AggregationType["SUM"] = 2] = "SUM";
+	AggregationType[AggregationType["LAST_VALUE"] = 3] = "LAST_VALUE";
+	AggregationType[AggregationType["EXPLICIT_BUCKET_HISTOGRAM"] = 4] = "EXPLICIT_BUCKET_HISTOGRAM";
+	AggregationType[AggregationType["EXPONENTIAL_HISTOGRAM"] = 5] = "EXPONENTIAL_HISTOGRAM";
+})(AggregationType || (AggregationType = {}));
+function toAggregation(option) {
+	switch (option.type) {
+		case AggregationType.DEFAULT:
+			return DEFAULT_AGGREGATION;
+		case AggregationType.DROP:
+			return DROP_AGGREGATION;
+		case AggregationType.SUM:
+			return SUM_AGGREGATION;
+		case AggregationType.LAST_VALUE:
+			return LAST_VALUE_AGGREGATION;
+		case AggregationType.EXPONENTIAL_HISTOGRAM: {
+			const expOption = option;
+			return new ExponentialHistogramAggregation(expOption.options?.maxSize, expOption.options?.recordMinMax);
+		}
+		case AggregationType.EXPLICIT_BUCKET_HISTOGRAM: {
+			const expOption = option;
+			if (expOption.options == null) {
+				return HISTOGRAM_AGGREGATION;
+			}
+			else {
+				return new ExplicitBucketHistogramAggregation(expOption.options?.boundaries, expOption.options?.recordMinMax);
+			}
+		}
+		default:
+			throw new Error('Unsupported Aggregation');
+	}
+}
+
+const DEFAULT_AGGREGATION_SELECTOR = _instrumentType => {
+	return {
+		type: AggregationType.DEFAULT,
+	};
+};
 const DEFAULT_AGGREGATION_TEMPORALITY_SELECTOR = _instrumentType => AggregationTemporality.CUMULATIVE;
 
 class MetricReader {
+	_shutdown = false;
+	_metricProducers;
+	_sdkMetricProducer;
+	_aggregationTemporalitySelector;
+	_aggregationSelector;
+	_cardinalitySelector;
 	constructor(options) {
-		this._shutdown = false;
 		this._aggregationSelector =
 			options?.aggregationSelector ?? DEFAULT_AGGREGATION_SELECTOR;
 		this._aggregationTemporalitySelector =
@@ -1283,6 +1310,10 @@ class MetricReader {
 }
 
 class PeriodicExportingMetricReader extends MetricReader {
+	_interval;
+	_exporter;
+	_exportInterval;
+	_exportTimeout;
 	constructor(options) {
 		super({
 			aggregationSelector: options.exporter.selectAggregation?.bind(options.exporter),
@@ -1362,9 +1393,10 @@ class PeriodicExportingMetricReader extends MetricReader {
 }
 
 class InMemoryMetricExporter {
+	_shutdown = false;
+	_aggregationTemporality;
+	_metrics = [];
 	constructor(aggregationTemporality) {
-		this._shutdown = false;
-		this._metrics = [];
 		this._aggregationTemporality = aggregationTemporality;
 	}
 	export(metrics, resultCallback) {
@@ -1394,8 +1426,9 @@ class InMemoryMetricExporter {
 }
 
 class ConsoleMetricExporter {
+	_shutdown = false;
+	_temporalitySelector;
 	constructor(options) {
-		this._shutdown = false;
 		this._temporalitySelector =
 			options?.temporalitySelector ?? DEFAULT_AGGREGATION_TEMPORALITY_SELECTOR;
 	}
@@ -1431,9 +1464,7 @@ class ConsoleMetricExporter {
 }
 
 class ViewRegistry {
-	constructor() {
-		this._registeredViews = [];
-	}
+	_registeredViews = [];
 	addView(view) {
 		this._registeredViews.push(view);
 	}
@@ -1459,7 +1490,43 @@ class ViewRegistry {
 	}
 }
 
+function createInstrumentDescriptor(name, type, options) {
+	if (!isValidName(name)) {
+		diag.warn(`Invalid metric name: "${name}". The metric name should be a ASCII string with a length no greater than 255 characters.`);
+	}
+	return {
+		name,
+		type,
+		description: options?.description ?? '',
+		unit: options?.unit ?? '',
+		valueType: options?.valueType ?? ValueType.DOUBLE,
+		advice: options?.advice ?? {},
+	};
+}
+function createInstrumentDescriptorWithView(view, instrument) {
+	return {
+		name: view.name ?? instrument.name,
+		description: view.description ?? instrument.description,
+		type: instrument.type,
+		unit: instrument.unit,
+		valueType: instrument.valueType,
+		advice: instrument.advice,
+	};
+}
+function isDescriptorCompatibleWith(descriptor, otherDescriptor) {
+	return (equalsCaseInsensitive(descriptor.name, otherDescriptor.name) &&
+		descriptor.unit === otherDescriptor.unit &&
+		descriptor.type === otherDescriptor.type &&
+		descriptor.valueType === otherDescriptor.valueType);
+}
+const NAME_REGEXP = /^[a-z][a-z0-9_.\-/]{0,254}$/i;
+function isValidName(name) {
+	return name.match(NAME_REGEXP) != null;
+}
+
 class SyncInstrument {
+	_writableMetricStorage;
+	_descriptor;
 	constructor(_writableMetricStorage, _descriptor) {
 		this._writableMetricStorage = _writableMetricStorage;
 		this._descriptor = _descriptor;
@@ -1509,6 +1576,9 @@ class HistogramInstrument extends SyncInstrument {
 	}
 }
 class ObservableInstrument {
+	_observableRegistry;
+	_metricStorages;
+	_descriptor;
 	constructor(descriptor, metricStorages, _observableRegistry) {
 		this._observableRegistry = _observableRegistry;
 		this._descriptor = descriptor;
@@ -1532,6 +1602,7 @@ function isObservableInstrument(it) {
 }
 
 class Meter {
+	_meterSharedState;
 	constructor(_meterSharedState) {
 		this._meterSharedState = _meterSharedState;
 	}
@@ -1579,6 +1650,7 @@ class Meter {
 }
 
 class MetricStorage {
+	_instrumentDescriptor;
 	constructor(_instrumentDescriptor) {
 		this._instrumentDescriptor = _instrumentDescriptor;
 	}
@@ -1596,10 +1668,11 @@ class MetricStorage {
 }
 
 class HashMap {
+	_hash;
+	_valueMap = new Map();
+	_keyMap = new Map();
 	constructor(_hash) {
 		this._hash = _hash;
-		this._valueMap = new Map();
-		this._keyMap = new Map();
 	}
 	get(key, hashCode) {
 		hashCode ??= this._hash(key);
@@ -1655,11 +1728,14 @@ class AttributeHashMap extends HashMap {
 }
 
 class DeltaMetricProcessor {
+	_aggregator;
+	_activeCollectionStorage = new AttributeHashMap();
+	_cumulativeMemoStorage = new AttributeHashMap();
+	_cardinalityLimit;
+	_overflowAttributes = { 'otel.metric.overflow': true };
+	_overflowHashCode;
 	constructor(_aggregator, aggregationCardinalityLimit) {
 		this._aggregator = _aggregator;
-		this._activeCollectionStorage = new AttributeHashMap();
-		this._cumulativeMemoStorage = new AttributeHashMap();
-		this._overflowAttributes = { 'otel.metric.overflow': true };
 		this._cardinalityLimit = (aggregationCardinalityLimit ?? 2000) - 1;
 		this._overflowHashCode = hashAttributes(this._overflowAttributes);
 	}
@@ -1711,10 +1787,11 @@ class DeltaMetricProcessor {
 }
 
 class TemporalMetricProcessor {
+	_aggregator;
+	_unreportedAccumulations = new Map();
+	_reportHistory = new Map();
 	constructor(_aggregator, collectorHandles) {
 		this._aggregator = _aggregator;
-		this._unreportedAccumulations = new Map();
-		this._reportHistory = new Map();
 		collectorHandles.forEach(handle => {
 			this._unreportedAccumulations.set(handle, []);
 		});
@@ -1804,6 +1881,10 @@ function AttributesMapToAccumulationRecords(map) {
 }
 
 class AsyncMetricStorage extends MetricStorage {
+	_attributesProcessor;
+	_aggregationCardinalityLimit;
+	_deltaMetricStorage;
+	_temporalMetricStorage;
 	constructor(_instrumentDescriptor, aggregator, _attributesProcessor, collectorHandles, _aggregationCardinalityLimit) {
 		super(_instrumentDescriptor);
 		this._attributesProcessor = _attributesProcessor;
@@ -1883,10 +1964,8 @@ function getConflictResolutionRecipe(existing, otherDescriptor) {
 }
 
 class MetricStorageRegistry {
-	constructor() {
-		this._sharedRegistry = new Map();
-		this._perCollectorRegistry = new Map();
-	}
+	_sharedRegistry = new Map();
+	_perCollectorRegistry = new Map();
 	static create() {
 		return new MetricStorageRegistry();
 	}
@@ -1964,6 +2043,7 @@ class MetricStorageRegistry {
 }
 
 class MultiMetricStorage {
+	_backingStorages;
 	constructor(_backingStorages) {
 		this._backingStorages = _backingStorages;
 	}
@@ -1975,10 +2055,12 @@ class MultiMetricStorage {
 }
 
 class ObservableResultImpl {
+	_instrumentName;
+	_valueType;
+	_buffer = new AttributeHashMap();
 	constructor(_instrumentName, _valueType) {
 		this._instrumentName = _instrumentName;
 		this._valueType = _valueType;
-		this._buffer = new AttributeHashMap();
 	}
 	observe(value, attributes = {}) {
 		if (typeof value !== 'number') {
@@ -1996,9 +2078,7 @@ class ObservableResultImpl {
 	}
 }
 class BatchObservableResultImpl {
-	constructor() {
-		this._buffer = new Map();
-	}
+	_buffer = new Map();
 	observe(metric, value, attributes = {}) {
 		if (!isObservableInstrument(metric)) {
 			return;
@@ -2025,10 +2105,8 @@ class BatchObservableResultImpl {
 }
 
 class ObservableRegistry {
-	constructor() {
-		this._callbacks = [];
-		this._batchCallbacks = [];
-	}
+	_callbacks = [];
+	_batchCallbacks = [];
 	addCallback(callback, instrument) {
 		const idx = this._findCallback(callback, instrument);
 		if (idx >= 0) {
@@ -2121,6 +2199,10 @@ class ObservableRegistry {
 }
 
 class SyncMetricStorage extends MetricStorage {
+	_attributesProcessor;
+	_aggregationCardinalityLimit;
+	_deltaMetricStorage;
+	_temporalMetricStorage;
 	constructor(instrumentDescriptor, aggregator, _attributesProcessor, collectorHandles, _aggregationCardinalityLimit) {
 		super(instrumentDescriptor);
 		this._attributesProcessor = _attributesProcessor;
@@ -2138,19 +2220,27 @@ class SyncMetricStorage extends MetricStorage {
 	}
 }
 
-class AttributesProcessor {
-	static Noop() {
-		return NOOP;
-	}
-}
-class NoopAttributesProcessor extends AttributesProcessor {
+class NoopAttributesProcessor {
 	process(incoming, _context) {
 		return incoming;
 	}
 }
-class FilteringAttributesProcessor extends AttributesProcessor {
+class MultiAttributesProcessor {
+	_processors;
+	constructor(_processors) {
+		this._processors = _processors;
+	}
+	process(incoming, context) {
+		let filteredAttributes = incoming;
+		for (const processor of this._processors) {
+			filteredAttributes = processor.process(filteredAttributes, context);
+		}
+		return filteredAttributes;
+	}
+}
+class AllowListProcessor {
+	_allowedAttributeNames;
 	constructor(_allowedAttributeNames) {
-		super();
 		this._allowedAttributeNames = _allowedAttributeNames;
 	}
 	process(incoming, _context) {
@@ -2161,14 +2251,42 @@ class FilteringAttributesProcessor extends AttributesProcessor {
 		return filteredAttributes;
 	}
 }
+class DenyListProcessor {
+	_deniedAttributeNames;
+	constructor(_deniedAttributeNames) {
+		this._deniedAttributeNames = _deniedAttributeNames;
+	}
+	process(incoming, _context) {
+		const filteredAttributes = {};
+		Object.keys(incoming)
+			.filter(attributeName => !this._deniedAttributeNames.includes(attributeName))
+			.forEach(attributeName => (filteredAttributes[attributeName] = incoming[attributeName]));
+		return filteredAttributes;
+	}
+}
+function createNoopAttributesProcessor() {
+	return NOOP;
+}
+function createMultiAttributesProcessor(processors) {
+	return new MultiAttributesProcessor(processors);
+}
+function createAllowListAttributesProcessor(attributeAllowList) {
+	return new AllowListProcessor(attributeAllowList);
+}
+function createDenyListAttributesProcessor(attributeDenyList) {
+	return new DenyListProcessor(attributeDenyList);
+}
 const NOOP = new NoopAttributesProcessor();
 
 class MeterSharedState {
+	_meterProviderSharedState;
+	_instrumentationScope;
+	metricStorageRegistry = new MetricStorageRegistry();
+	observableRegistry = new ObservableRegistry();
+	meter;
 	constructor(_meterProviderSharedState, _instrumentationScope) {
 		this._meterProviderSharedState = _meterProviderSharedState;
 		this._instrumentationScope = _instrumentationScope;
-		this.metricStorageRegistry = new MetricStorageRegistry();
-		this.observableRegistry = new ObservableRegistry();
 		this.meter = new Meter(this);
 	}
 	registerMetricStorage(descriptor) {
@@ -2226,7 +2344,7 @@ class MeterSharedState {
 				}
 				const aggregator = aggregation.createAggregator(descriptor);
 				const cardinalityLimit = collector.selectCardinalityLimit(descriptor.type);
-				const storage = new MetricStorageType(descriptor, aggregator, AttributesProcessor.Noop(), [collector], cardinalityLimit);
+				const storage = new MetricStorageType(descriptor, aggregator, createNoopAttributesProcessor(), [collector], cardinalityLimit);
 				this.metricStorageRegistry.registerForCollector(collector, storage);
 				return storage;
 			});
@@ -2237,11 +2355,12 @@ class MeterSharedState {
 }
 
 class MeterProviderSharedState {
+	resource;
+	viewRegistry = new ViewRegistry();
+	metricCollectors = [];
+	meterSharedStates = new Map();
 	constructor(resource) {
 		this.resource = resource;
-		this.viewRegistry = new ViewRegistry();
-		this.metricCollectors = [];
-		this.meterSharedStates = new Map();
 	}
 	getMeterSharedState(instrumentationScope) {
 		const id = instrumentationScopeId(instrumentationScope);
@@ -2255,13 +2374,18 @@ class MeterProviderSharedState {
 	selectAggregations(instrumentType) {
 		const result = [];
 		for (const collector of this.metricCollectors) {
-			result.push([collector, collector.selectAggregation(instrumentType)]);
+			result.push([
+				collector,
+				toAggregation(collector.selectAggregation(instrumentType)),
+			]);
 		}
 		return result;
 	}
 }
 
 class MetricCollector {
+	_sharedState;
+	_metricReader;
 	constructor(_sharedState, _metricReader) {
 		this._sharedState = _sharedState;
 		this._metricReader = _metricReader;
@@ -2305,67 +2429,10 @@ class MetricCollector {
 	}
 }
 
-function prepareResource(mergeWithDefaults, providedResource) {
-	const resource = providedResource ?? Resource.empty();
-	if (mergeWithDefaults) {
-		return Resource.default().merge(resource);
-	}
-	return resource;
-}
-class MeterProvider {
-	constructor(options) {
-		this._shutdown = false;
-		this._sharedState = new MeterProviderSharedState(prepareResource(options?.mergeResourceWithDefaults ?? true, options?.resource));
-		if (options?.views != null && options.views.length > 0) {
-			for (const view of options.views) {
-				this._sharedState.viewRegistry.addView(view);
-			}
-		}
-		if (options?.readers != null && options.readers.length > 0) {
-			for (const metricReader of options.readers) {
-				this.addMetricReader(metricReader);
-			}
-		}
-	}
-	getMeter(name, version = '', options = {}) {
-		if (this._shutdown) {
-			diag.warn('A shutdown MeterProvider cannot provide a Meter');
-			return createNoopMeter();
-		}
-		return this._sharedState.getMeterSharedState({
-			name,
-			version,
-			schemaUrl: options.schemaUrl,
-		}).meter;
-	}
-	addMetricReader(metricReader) {
-		const collector = new MetricCollector(this._sharedState, metricReader);
-		metricReader.setMetricProducer(collector);
-		this._sharedState.metricCollectors.push(collector);
-	}
-	async shutdown(options) {
-		if (this._shutdown) {
-			diag.warn('shutdown may only be called once per MeterProvider');
-			return;
-		}
-		this._shutdown = true;
-		await Promise.all(this._sharedState.metricCollectors.map(collector => {
-			return collector.shutdown(options);
-		}));
-	}
-	async forceFlush(options) {
-		if (this._shutdown) {
-			diag.warn('invalid attempt to force flush after MeterProvider shutdown');
-			return;
-		}
-		await Promise.all(this._sharedState.metricCollectors.map(collector => {
-			return collector.forceFlush(options);
-		}));
-	}
-}
-
 const ESCAPE = /[\^$\\.+?()[\]{}|]/g;
 class PatternPredicate {
+	_matchAll;
+	_regexp;
 	constructor(pattern) {
 		if (pattern === '*') {
 			this._matchAll = true;
@@ -2390,6 +2457,8 @@ class PatternPredicate {
 	}
 }
 class ExactPredicate {
+	_matchAll;
+	_pattern;
 	constructor(pattern) {
 		this._matchAll = pattern === undefined;
 		this._pattern = pattern;
@@ -2406,6 +2475,9 @@ class ExactPredicate {
 }
 
 class InstrumentSelector {
+	_nameFilter;
+	_type;
+	_unitFilter;
 	constructor(criteria) {
 		this._nameFilter = new PatternPredicate(criteria?.name ?? '*');
 		this._type = criteria?.type;
@@ -2423,6 +2495,9 @@ class InstrumentSelector {
 }
 
 class MeterSelector {
+	_nameFilter;
+	_versionFilter;
+	_schemaUrlFilter;
 	constructor(criteria) {
 		this._nameFilter = new ExactPredicate(criteria?.name);
 		this._versionFilter = new ExactPredicate(criteria?.version);
@@ -2447,25 +2522,35 @@ function isSelectorNotProvided(options) {
 		options.meterVersion == null &&
 		options.meterSchemaUrl == null);
 }
+function validateViewOptions(viewOptions) {
+	if (isSelectorNotProvided(viewOptions)) {
+		throw new Error('Cannot create view with no selector arguments supplied');
+	}
+	if (viewOptions.name != null &&
+		(viewOptions?.instrumentName == null ||
+			PatternPredicate.hasWildcard(viewOptions.instrumentName))) {
+		throw new Error('Views with a specified name must be declared with an instrument selector that selects at most one instrument per meter.');
+	}
+}
 class View {
+	name;
+	description;
+	aggregation;
+	attributesProcessor;
+	instrumentSelector;
+	meterSelector;
+	aggregationCardinalityLimit;
 	constructor(viewOptions) {
-		if (isSelectorNotProvided(viewOptions)) {
-			throw new Error('Cannot create view with no selector arguments supplied');
-		}
-		if (viewOptions.name != null &&
-			(viewOptions?.instrumentName == null ||
-				PatternPredicate.hasWildcard(viewOptions.instrumentName))) {
-			throw new Error('Views with a specified name must be declared with an instrument selector that selects at most one instrument per meter.');
-		}
-		if (viewOptions.attributeKeys != null) {
-			this.attributesProcessor = new FilteringAttributesProcessor(viewOptions.attributeKeys);
+		validateViewOptions(viewOptions);
+		if (viewOptions.attributesProcessors != null) {
+			this.attributesProcessor = createMultiAttributesProcessor(viewOptions.attributesProcessors);
 		}
 		else {
-			this.attributesProcessor = AttributesProcessor.Noop();
+			this.attributesProcessor = createNoopAttributesProcessor();
 		}
 		this.name = viewOptions.name;
 		this.description = viewOptions.description;
-		this.aggregation = viewOptions.aggregation ?? Aggregation.Default();
+		this.aggregation = toAggregation(viewOptions.aggregation ?? { type: AggregationType.DEFAULT });
 		this.instrumentSelector = new InstrumentSelector({
 			name: viewOptions.instrumentName,
 			type: viewOptions.instrumentType,
@@ -2480,4 +2565,54 @@ class View {
 	}
 }
 
-export { Aggregation, AggregationTemporality, ConsoleMetricExporter, DataPointType, DefaultAggregation, DropAggregation, ExplicitBucketHistogramAggregation, ExponentialHistogramAggregation, HistogramAggregation, InMemoryMetricExporter, InstrumentType, LastValueAggregation, MeterProvider, MetricReader, PeriodicExportingMetricReader, SumAggregation, TimeoutError, View };
+class MeterProvider {
+	_sharedState;
+	_shutdown = false;
+	constructor(options) {
+		this._sharedState = new MeterProviderSharedState(options?.resource ?? defaultResource());
+		if (options?.views != null && options.views.length > 0) {
+			for (const viewOption of options.views) {
+				this._sharedState.viewRegistry.addView(new View(viewOption));
+			}
+		}
+		if (options?.readers != null && options.readers.length > 0) {
+			for (const metricReader of options.readers) {
+				const collector = new MetricCollector(this._sharedState, metricReader);
+				metricReader.setMetricProducer(collector);
+				this._sharedState.metricCollectors.push(collector);
+			}
+		}
+	}
+	getMeter(name, version = '', options = {}) {
+		if (this._shutdown) {
+			diag.warn('A shutdown MeterProvider cannot provide a Meter');
+			return createNoopMeter();
+		}
+		return this._sharedState.getMeterSharedState({
+			name,
+			version,
+			schemaUrl: options.schemaUrl,
+		}).meter;
+	}
+	async shutdown(options) {
+		if (this._shutdown) {
+			diag.warn('shutdown may only be called once per MeterProvider');
+			return;
+		}
+		this._shutdown = true;
+		await Promise.all(this._sharedState.metricCollectors.map(collector => {
+			return collector.shutdown(options);
+		}));
+	}
+	async forceFlush(options) {
+		if (this._shutdown) {
+			diag.warn('invalid attempt to force flush after MeterProvider shutdown');
+			return;
+		}
+		await Promise.all(this._sharedState.metricCollectors.map(collector => {
+			return collector.forceFlush(options);
+		}));
+	}
+}
+
+export { AggregationTemporality, AggregationType, ConsoleMetricExporter, DataPointType, InMemoryMetricExporter, InstrumentType, MeterProvider, MetricReader, PeriodicExportingMetricReader, TimeoutError, createAllowListAttributesProcessor, createDenyListAttributesProcessor };

@@ -88,7 +88,8 @@ const major = VERSION.split('.')[0];
 const GLOBAL_OPENTELEMETRY_API_KEY = Symbol.for(`opentelemetry.js.api.${major}`);
 const _global = _globalThis;
 function registerGlobal(type, instance, diag, allowOverride = false) {
-	const api = (_global[GLOBAL_OPENTELEMETRY_API_KEY] = _global[GLOBAL_OPENTELEMETRY_API_KEY] ?? {
+	var _a;
+	const api = (_global[GLOBAL_OPENTELEMETRY_API_KEY] = (_a = _global[GLOBAL_OPENTELEMETRY_API_KEY]) !== null && _a !== void 0 ? _a : {
 		version: VERSION,
 	});
 	if (!allowOverride && api[type]) {
@@ -106,11 +107,12 @@ function registerGlobal(type, instance, diag, allowOverride = false) {
 	return true;
 }
 function getGlobal(type) {
-	const globalVersion = _global[GLOBAL_OPENTELEMETRY_API_KEY]?.version;
+	var _a, _b;
+	const globalVersion = (_a = _global[GLOBAL_OPENTELEMETRY_API_KEY]) === null || _a === void 0 ? void 0 : _a.version;
 	if (!globalVersion || !isCompatible(globalVersion)) {
 		return;
 	}
-	return _global[GLOBAL_OPENTELEMETRY_API_KEY]?.[type];
+	return (_b = _global[GLOBAL_OPENTELEMETRY_API_KEY]) === null || _b === void 0 ? void 0 : _b[type];
 }
 function unregisterGlobal(type, diag) {
 	diag.debug(`@opentelemetry/api: Unregistering a global for ${type} v${VERSION}.`);
@@ -186,6 +188,12 @@ function createLogLevelDiagLogger(maxLevel, logger) {
 
 const API_NAME$4 = 'diag';
 class DiagAPI {
+	static instance() {
+		if (!this._instance) {
+			this._instance = new DiagAPI();
+		}
+		return this._instance;
+	}
 	constructor() {
 		function _logProxy(funcName) {
 			return function (...args) {
@@ -197,9 +205,10 @@ class DiagAPI {
 		}
 		const self = this;
 		const setLogger = (logger, optionsOrLogLevel = { logLevel: DiagLogLevel.INFO }) => {
+			var _a, _b, _c;
 			if (logger === self) {
 				const err = new Error('Cannot use diag as the logger for itself. Please use a DiagLogger implementation like ConsoleDiagLogger or a custom implementation');
-				self.error(err.stack ?? err.message);
+				self.error((_a = err.stack) !== null && _a !== void 0 ? _a : err.message);
 				return false;
 			}
 			if (typeof optionsOrLogLevel === 'number') {
@@ -208,9 +217,9 @@ class DiagAPI {
 				};
 			}
 			const oldLogger = getGlobal('diag');
-			const newLogger = createLogLevelDiagLogger(optionsOrLogLevel.logLevel ?? DiagLogLevel.INFO, logger);
+			const newLogger = createLogLevelDiagLogger((_b = optionsOrLogLevel.logLevel) !== null && _b !== void 0 ? _b : DiagLogLevel.INFO, logger);
 			if (oldLogger && !optionsOrLogLevel.suppressOverrideMessage) {
-				const stack = new Error().stack ?? '<failed to generate stacktrace>';
+				const stack = (_c = new Error().stack) !== null && _c !== void 0 ? _c : '<failed to generate stacktrace>';
 				oldLogger.warn(`Current logger will be overwritten from ${stack}`);
 				newLogger.warn(`Current logger will overwrite one already registered from ${stack}`);
 			}
@@ -228,12 +237,6 @@ class DiagAPI {
 		self.info = _logProxy('info');
 		self.warn = _logProxy('warn');
 		self.error = _logProxy('error');
-	}
-	static instance() {
-		if (!this._instance) {
-			this._instance = new DiagAPI();
-		}
-		return this._instance;
 	}
 }
 
@@ -548,7 +551,8 @@ function setSpanContext(context, spanContext) {
 	return setSpan(context, new NonRecordingSpan(spanContext));
 }
 function getSpanContext(context) {
-	return getSpan(context)?.spanContext();
+	var _a;
+	return (_a = getSpan(context)) === null || _a === void 0 ? void 0 : _a.spanContext();
 }
 
 const VALID_TRACEID_REGEX = /^([0-9a-f]{32})$/i;
@@ -569,7 +573,7 @@ function wrapSpanContext(spanContext) {
 const contextApi = ContextAPI.getInstance();
 class NoopTracer {
 	startSpan(name, options, context = contextApi.active()) {
-		const root = Boolean(options?.root);
+		const root = Boolean(options === null || options === void 0 ? void 0 : options.root);
 		if (root) {
 			return new NonRecordingSpan();
 		}
@@ -601,7 +605,7 @@ class NoopTracer {
 			ctx = arg3;
 			fn = arg4;
 		}
-		const parentContext = ctx ?? contextApi.active();
+		const parentContext = ctx !== null && ctx !== void 0 ? ctx : contextApi.active();
 		const span = this.startSpan(name, opts, parentContext);
 		const contextWithSpanSet = setSpan(parentContext, span);
 		return contextApi.with(contextWithSpanSet, fn, undefined, span);
@@ -651,17 +655,19 @@ class NoopTracerProvider {
 const NOOP_TRACER_PROVIDER = new NoopTracerProvider();
 class ProxyTracerProvider {
 	getTracer(name, version, options) {
-		return (this.getDelegateTracer(name, version, options) ??
-			new ProxyTracer(this, name, version, options));
+		var _a;
+		return ((_a = this.getDelegateTracer(name, version, options)) !== null && _a !== void 0 ? _a : new ProxyTracer(this, name, version, options));
 	}
 	getDelegate() {
-		return this._delegate ?? NOOP_TRACER_PROVIDER;
+		var _a;
+		return (_a = this._delegate) !== null && _a !== void 0 ? _a : NOOP_TRACER_PROVIDER;
 	}
 	setDelegate(delegate) {
 		this._delegate = delegate;
 	}
 	getDelegateTracer(name, version, options) {
-		return this._delegate?.getTracer(name, version, options);
+		var _a;
+		return (_a = this._delegate) === null || _a === void 0 ? void 0 : _a.getTracer(name, version, options);
 	}
 }
 

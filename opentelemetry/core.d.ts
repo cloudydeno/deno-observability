@@ -15,7 +15,7 @@
  */
 
 import * as api from './api.d.ts';
-import { TextMapPropagator, Context, TextMapSetter, TextMapGetter, SpanAttributes, SpanAttributeValue, Exception, Baggage, BaggageEntryMetadata, DiagLogLevel, SpanContext, Span, Sampler, SamplingResult, SpanKind, Link } from './api.d.ts';
+import { TextMapPropagator, Context, TextMapSetter, TextMapGetter, Attributes, AttributeValue, Exception, SpanContext, Span, DiagLogLevel } from './api.d.ts';
 
 /**
  * Propagates {@link Baggage} through Context format propagation.
@@ -70,40 +70,9 @@ declare class AnchoredClock implements Clock {
 	now(): number;
 }
 
-declare function sanitizeAttributes(attributes: unknown): SpanAttributes;
-declare function isAttributeKey(key: unknown): key is string;
-declare function isAttributeValue(val: unknown): val is SpanAttributeValue;
+declare function sanitizeAttributes(attributes: unknown): Attributes;
+declare function isAttributeValue(val: unknown): val is AttributeValue;
 
-/**
- * This interface defines a fallback to read a timeOrigin when it is not available on performance.timeOrigin,
- * this happens for example on Safari Mac
- * then the timeOrigin is taken from fetchStart - which is the closest to timeOrigin
- */
-interface TimeOriginLegacy {
-	timing: {
-		fetchStart: number;
-	};
-}
-/**
- * This interface defines the params that are be added to the wrapped function
- * using the "shimmer.wrap"
- */
-interface ShimWrapped extends Function {
-	__wrapped: boolean;
-	__unwrap: Function;
-	__original: Function;
-}
-/**
- * An instrumentation library consists of the name and optional version
- * used to obtain a tracer or meter from a provider. This metadata is made
- * available on ReadableSpan and MetricRecord for use by the export pipeline.
- * @deprecated Use {@link InstrumentationScope} instead.
- */
-interface InstrumentationLibrary {
-	readonly name: string;
-	readonly version?: string;
-	readonly schemaUrl?: string;
-}
 /**
  * An instrumentation scope consists of the name and optional version
  * used to obtain a tracer or meter from a provider. This metadata is made
@@ -115,7 +84,7 @@ interface InstrumentationScope {
 	readonly schemaUrl?: string;
 }
 /** Defines an error handler function */
-declare type ErrorHandler = (ex: Exception) => void;
+type ErrorHandler = (ex: Exception) => void;
 
 /**
  * Set the global error handler
@@ -192,8 +161,6 @@ declare function isTimeInput(value: unknown): value is api.HrTime | number | Dat
  */
 declare function addHrTimes(time1: api.HrTime, time2: api.HrTime): api.HrTime;
 
-declare function hexToBinary(hexStr: string): Uint8Array;
-
 interface ExportResult {
 	code: ExportResultCode;
 	error?: Error;
@@ -203,14 +170,6 @@ declare enum ExportResultCode {
 	FAILED = 1
 }
 
-declare type ParsedBaggageKeyValue = {
-	key: string;
-	value: string;
-	metadata: BaggageEntryMetadata | undefined;
-};
-declare function serializeKeyPairs(keyPairs: string[]): string;
-declare function getKeyPairs(baggage: Baggage): string[];
-declare function parsePairKeyValue(entry: string): ParsedBaggageKeyValue | undefined;
 /**
  * Parse a string serialized in the baggage HTTP Format (without metadata):
  * https://github.com/w3c/baggage/blob/master/baggage/HTTP_HEADER_FORMAT.md
@@ -218,127 +177,47 @@ declare function parsePairKeyValue(entry: string): ParsedBaggageKeyValue | undef
 declare function parseKeyPairsIntoRecord(value?: string): Record<string, string>;
 
 /**
- * Environment interface to define all names
+ * Retrieves a number from an environment variable.
+ * - Returns `undefined` if the environment variable is empty, unset, contains only whitespace, or is not a number.
+ * - Returns a number in all other cases.
+ *
+ * @param {string} key - The name of the environment variable to retrieve.
+ * @returns {number | undefined} - The number value or `undefined`.
  */
-declare const ENVIRONMENT_BOOLEAN_KEYS: readonly ["OTEL_SDK_DISABLED"];
-declare type ENVIRONMENT_BOOLEANS = {
-	[K in (typeof ENVIRONMENT_BOOLEAN_KEYS)[number]]?: boolean;
-};
-declare const ENVIRONMENT_NUMBERS_KEYS: readonly ["OTEL_BSP_EXPORT_TIMEOUT", "OTEL_BSP_MAX_EXPORT_BATCH_SIZE", "OTEL_BSP_MAX_QUEUE_SIZE", "OTEL_BSP_SCHEDULE_DELAY", "OTEL_BLRP_EXPORT_TIMEOUT", "OTEL_BLRP_MAX_EXPORT_BATCH_SIZE", "OTEL_BLRP_MAX_QUEUE_SIZE", "OTEL_BLRP_SCHEDULE_DELAY", "OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT", "OTEL_ATTRIBUTE_COUNT_LIMIT", "OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT", "OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT", "OTEL_LOGRECORD_ATTRIBUTE_VALUE_LENGTH_LIMIT", "OTEL_LOGRECORD_ATTRIBUTE_COUNT_LIMIT", "OTEL_SPAN_EVENT_COUNT_LIMIT", "OTEL_SPAN_LINK_COUNT_LIMIT", "OTEL_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT", "OTEL_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT", "OTEL_EXPORTER_OTLP_TIMEOUT", "OTEL_EXPORTER_OTLP_TRACES_TIMEOUT", "OTEL_EXPORTER_OTLP_METRICS_TIMEOUT", "OTEL_EXPORTER_OTLP_LOGS_TIMEOUT", "OTEL_EXPORTER_JAEGER_AGENT_PORT"];
-declare type ENVIRONMENT_NUMBERS = {
-	[K in (typeof ENVIRONMENT_NUMBERS_KEYS)[number]]?: number;
-};
-declare const ENVIRONMENT_LISTS_KEYS: readonly ["OTEL_NO_PATCH_MODULES", "OTEL_PROPAGATORS", "OTEL_SEMCONV_STABILITY_OPT_IN"];
-declare type ENVIRONMENT_LISTS = {
-	[K in (typeof ENVIRONMENT_LISTS_KEYS)[number]]?: string[];
-};
-declare type ENVIRONMENT = {
-	CONTAINER_NAME?: string;
-	ECS_CONTAINER_METADATA_URI_V4?: string;
-	ECS_CONTAINER_METADATA_URI?: string;
-	HOSTNAME?: string;
-	KUBERNETES_SERVICE_HOST?: string;
-	NAMESPACE?: string;
-	OTEL_EXPORTER_JAEGER_AGENT_HOST?: string;
-	OTEL_EXPORTER_JAEGER_ENDPOINT?: string;
-	OTEL_EXPORTER_JAEGER_PASSWORD?: string;
-	OTEL_EXPORTER_JAEGER_USER?: string;
-	OTEL_EXPORTER_OTLP_ENDPOINT?: string;
-	OTEL_EXPORTER_OTLP_TRACES_ENDPOINT?: string;
-	OTEL_EXPORTER_OTLP_METRICS_ENDPOINT?: string;
-	OTEL_EXPORTER_OTLP_LOGS_ENDPOINT?: string;
-	OTEL_EXPORTER_OTLP_HEADERS?: string;
-	OTEL_EXPORTER_OTLP_TRACES_HEADERS?: string;
-	OTEL_EXPORTER_OTLP_METRICS_HEADERS?: string;
-	OTEL_EXPORTER_OTLP_LOGS_HEADERS?: string;
-	OTEL_EXPORTER_ZIPKIN_ENDPOINT?: string;
-	OTEL_LOG_LEVEL?: DiagLogLevel;
-	OTEL_RESOURCE_ATTRIBUTES?: string;
-	OTEL_SERVICE_NAME?: string;
-	OTEL_TRACES_EXPORTER?: string;
-	OTEL_TRACES_SAMPLER_ARG?: string;
-	OTEL_TRACES_SAMPLER?: string;
-	OTEL_LOGS_EXPORTER?: string;
-	OTEL_EXPORTER_OTLP_INSECURE?: string;
-	OTEL_EXPORTER_OTLP_TRACES_INSECURE?: string;
-	OTEL_EXPORTER_OTLP_METRICS_INSECURE?: string;
-	OTEL_EXPORTER_OTLP_LOGS_INSECURE?: string;
-	OTEL_EXPORTER_OTLP_CERTIFICATE?: string;
-	OTEL_EXPORTER_OTLP_TRACES_CERTIFICATE?: string;
-	OTEL_EXPORTER_OTLP_METRICS_CERTIFICATE?: string;
-	OTEL_EXPORTER_OTLP_LOGS_CERTIFICATE?: string;
-	OTEL_EXPORTER_OTLP_COMPRESSION?: string;
-	OTEL_EXPORTER_OTLP_TRACES_COMPRESSION?: string;
-	OTEL_EXPORTER_OTLP_METRICS_COMPRESSION?: string;
-	OTEL_EXPORTER_OTLP_LOGS_COMPRESSION?: string;
-	OTEL_EXPORTER_OTLP_CLIENT_KEY?: string;
-	OTEL_EXPORTER_OTLP_TRACES_CLIENT_KEY?: string;
-	OTEL_EXPORTER_OTLP_METRICS_CLIENT_KEY?: string;
-	OTEL_EXPORTER_OTLP_LOGS_CLIENT_KEY?: string;
-	OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE?: string;
-	OTEL_EXPORTER_OTLP_TRACES_CLIENT_CERTIFICATE?: string;
-	OTEL_EXPORTER_OTLP_METRICS_CLIENT_CERTIFICATE?: string;
-	OTEL_EXPORTER_OTLP_LOGS_CLIENT_CERTIFICATE?: string;
-	OTEL_EXPORTER_OTLP_PROTOCOL?: string;
-	OTEL_EXPORTER_OTLP_TRACES_PROTOCOL?: string;
-	OTEL_EXPORTER_OTLP_METRICS_PROTOCOL?: string;
-	OTEL_EXPORTER_OTLP_LOGS_PROTOCOL?: string;
-	OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE?: string;
-} & ENVIRONMENT_BOOLEANS & ENVIRONMENT_NUMBERS & ENVIRONMENT_LISTS;
-declare type RAW_ENVIRONMENT = {
-	[key: string]: string | number | undefined | string[];
-};
-declare const DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT: number;
-declare const DEFAULT_ATTRIBUTE_COUNT_LIMIT = 128;
-declare const DEFAULT_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT = 128;
-declare const DEFAULT_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT = 128;
+declare function getNumberFromEnv(key: string): number | undefined;
 /**
- * Default environment variables
+ * Retrieves a string from an environment variable.
+ * - Returns `undefined` if the environment variable is empty, unset, or contains only whitespace.
+ *
+ * @param {string} key - The name of the environment variable to retrieve.
+ * @returns {string | undefined} - The string value or `undefined`.
  */
-declare const DEFAULT_ENVIRONMENT: Required<ENVIRONMENT>;
+declare function getStringFromEnv(key: string): string | undefined;
 /**
- * Parses environment values
- * @param values
+ * Retrieves a boolean value from an environment variable.
+ * - Trims leading and trailing whitespace and ignores casing.
+ * - Returns `false` if the environment variable is empty, unset, or contains only whitespace.
+ * - Returns `false` for strings that cannot be mapped to a boolean.
+ *
+ * @param {string} key - The name of the environment variable to retrieve.
+ * @returns {boolean} - The boolean value or `false` if the environment variable is unset empty, unset, or contains only whitespace.
  */
-declare function parseEnvironment(values: RAW_ENVIRONMENT): ENVIRONMENT;
-
+declare function getBooleanFromEnv(key: string): boolean;
 /**
- * Gets the environment variables
+ * Retrieves a list of strings from an environment variable.
+ * - Uses ',' as the delimiter.
+ * - Trims leading and trailing whitespace from each entry.
+ * - Excludes empty entries.
+ * - Returns `undefined` if the environment variable is empty or contains only whitespace.
+ * - Returns an empty array if all entries are empty or whitespace.
+ *
+ * @param {string} key - The name of the environment variable to retrieve.
+ * @returns {string[] | undefined} - The list of strings or `undefined`.
  */
-declare function getEnv(): Required<ENVIRONMENT>;
-declare function getEnvWithoutDefaults(): ENVIRONMENT;
+declare function getStringListFromEnv(key: string): string[] | undefined;
 
 /** only globals that common to node and browsers are allowed */
 declare const _globalThis: typeof globalThis;
-
-declare function hexToBase64(hexStr: string): string;
-
-/**
- * @deprecated Use the one defined in @opentelemetry/sdk-trace-base instead.
- * IdGenerator provides an interface for generating Trace Id and Span Id.
- */
-interface IdGenerator {
-	/** Returns a trace ID composed of 32 lowercase hex characters. */
-	generateTraceId(): string;
-	/** Returns a span ID composed of 16 lowercase hex characters. */
-	generateSpanId(): string;
-}
-
-/**
- * @deprecated Use the one defined in @opentelemetry/sdk-trace-base instead.
- */
-declare class RandomIdGenerator implements IdGenerator {
-	/**
-	* Returns a random 16-byte trace ID formatted/encoded as a 32 lowercase hex
-	* characters corresponding to 128 bits.
-	*/
-	generateTraceId: () => string;
-	/**
-	* Returns a random 8-byte span ID formatted/encoded as a 16 lowercase hex
-	* characters corresponding to 64 bits.
-	*/
-	generateSpanId: () => string;
-}
 
 declare const otperformance: Performance;
 
@@ -422,7 +301,7 @@ declare class W3CTraceContextPropagator implements TextMapPropagator {
 declare enum RPCType {
 	HTTP = "http"
 }
-declare type HTTPMetadata = {
+type HTTPMetadata = {
 	type: RPCType.HTTP;
 	route?: string;
 	span: Span;
@@ -430,70 +309,10 @@ declare type HTTPMetadata = {
 /**
  * Allows for future rpc metadata to be used with this mechanism
  */
-declare type RPCMetadata = HTTPMetadata;
+type RPCMetadata = HTTPMetadata;
 declare function setRPCMetadata(context: Context, meta: RPCMetadata): Context;
 declare function deleteRPCMetadata(context: Context): Context;
 declare function getRPCMetadata(context: Context): RPCMetadata | undefined;
-
-/**
- * @deprecated Use the one defined in @opentelemetry/sdk-trace-base instead.
- * Sampler that samples no traces.
- */
-declare class AlwaysOffSampler implements Sampler {
-	shouldSample(): SamplingResult;
-	toString(): string;
-}
-
-/**
- * @deprecated Use the one defined in @opentelemetry/sdk-trace-base instead.
- * Sampler that samples all traces.
- */
-declare class AlwaysOnSampler implements Sampler {
-	shouldSample(): SamplingResult;
-	toString(): string;
-}
-
-/**
- * @deprecated Use the one defined in @opentelemetry/sdk-trace-base instead.
- * A composite sampler that either respects the parent span's sampling decision
- * or delegates to `delegateSampler` for root spans.
- */
-declare class ParentBasedSampler implements Sampler {
-	private _root;
-	private _remoteParentSampled;
-	private _remoteParentNotSampled;
-	private _localParentSampled;
-	private _localParentNotSampled;
-	constructor(config: ParentBasedSamplerConfig);
-	shouldSample(context: Context, traceId: string, spanName: string, spanKind: SpanKind, attributes: SpanAttributes, links: Link[]): SamplingResult;
-	toString(): string;
-}
-interface ParentBasedSamplerConfig {
-	/** Sampler called for spans with no parent */
-	root: Sampler;
-	/** Sampler called for spans with a remote parent which was sampled. Default AlwaysOn */
-	remoteParentSampled?: Sampler;
-	/** Sampler called for spans with a remote parent which was not sampled. Default AlwaysOff */
-	remoteParentNotSampled?: Sampler;
-	/** Sampler called for spans with a local parent which was sampled. Default AlwaysOn */
-	localParentSampled?: Sampler;
-	/** Sampler called for spans with a local parent which was not sampled. Default AlwaysOff */
-	localParentNotSampled?: Sampler;
-}
-
-/**
- * @deprecated Use the one defined in @opentelemetry/sdk-trace-base instead.
- * Sampler that samples a given fraction of traces based of trace id deterministically.
- */
-declare class TraceIdRatioBasedSampler implements Sampler {
-	private readonly _ratio;
-	private _upperBound;
-	constructor(_ratio?: number);
-	shouldSample(context: unknown, traceId: string): SamplingResult;
-	toString(): string;
-	private _normalize;
-	private _accumulate;
-}
 
 declare function suppressTracing(context: Context): Context;
 declare function unsuppressTracing(context: Context): Context;
@@ -526,15 +345,6 @@ declare class TraceState implements api.TraceState {
  */
 declare function merge(...args: any[]): any;
 
-declare enum TracesSamplerValues {
-	AlwaysOff = "always_off",
-	AlwaysOn = "always_on",
-	ParentBasedAlwaysOff = "parentbased_always_off",
-	ParentBasedAlwaysOn = "parentbased_always_on",
-	ParentBasedTraceIdRatio = "parentbased_traceidratio",
-	TraceIdRatio = "traceidratio"
-}
-
 /**
  * Error that is thrown on timeouts.
  */
@@ -561,12 +371,6 @@ declare function urlMatches(url: string, urlToMatch: string | RegExp): boolean;
 declare function isUrlIgnored(url: string, ignoredUrls?: Array<string | RegExp>): boolean;
 
 /**
- * Checks if certain function has been already wrapped
- * @param func
- */
-declare function isWrapped(func: unknown): func is ShimWrapped;
-
-/**
  * Bind the callback and only invoke the callback once regardless how many times `BindOnceFuture.call` is invoked.
  */
 declare class BindOnceFuture<R, This = unknown, T extends (this: This, ...args: unknown[]) => R = () => R> {
@@ -580,7 +384,11 @@ declare class BindOnceFuture<R, This = unknown, T extends (this: This, ...args: 
 	call(...args: Parameters<T>): Promise<R>;
 }
 
-declare const VERSION = "1.30.1";
+/**
+ * Convert a string to a {@link DiagLogLevel}, defaults to {@link DiagLogLevel} if the log level does not exist or undefined if the input is undefined.
+ * @param value
+ */
+declare function diagLogLevelFromString(value: string | undefined): DiagLogLevel | undefined;
 
 interface Exporter<T> {
 	export(arg: T, resultCallback: (result: ExportResult) => void): void;
@@ -591,15 +399,8 @@ interface Exporter<T> {
  */
 declare function _export<T>(exporter: Exporter<T>, arg: T): Promise<ExportResult>;
 
-declare const baggageUtils: {
-	getKeyPairs: typeof getKeyPairs;
-	serializeKeyPairs: typeof serializeKeyPairs;
-	parseKeyPairsIntoRecord: typeof parseKeyPairsIntoRecord;
-	parsePairKeyValue: typeof parsePairKeyValue;
-};
-
 declare const internal: {
 	_export: typeof _export;
 };
 
-export { AlwaysOffSampler, AlwaysOnSampler, AnchoredClock, BindOnceFuture, Clock, CompositePropagator, CompositePropagatorConfig, DEFAULT_ATTRIBUTE_COUNT_LIMIT, DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT, DEFAULT_ENVIRONMENT, DEFAULT_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT, DEFAULT_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT, ENVIRONMENT, ErrorHandler, ExportResult, ExportResultCode, IdGenerator, InstrumentationLibrary, InstrumentationScope, ParentBasedSampler, RAW_ENVIRONMENT, RPCMetadata, RPCType, RandomIdGenerator, SDK_INFO, ShimWrapped, TRACE_PARENT_HEADER, TRACE_STATE_HEADER, TimeOriginLegacy, TimeoutError, TraceIdRatioBasedSampler, TraceState, TracesSamplerValues, VERSION, W3CBaggagePropagator, W3CTraceContextPropagator, _globalThis, addHrTimes, baggageUtils, callWithTimeout, deleteRPCMetadata, getEnv, getEnvWithoutDefaults, getRPCMetadata, getTimeOrigin, globalErrorHandler, hexToBase64, hexToBinary, hrTime, hrTimeDuration, hrTimeToMicroseconds, hrTimeToMilliseconds, hrTimeToNanoseconds, hrTimeToTimeStamp, internal, isAttributeKey, isAttributeValue, isTimeInput, isTimeInputHrTime, isTracingSuppressed, isUrlIgnored, isWrapped, loggingErrorHandler, merge, millisToHrTime, otperformance, parseEnvironment, parseTraceParent, sanitizeAttributes, setGlobalErrorHandler, setRPCMetadata, suppressTracing, timeInputToHrTime, unrefTimer, unsuppressTracing, urlMatches };
+export { AnchoredClock, BindOnceFuture, Clock, CompositePropagator, CompositePropagatorConfig, ErrorHandler, ExportResult, ExportResultCode, InstrumentationScope, RPCMetadata, RPCType, SDK_INFO, TRACE_PARENT_HEADER, TRACE_STATE_HEADER, TimeoutError, TraceState, W3CBaggagePropagator, W3CTraceContextPropagator, _globalThis, addHrTimes, callWithTimeout, deleteRPCMetadata, diagLogLevelFromString, getBooleanFromEnv, getNumberFromEnv, getRPCMetadata, getStringFromEnv, getStringListFromEnv, getTimeOrigin, globalErrorHandler, hrTime, hrTimeDuration, hrTimeToMicroseconds, hrTimeToMilliseconds, hrTimeToNanoseconds, hrTimeToTimeStamp, internal, isAttributeValue, isTimeInput, isTimeInputHrTime, isTracingSuppressed, isUrlIgnored, loggingErrorHandler, merge, millisToHrTime, otperformance, parseKeyPairsIntoRecord, parseTraceParent, sanitizeAttributes, setGlobalErrorHandler, setRPCMetadata, suppressTracing, timeInputToHrTime, unrefTimer, unsuppressTracing, urlMatches };

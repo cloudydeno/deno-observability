@@ -29,7 +29,7 @@ interface ExportResponseRetryable {
 	status: 'retryable';
 	retryInMillis?: number;
 }
-declare type ExportResponse = ExportResponseSuccess | ExportResponseFailure | ExportResponseRetryable;
+type ExportResponse = ExportResponseSuccess | ExportResponseFailure | ExportResponseRetryable;
 
 interface IExporterTransport {
 	send(data: Uint8Array, timeoutMillis: number): Promise<ExportResponse>;

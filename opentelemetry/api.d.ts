@@ -39,7 +39,7 @@ interface ExceptionWithName {
  *
  * @since 1.0.0
  */
-declare type Exception = ExceptionWithCode | ExceptionWithMessage | ExceptionWithName | string;
+type Exception = ExceptionWithCode | ExceptionWithMessage | ExceptionWithName | string;
 
 /**
  * Defines High-Resolution Time.
@@ -55,7 +55,7 @@ declare type Exception = ExceptionWithCode | ExceptionWithMessage | ExceptionWit
  *
  * @since 1.0.0
  */
-declare type HrTime = [number, number];
+type HrTime = [number, number];
 /**
  * Defines TimeInput.
  *
@@ -63,7 +63,7 @@ declare type HrTime = [number, number];
  *
  * @since 1.0.0
  */
-declare type TimeInput = HrTime | number | Date;
+type TimeInput = HrTime | number | Date;
 
 /**
  * Attributes is a map from string to attribute values.
@@ -82,18 +82,18 @@ interface Attributes {
  *
  * @since 1.3.0
  */
-declare type AttributeValue = string | number | boolean | Array<null | undefined | string> | Array<null | undefined | number> | Array<null | undefined | boolean>;
+type AttributeValue = string | number | boolean | Array<null | undefined | string> | Array<null | undefined | number> | Array<null | undefined | boolean>;
 
 /**
  * @deprecated please use {@link Attributes}
  * @since 1.0.0
  */
-declare type SpanAttributes = Attributes;
+type SpanAttributes = Attributes;
 /**
  * @deprecated please use {@link AttributeValue}
  * @since 1.0.0
  */
-declare type SpanAttributeValue = AttributeValue;
+type SpanAttributeValue = AttributeValue;
 
 /**
  * @since 1.0.0
@@ -791,7 +791,7 @@ interface BaggageEntry {
  *
  * @since 1.0.0
  */
-declare type BaggageEntryMetadata = {
+type BaggageEntryMetadata = {
 	toString(): string;
 } & {
 	__TYPE__: typeof baggageEntryMetadataSymbol;
@@ -1064,24 +1064,24 @@ interface Histogram<AttributesTypes extends MetricAttributes = MetricAttributes>
  * @deprecated please use {@link Attributes}
  * @since 1.3.0
  */
-declare type MetricAttributes = Attributes;
+type MetricAttributes = Attributes;
 /**
  * @deprecated please use {@link AttributeValue}
  * @since 1.3.0
  */
-declare type MetricAttributeValue = AttributeValue;
+type MetricAttributeValue = AttributeValue;
 /**
  * The observable callback for Observable instruments.
  *
  * @since 1.3.0
  */
-declare type ObservableCallback<AttributesTypes extends MetricAttributes = MetricAttributes> = (observableResult: ObservableResult<AttributesTypes>) => void | Promise<void>;
+type ObservableCallback<AttributesTypes extends MetricAttributes = MetricAttributes> = (observableResult: ObservableResult<AttributesTypes>) => void | Promise<void>;
 /**
  * The observable callback for a batch of Observable instruments.
  *
  * @since 1.3.0
  */
-declare type BatchObservableCallback<AttributesTypes extends MetricAttributes = MetricAttributes> = (observableResult: BatchObservableResult<AttributesTypes>) => void | Promise<void>;
+type BatchObservableCallback<AttributesTypes extends MetricAttributes = MetricAttributes> = (observableResult: BatchObservableResult<AttributesTypes>) => void | Promise<void>;
 /**
  * @since 1.3.0
  */
@@ -1100,15 +1100,15 @@ interface Observable<AttributesTypes extends MetricAttributes = MetricAttributes
 /**
  * @since 1.3.0
  */
-declare type ObservableCounter<AttributesTypes extends MetricAttributes = MetricAttributes> = Observable<AttributesTypes>;
+type ObservableCounter<AttributesTypes extends MetricAttributes = MetricAttributes> = Observable<AttributesTypes>;
 /**
  * @since 1.3.0
  */
-declare type ObservableUpDownCounter<AttributesTypes extends MetricAttributes = MetricAttributes> = Observable<AttributesTypes>;
+type ObservableUpDownCounter<AttributesTypes extends MetricAttributes = MetricAttributes> = Observable<AttributesTypes>;
 /**
  * @since 1.3.0
  */
-declare type ObservableGauge<AttributesTypes extends MetricAttributes = MetricAttributes> = Observable<AttributesTypes>;
+type ObservableGauge<AttributesTypes extends MetricAttributes = MetricAttributes> = Observable<AttributesTypes>;
 
 /**
  * An interface describes additional metadata of a meter.
@@ -1270,7 +1270,7 @@ declare class MetricsAPI {
 /**
  * @since 1.0.0
  */
-declare type DiagLogFunction = (message: string, ...args: unknown[]) => void;
+type DiagLogFunction = (message: string, ...args: unknown[]) => void;
 /**
  * Defines an internal diagnostic logger interface which is used to log internal diagnostic
  * messages, you can set the default diagnostic logger via the {@link DiagAPI} setLogger function.

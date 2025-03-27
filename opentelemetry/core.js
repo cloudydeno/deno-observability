@@ -15,7 +15,7 @@
  */
 /// <reference types="./core.d.ts" />
 
-import { createContextKey, baggageEntryMetadataFromString, propagation, diag, DiagLogLevel, trace, isSpanContextValid, TraceFlags, SamplingDecision, isValidTraceId, context } from './api.js';
+import { createContextKey, baggageEntryMetadataFromString, propagation, diag, trace, isSpanContextValid, TraceFlags, DiagLogLevel, context } from './api.js';
 import { SEMRESATTRS_TELEMETRY_SDK_NAME, SEMRESATTRS_PROCESS_RUNTIME_NAME, SEMRESATTRS_TELEMETRY_SDK_LANGUAGE, TELEMETRYSDKLANGUAGEVALUES_NODEJS, SEMRESATTRS_TELEMETRY_SDK_VERSION } from './semantic-conventions.js';
 
 const SUPPRESS_TRACING_KEY = createContextKey('OpenTelemetry SDK Context Key SUPPRESS_TRACING');
@@ -133,6 +133,9 @@ class W3CBaggagePropagator {
 }
 
 class AnchoredClock {
+	_monotonicClock;
+	_epochMillis;
+	_performanceMillis;
 	constructor(systemClock, monotonicClock) {
 		this._monotonicClock = monotonicClock;
 		this._epochMillis = systemClock.now();
@@ -249,275 +252,53 @@ function globalErrorHandler(ex) {
 	catch { }
 }
 
-var TracesSamplerValues;
-(function (TracesSamplerValues) {
-	TracesSamplerValues["AlwaysOff"] = "always_off";
-	TracesSamplerValues["AlwaysOn"] = "always_on";
-	TracesSamplerValues["ParentBasedAlwaysOff"] = "parentbased_always_off";
-	TracesSamplerValues["ParentBasedAlwaysOn"] = "parentbased_always_on";
-	TracesSamplerValues["ParentBasedTraceIdRatio"] = "parentbased_traceidratio";
-	TracesSamplerValues["TraceIdRatio"] = "traceidratio";
-})(TracesSamplerValues || (TracesSamplerValues = {}));
-
-const DEFAULT_LIST_SEPARATOR = ',';
-const ENVIRONMENT_BOOLEAN_KEYS = ['OTEL_SDK_DISABLED'];
-function isEnvVarABoolean(key) {
-	return (ENVIRONMENT_BOOLEAN_KEYS.indexOf(key) > -1);
-}
-const ENVIRONMENT_NUMBERS_KEYS = [
-	'OTEL_BSP_EXPORT_TIMEOUT',
-	'OTEL_BSP_MAX_EXPORT_BATCH_SIZE',
-	'OTEL_BSP_MAX_QUEUE_SIZE',
-	'OTEL_BSP_SCHEDULE_DELAY',
-	'OTEL_BLRP_EXPORT_TIMEOUT',
-	'OTEL_BLRP_MAX_EXPORT_BATCH_SIZE',
-	'OTEL_BLRP_MAX_QUEUE_SIZE',
-	'OTEL_BLRP_SCHEDULE_DELAY',
-	'OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT',
-	'OTEL_ATTRIBUTE_COUNT_LIMIT',
-	'OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT',
-	'OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT',
-	'OTEL_LOGRECORD_ATTRIBUTE_VALUE_LENGTH_LIMIT',
-	'OTEL_LOGRECORD_ATTRIBUTE_COUNT_LIMIT',
-	'OTEL_SPAN_EVENT_COUNT_LIMIT',
-	'OTEL_SPAN_LINK_COUNT_LIMIT',
-	'OTEL_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT',
-	'OTEL_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT',
-	'OTEL_EXPORTER_OTLP_TIMEOUT',
-	'OTEL_EXPORTER_OTLP_TRACES_TIMEOUT',
-	'OTEL_EXPORTER_OTLP_METRICS_TIMEOUT',
-	'OTEL_EXPORTER_OTLP_LOGS_TIMEOUT',
-	'OTEL_EXPORTER_JAEGER_AGENT_PORT',
-];
-function isEnvVarANumber(key) {
-	return (ENVIRONMENT_NUMBERS_KEYS.indexOf(key) > -1);
-}
-const ENVIRONMENT_LISTS_KEYS = [
-	'OTEL_NO_PATCH_MODULES',
-	'OTEL_PROPAGATORS',
-	'OTEL_SEMCONV_STABILITY_OPT_IN',
-];
-function isEnvVarAList(key) {
-	return ENVIRONMENT_LISTS_KEYS.indexOf(key) > -1;
-}
-const DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT = Infinity;
-const DEFAULT_ATTRIBUTE_COUNT_LIMIT = 128;
-const DEFAULT_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT = 128;
-const DEFAULT_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT = 128;
-const DEFAULT_ENVIRONMENT = {
-	OTEL_SDK_DISABLED: false,
-	CONTAINER_NAME: '',
-	ECS_CONTAINER_METADATA_URI_V4: '',
-	ECS_CONTAINER_METADATA_URI: '',
-	HOSTNAME: '',
-	KUBERNETES_SERVICE_HOST: '',
-	NAMESPACE: '',
-	OTEL_BSP_EXPORT_TIMEOUT: 30000,
-	OTEL_BSP_MAX_EXPORT_BATCH_SIZE: 512,
-	OTEL_BSP_MAX_QUEUE_SIZE: 2048,
-	OTEL_BSP_SCHEDULE_DELAY: 5000,
-	OTEL_BLRP_EXPORT_TIMEOUT: 30000,
-	OTEL_BLRP_MAX_EXPORT_BATCH_SIZE: 512,
-	OTEL_BLRP_MAX_QUEUE_SIZE: 2048,
-	OTEL_BLRP_SCHEDULE_DELAY: 5000,
-	OTEL_EXPORTER_JAEGER_AGENT_HOST: '',
-	OTEL_EXPORTER_JAEGER_AGENT_PORT: 6832,
-	OTEL_EXPORTER_JAEGER_ENDPOINT: '',
-	OTEL_EXPORTER_JAEGER_PASSWORD: '',
-	OTEL_EXPORTER_JAEGER_USER: '',
-	OTEL_EXPORTER_OTLP_ENDPOINT: '',
-	OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: '',
-	OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: '',
-	OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: '',
-	OTEL_EXPORTER_OTLP_HEADERS: '',
-	OTEL_EXPORTER_OTLP_TRACES_HEADERS: '',
-	OTEL_EXPORTER_OTLP_METRICS_HEADERS: '',
-	OTEL_EXPORTER_OTLP_LOGS_HEADERS: '',
-	OTEL_EXPORTER_OTLP_TIMEOUT: 10000,
-	OTEL_EXPORTER_OTLP_TRACES_TIMEOUT: 10000,
-	OTEL_EXPORTER_OTLP_METRICS_TIMEOUT: 10000,
-	OTEL_EXPORTER_OTLP_LOGS_TIMEOUT: 10000,
-	OTEL_EXPORTER_ZIPKIN_ENDPOINT: 'http://localhost:9411/api/v2/spans',
-	OTEL_LOG_LEVEL: DiagLogLevel.INFO,
-	OTEL_NO_PATCH_MODULES: [],
-	OTEL_PROPAGATORS: ['tracecontext', 'baggage'],
-	OTEL_RESOURCE_ATTRIBUTES: '',
-	OTEL_SERVICE_NAME: '',
-	OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT: DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT,
-	OTEL_ATTRIBUTE_COUNT_LIMIT: DEFAULT_ATTRIBUTE_COUNT_LIMIT,
-	OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT: DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT,
-	OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT: DEFAULT_ATTRIBUTE_COUNT_LIMIT,
-	OTEL_LOGRECORD_ATTRIBUTE_VALUE_LENGTH_LIMIT: DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT,
-	OTEL_LOGRECORD_ATTRIBUTE_COUNT_LIMIT: DEFAULT_ATTRIBUTE_COUNT_LIMIT,
-	OTEL_SPAN_EVENT_COUNT_LIMIT: 128,
-	OTEL_SPAN_LINK_COUNT_LIMIT: 128,
-	OTEL_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT: DEFAULT_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT,
-	OTEL_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT: DEFAULT_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT,
-	OTEL_TRACES_EXPORTER: '',
-	OTEL_TRACES_SAMPLER: TracesSamplerValues.ParentBasedAlwaysOn,
-	OTEL_TRACES_SAMPLER_ARG: '',
-	OTEL_LOGS_EXPORTER: '',
-	OTEL_EXPORTER_OTLP_INSECURE: '',
-	OTEL_EXPORTER_OTLP_TRACES_INSECURE: '',
-	OTEL_EXPORTER_OTLP_METRICS_INSECURE: '',
-	OTEL_EXPORTER_OTLP_LOGS_INSECURE: '',
-	OTEL_EXPORTER_OTLP_CERTIFICATE: '',
-	OTEL_EXPORTER_OTLP_TRACES_CERTIFICATE: '',
-	OTEL_EXPORTER_OTLP_METRICS_CERTIFICATE: '',
-	OTEL_EXPORTER_OTLP_LOGS_CERTIFICATE: '',
-	OTEL_EXPORTER_OTLP_COMPRESSION: '',
-	OTEL_EXPORTER_OTLP_TRACES_COMPRESSION: '',
-	OTEL_EXPORTER_OTLP_METRICS_COMPRESSION: '',
-	OTEL_EXPORTER_OTLP_LOGS_COMPRESSION: '',
-	OTEL_EXPORTER_OTLP_CLIENT_KEY: '',
-	OTEL_EXPORTER_OTLP_TRACES_CLIENT_KEY: '',
-	OTEL_EXPORTER_OTLP_METRICS_CLIENT_KEY: '',
-	OTEL_EXPORTER_OTLP_LOGS_CLIENT_KEY: '',
-	OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE: '',
-	OTEL_EXPORTER_OTLP_TRACES_CLIENT_CERTIFICATE: '',
-	OTEL_EXPORTER_OTLP_METRICS_CLIENT_CERTIFICATE: '',
-	OTEL_EXPORTER_OTLP_LOGS_CLIENT_CERTIFICATE: '',
-	OTEL_EXPORTER_OTLP_PROTOCOL: 'http/protobuf',
-	OTEL_EXPORTER_OTLP_TRACES_PROTOCOL: 'http/protobuf',
-	OTEL_EXPORTER_OTLP_METRICS_PROTOCOL: 'http/protobuf',
-	OTEL_EXPORTER_OTLP_LOGS_PROTOCOL: 'http/protobuf',
-	OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE: 'cumulative',
-	OTEL_SEMCONV_STABILITY_OPT_IN: [],
-};
-function parseBoolean(key, environment, values) {
-	if (typeof values[key] === 'undefined') {
-		return;
+function getNumberFromEnv(key) {
+	const raw = Deno.env.get(key);
+	if (raw == null || raw.trim() === '') {
+		return undefined;
 	}
-	const value = String(values[key]);
-	environment[key] = value.toLowerCase() === 'true';
+	const value = Number(raw);
+	if (isNaN(value)) {
+		diag.warn(`Unknown value ${JSON.stringify(raw)} for ${key}, expected a number, using defaults`);
+		return undefined;
+	}
+	return value;
 }
-function parseNumber(name, environment, values, min = -Infinity, max = Infinity) {
-	if (typeof values[name] !== 'undefined') {
-		const value = Number(values[name]);
-		if (!isNaN(value)) {
-			if (value < min) {
-				environment[name] = min;
-			}
-			else if (value > max) {
-				environment[name] = max;
-			}
-			else {
-				environment[name] = value;
-			}
-		}
+function getStringFromEnv(key) {
+	const raw = Deno.env.get(key);
+	if (raw == null || raw.trim() === '') {
+		return undefined;
+	}
+	return raw;
+}
+function getBooleanFromEnv(key) {
+	const raw = Deno.env.get(key)?.trim().toLowerCase();
+	if (raw == null || raw === '') {
+		return false;
+	}
+	if (raw === 'true') {
+		return true;
+	}
+	else if (raw === 'false') {
+		return false;
+	}
+	else {
+		diag.warn(`Unknown value ${JSON.stringify(raw)} for ${key}, expected 'true' or 'false', falling back to 'false' (default)`);
+		return false;
 	}
 }
-function parseStringList(name, output, input, separator = DEFAULT_LIST_SEPARATOR) {
-	const givenValue = input[name];
-	if (typeof givenValue === 'string') {
-		output[name] = givenValue.split(separator).map(v => v.trim());
-	}
-}
-const logLevelMap = {
-	ALL: DiagLogLevel.ALL,
-	VERBOSE: DiagLogLevel.VERBOSE,
-	DEBUG: DiagLogLevel.DEBUG,
-	INFO: DiagLogLevel.INFO,
-	WARN: DiagLogLevel.WARN,
-	ERROR: DiagLogLevel.ERROR,
-	NONE: DiagLogLevel.NONE,
-};
-function setLogLevelFromEnv(key, environment, values) {
-	const value = values[key];
-	if (typeof value === 'string') {
-		const theLevel = logLevelMap[value.toUpperCase()];
-		if (theLevel != null) {
-			environment[key] = theLevel;
-		}
-	}
-}
-function parseEnvironment(values) {
-	const environment = {};
-	for (const env in DEFAULT_ENVIRONMENT) {
-		const key = env;
-		switch (key) {
-			case 'OTEL_LOG_LEVEL':
-				setLogLevelFromEnv(key, environment, values);
-				break;
-			default:
-				if (isEnvVarABoolean(key)) {
-					parseBoolean(key, environment, values);
-				}
-				else if (isEnvVarANumber(key)) {
-					parseNumber(key, environment, values);
-				}
-				else if (isEnvVarAList(key)) {
-					parseStringList(key, environment, values);
-				}
-				else {
-					const value = values[key];
-					if (typeof value !== 'undefined' && value !== null) {
-						environment[key] = String(value);
-					}
-				}
-		}
-	}
-	return environment;
-}
-
-function getEnv() {
-	const processEnv = parseEnvironment(Deno.env.toObject());
-	return Object.assign({}, DEFAULT_ENVIRONMENT, processEnv);
-}
-function getEnvWithoutDefaults() {
-	return parseEnvironment(Deno.env.toObject());
+function getStringListFromEnv(key) {
+	return getStringFromEnv(key)
+		?.split(',')
+		.map(v => v.trim())
+		.filter(s => s !== '');
 }
 
 const _globalThis = typeof globalThis === 'object' ? globalThis : global;
 
-function intValue(charCode) {
-	if (charCode >= 48 && charCode <= 57) {
-		return charCode - 48;
-	}
-	if (charCode >= 97 && charCode <= 102) {
-		return charCode - 87;
-	}
-	return charCode - 55;
-}
-function hexToBinary(hexStr) {
-	const buf = new Uint8Array(hexStr.length / 2);
-	let offset = 0;
-	for (let i = 0; i < hexStr.length; i += 2) {
-		const hi = intValue(hexStr.charCodeAt(i));
-		const lo = intValue(hexStr.charCodeAt(i + 1));
-		buf[offset++] = (hi << 4) | lo;
-	}
-	return buf;
-}
-
-function hexToBase64(hexStr) {
-	return btoa(String.fromCharCode(...hexToBinary(hexStr)));
-}
-
-const SPAN_ID_BYTES = 8;
-const TRACE_ID_BYTES = 16;
-class RandomIdGenerator {
-	constructor() {
-		this.generateTraceId = getIdGenerator(TRACE_ID_BYTES);
-		this.generateSpanId = getIdGenerator(SPAN_ID_BYTES);
-	}
-}
-const SHARED_CHAR_CODES_ARRAY = Array(32);
-function getIdGenerator(bytes) {
-	return function generateId() {
-		for (let i = 0; i < bytes * 2; i++) {
-			SHARED_CHAR_CODES_ARRAY[i] = Math.floor(Math.random() * 16) + 48;
-			if (SHARED_CHAR_CODES_ARRAY[i] >= 58) {
-				SHARED_CHAR_CODES_ARRAY[i] += 39;
-			}
-		}
-		return String.fromCharCode.apply(null, SHARED_CHAR_CODES_ARRAY.slice(0, bytes * 2));
-	};
-}
-
 const otperformance = performance;
 
-const VERSION$1 = "1.30.1";
+const VERSION$1 = "2.0.0";
 
 const SDK_INFO = {
 	[SEMRESATTRS_TELEMETRY_SDK_NAME]: 'opentelemetry',
@@ -624,6 +405,8 @@ var ExportResultCode;
 })(ExportResultCode || (ExportResultCode = {}));
 
 class CompositePropagator {
+	_propagators;
+	_fields;
 	constructor(config = {}) {
 		this._propagators = config.propagators ?? [];
 		this._fields = Array.from(new Set(this._propagators
@@ -675,8 +458,8 @@ const MAX_TRACE_STATE_LEN = 512;
 const LIST_MEMBERS_SEPARATOR = ',';
 const LIST_MEMBER_KEY_VALUE_SPLITTER = '=';
 class TraceState {
+	_internalState = new Map();
 	constructor(rawTraceState) {
-		this._internalState = new Map();
 		if (rawTraceState)
 			this._parse(rawTraceState);
 	}
@@ -813,118 +596,22 @@ function getRPCMetadata(context) {
 	return context.getValue(RPC_METADATA_KEY);
 }
 
-class AlwaysOffSampler {
-	shouldSample() {
-		return {
-			decision: SamplingDecision.NOT_RECORD,
-		};
-	}
-	toString() {
-		return 'AlwaysOffSampler';
-	}
-}
-
-class AlwaysOnSampler {
-	shouldSample() {
-		return {
-			decision: SamplingDecision.RECORD_AND_SAMPLED,
-		};
-	}
-	toString() {
-		return 'AlwaysOnSampler';
-	}
-}
-
-class ParentBasedSampler {
-	constructor(config) {
-		this._root = config.root;
-		if (!this._root) {
-			globalErrorHandler(new Error('ParentBasedSampler must have a root sampler configured'));
-			this._root = new AlwaysOnSampler();
-		}
-		this._remoteParentSampled =
-			config.remoteParentSampled ?? new AlwaysOnSampler();
-		this._remoteParentNotSampled =
-			config.remoteParentNotSampled ?? new AlwaysOffSampler();
-		this._localParentSampled =
-			config.localParentSampled ?? new AlwaysOnSampler();
-		this._localParentNotSampled =
-			config.localParentNotSampled ?? new AlwaysOffSampler();
-	}
-	shouldSample(context, traceId, spanName, spanKind, attributes, links) {
-		const parentContext = trace.getSpanContext(context);
-		if (!parentContext || !isSpanContextValid(parentContext)) {
-			return this._root.shouldSample(context, traceId, spanName, spanKind, attributes, links);
-		}
-		if (parentContext.isRemote) {
-			if (parentContext.traceFlags & TraceFlags.SAMPLED) {
-				return this._remoteParentSampled.shouldSample(context, traceId, spanName, spanKind, attributes, links);
-			}
-			return this._remoteParentNotSampled.shouldSample(context, traceId, spanName, spanKind, attributes, links);
-		}
-		if (parentContext.traceFlags & TraceFlags.SAMPLED) {
-			return this._localParentSampled.shouldSample(context, traceId, spanName, spanKind, attributes, links);
-		}
-		return this._localParentNotSampled.shouldSample(context, traceId, spanName, spanKind, attributes, links);
-	}
-	toString() {
-		return `ParentBased{root=${this._root.toString()}, remoteParentSampled=${this._remoteParentSampled.toString()}, remoteParentNotSampled=${this._remoteParentNotSampled.toString()}, localParentSampled=${this._localParentSampled.toString()}, localParentNotSampled=${this._localParentNotSampled.toString()}}`;
-	}
-}
-
-class TraceIdRatioBasedSampler {
-	constructor(_ratio = 0) {
-		this._ratio = _ratio;
-		this._ratio = this._normalize(_ratio);
-		this._upperBound = Math.floor(this._ratio * 0xffffffff);
-	}
-	shouldSample(context, traceId) {
-		return {
-			decision: isValidTraceId(traceId) && this._accumulate(traceId) < this._upperBound
-				? SamplingDecision.RECORD_AND_SAMPLED
-				: SamplingDecision.NOT_RECORD,
-		};
-	}
-	toString() {
-		return `TraceIdRatioBased{${this._ratio}}`;
-	}
-	_normalize(ratio) {
-		if (typeof ratio !== 'number' || isNaN(ratio))
-			return 0;
-		return ratio >= 1 ? 1 : ratio <= 0 ? 0 : ratio;
-	}
-	_accumulate(traceId) {
-		let accumulation = 0;
-		for (let i = 0; i < traceId.length / 8; i++) {
-			const pos = i * 8;
-			const part = parseInt(traceId.slice(pos, pos + 8), 16);
-			accumulation = (accumulation ^ part) >>> 0;
-		}
-		return accumulation;
-	}
-}
-
 const objectTag = '[object Object]';
 const nullTag = '[object Null]';
 const undefinedTag = '[object Undefined]';
 const funcProto = Function.prototype;
 const funcToString = funcProto.toString;
 const objectCtorString = funcToString.call(Object);
-const getPrototype = overArg(Object.getPrototypeOf, Object);
+const getPrototypeOf = Object.getPrototypeOf;
 const objectProto = Object.prototype;
 const hasOwnProperty = objectProto.hasOwnProperty;
 const symToStringTag = Symbol ? Symbol.toStringTag : undefined;
 const nativeObjectToString = objectProto.toString;
-function overArg(func, transform) {
-	return function (arg) {
-		return func(transform(arg));
-	};
-}
 function isPlainObject(value) {
 	if (!isObjectLike(value) || baseGetTag(value) !== objectTag) {
 		return false;
 	}
-	const proto = getPrototype(value);
+	const proto = getPrototypeOf(value);
 	if (proto === null) {
 		return true;
 	}
@@ -1132,14 +819,10 @@ function isUrlIgnored(url, ignoredUrls) {
 	return false;
 }
 
-function isWrapped(func) {
-	return (typeof func === 'function' &&
-		typeof func.__original === 'function' &&
-		typeof func.__unwrap === 'function' &&
-		func.__wrapped === true);
-}
-
 class Deferred {
+	_promise;
+	_resolve;
+	_reject;
 	constructor() {
 		this._promise = new Promise((resolve, reject) => {
 			this._resolve = resolve;
@@ -1158,11 +841,13 @@ class Deferred {
 }
 
 class BindOnceFuture {
+	_callback;
+	_that;
+	_isCalled = false;
+	_deferred = new Deferred();
 	constructor(_callback, _that) {
 		this._callback = _callback;
 		this._that = _that;
-		this._isCalled = false;
-		this._deferred = new Deferred();
 	}
 	get isCalled() {
 		return this._isCalled;
@@ -1184,6 +869,27 @@ class BindOnceFuture {
 	}
 }
 
+const logLevelMap = {
+	ALL: DiagLogLevel.ALL,
+	VERBOSE: DiagLogLevel.VERBOSE,
+	DEBUG: DiagLogLevel.DEBUG,
+	INFO: DiagLogLevel.INFO,
+	WARN: DiagLogLevel.WARN,
+	ERROR: DiagLogLevel.ERROR,
+	NONE: DiagLogLevel.NONE,
+};
+function diagLogLevelFromString(value) {
+	if (value == null) {
+		return undefined;
+	}
+	const resolvedLogLevel = logLevelMap[value.toUpperCase()];
+	if (resolvedLogLevel == null) {
+		diag.warn(`Unknown log level "${value}", expected one of ${Object.keys(logLevelMap)}, using default`);
+		return DiagLogLevel.INFO;
+	}
+	return resolvedLogLevel;
+}
+
 function _export(exporter, arg) {
 	return new Promise(resolve => {
 		context.with(suppressTracing(context.active()), () => {
@@ -1194,14 +900,8 @@ function _export(exporter, arg) {
 	});
 }
 
-const baggageUtils = {
-	getKeyPairs,
-	serializeKeyPairs,
-	parseKeyPairsIntoRecord,
-	parsePairKeyValue,
-};
 const internal = {
 	_export,
 };
 
-export { AlwaysOffSampler, AlwaysOnSampler, AnchoredClock, BindOnceFuture, CompositePropagator, DEFAULT_ATTRIBUTE_COUNT_LIMIT, DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT, DEFAULT_ENVIRONMENT, DEFAULT_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT, DEFAULT_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT, ExportResultCode, ParentBasedSampler, RPCType, RandomIdGenerator, SDK_INFO, TRACE_PARENT_HEADER, TRACE_STATE_HEADER, TimeoutError, TraceIdRatioBasedSampler, TraceState, TracesSamplerValues, VERSION$1 as VERSION, W3CBaggagePropagator, W3CTraceContextPropagator, _globalThis, addHrTimes, baggageUtils, callWithTimeout, deleteRPCMetadata, getEnv, getEnvWithoutDefaults, getRPCMetadata, getTimeOrigin, globalErrorHandler, hexToBase64, hexToBinary, hrTime, hrTimeDuration, hrTimeToMicroseconds, hrTimeToMilliseconds, hrTimeToNanoseconds, hrTimeToTimeStamp, internal, isAttributeKey, isAttributeValue, isTimeInput, isTimeInputHrTime, isTracingSuppressed, isUrlIgnored, isWrapped, loggingErrorHandler, merge, millisToHrTime, otperformance, parseEnvironment, parseTraceParent, sanitizeAttributes, setGlobalErrorHandler, setRPCMetadata, suppressTracing, timeInputToHrTime, unrefTimer, unsuppressTracing, urlMatches };
+export { AnchoredClock, BindOnceFuture, CompositePropagator, ExportResultCode, RPCType, SDK_INFO, TRACE_PARENT_HEADER, TRACE_STATE_HEADER, TimeoutError, TraceState, W3CBaggagePropagator, W3CTraceContextPropagator, _globalThis, addHrTimes, callWithTimeout, deleteRPCMetadata, diagLogLevelFromString, getBooleanFromEnv, getNumberFromEnv, getRPCMetadata, getStringFromEnv, getStringListFromEnv, getTimeOrigin, globalErrorHandler, hrTime, hrTimeDuration, hrTimeToMicroseconds, hrTimeToMilliseconds, hrTimeToNanoseconds, hrTimeToTimeStamp, internal, isAttributeValue, isTimeInput, isTimeInputHrTime, isTracingSuppressed, isUrlIgnored, loggingErrorHandler, merge, millisToHrTime, otperformance, parseKeyPairsIntoRecord, parseTraceParent, sanitizeAttributes, setGlobalErrorHandler, setRPCMetadata, suppressTracing, timeInputToHrTime, unrefTimer, unsuppressTracing, urlMatches };

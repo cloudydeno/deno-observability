@@ -18,32 +18,22 @@
 import * as api from './api.js';
 import { diag, context } from './api.js';
 import { NOOP_LOGGER } from './api-logs.js';
-import { Resource } from './resources.js';
-import { timeInputToHrTime, isAttributeValue, getEnv, getEnvWithoutDefaults, DEFAULT_ATTRIBUTE_COUNT_LIMIT, DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT, callWithTimeout, merge, BindOnceFuture, hrTimeToMicroseconds, ExportResultCode, globalErrorHandler, internal, unrefTimer } from './core.js';
+import { defaultResource } from './resources.js';
+import { timeInputToHrTime, isAttributeValue, getNumberFromEnv, callWithTimeout, merge, BindOnceFuture, hrTimeToMicroseconds, ExportResultCode, globalErrorHandler, internal, unrefTimer } from './core.js';
 
 class LogRecord {
-	constructor(_sharedState, instrumentationScope, logRecord) {
-		this.attributes = {};
-		this.totalAttributesCount = 0;
-		this._isReadonly = false;
-		const { timestamp, observedTimestamp, severityNumber, severityText, body, attributes = {}, context, } = logRecord;
-		const now = Date.now();
-		this.hrTime = timeInputToHrTime(timestamp ?? now);
-		this.hrTimeObserved = timeInputToHrTime(observedTimestamp ?? now);
-		if (context) {
-			const spanContext = api.trace.getSpanContext(context);
-			if (spanContext && api.isSpanContextValid(spanContext)) {
-				this.spanContext = spanContext;
-			}
-		}
-		this.severityNumber = severityNumber;
-		this.severityText = severityText;
-		this.body = body;
-		this.resource = _sharedState.resource;
-		this.instrumentationScope = instrumentationScope;
-		this._logRecordLimits = _sharedState.logRecordLimits;
-		this.setAttributes(attributes);
-	}
+	hrTime;
+	hrTimeObserved;
+	spanContext;
+	resource;
+	instrumentationScope;
+	attributes = {};
+	_severityText;
+	_severityNumber;
+	_body;
+	totalAttributesCount = 0;
+	_isReadonly = false;
+	_logRecordLimits;
 	set severityText(severityText) {
 		if (this._isLogRecordReadonly()) {
 			return;
@@ -73,6 +63,25 @@ class LogRecord {
 	}
 	get droppedAttributesCount() {
 		return this.totalAttributesCount - Object.keys(this.attributes).length;
+	}
+	constructor(_sharedState, instrumentationScope, logRecord) {
+		const { timestamp, observedTimestamp, severityNumber, severityText, body, attributes = {}, context, } = logRecord;
+		const now = Date.now();
+		this.hrTime = timeInputToHrTime(timestamp ?? now);
+		this.hrTimeObserved = timeInputToHrTime(observedTimestamp ?? now);
+		if (context) {
+			const spanContext = api.trace.getSpanContext(context);
+			if (spanContext && api.isSpanContextValid(spanContext)) {
+				this.spanContext = spanContext;
+			}
+		}
+		this.severityNumber = severityNumber;
+		this.severityText = severityText;
+		this.body = body;
+		this.resource = _sharedState.resource;
+		this.instrumentationScope = instrumentationScope;
+		this._logRecordLimits = _sharedState.logRecordLimits;
+		this.setAttributes(attributes);
 	}
 	setAttribute(key, value) {
 		if (this._isLogRecordReadonly()) {
@@ -159,6 +168,8 @@ class LogRecord {
 }
 
 class Logger {
+	instrumentationScope;
+	_sharedState;
 	constructor(instrumentationScope, _sharedState) {
 		this.instrumentationScope = instrumentationScope;
 		this._sharedState = _sharedState;
@@ -178,28 +189,29 @@ function loadDefaultConfig() {
 	return {
 		forceFlushTimeoutMillis: 30000,
 		logRecordLimits: {
-			attributeValueLengthLimit: getEnv().OTEL_LOGRECORD_ATTRIBUTE_VALUE_LENGTH_LIMIT,
-			attributeCountLimit: getEnv().OTEL_LOGRECORD_ATTRIBUTE_COUNT_LIMIT,
+			attributeValueLengthLimit: getNumberFromEnv('OTEL_LOGRECORD_ATTRIBUTE_VALUE_LENGTH_LIMIT') ??
+				Infinity,
+			attributeCountLimit: getNumberFromEnv('OTEL_LOGRECORD_ATTRIBUTE_COUNT_LIMIT') ?? 128,
 		},
 		includeTraceContext: true,
-		mergeResourceWithDefaults: true,
 	};
 }
 function reconfigureLimits(logRecordLimits) {
-	const parsedEnvConfig = getEnvWithoutDefaults();
 	return {
 		attributeCountLimit: logRecordLimits.attributeCountLimit ??
-			parsedEnvConfig.OTEL_LOGRECORD_ATTRIBUTE_COUNT_LIMIT ??
-			parsedEnvConfig.OTEL_ATTRIBUTE_COUNT_LIMIT ??
-			DEFAULT_ATTRIBUTE_COUNT_LIMIT,
+			getNumberFromEnv('OTEL_LOGRECORD_ATTRIBUTE_COUNT_LIMIT') ??
+			getNumberFromEnv('OTEL_ATTRIBUTE_COUNT_LIMIT') ??
+			128,
 		attributeValueLengthLimit: logRecordLimits.attributeValueLengthLimit ??
-			parsedEnvConfig.OTEL_LOGRECORD_ATTRIBUTE_VALUE_LENGTH_LIMIT ??
-			parsedEnvConfig.OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT ??
-			DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT,
+			getNumberFromEnv('OTEL_LOGRECORD_ATTRIBUTE_VALUE_LENGTH_LIMIT') ??
+			getNumberFromEnv('OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT') ??
+			Infinity,
 	};
 }
 
 class MultiLogRecordProcessor {
+	processors;
+	forceFlushTimeoutMillis;
 	constructor(processors, forceFlushTimeoutMillis) {
 		this.processors = processors;
 		this.forceFlushTimeoutMillis = forceFlushTimeoutMillis;
@@ -227,28 +239,27 @@ class NoopLogRecordProcessor {
 }
 
 class LoggerProviderSharedState {
+	resource;
+	forceFlushTimeoutMillis;
+	logRecordLimits;
+	loggers = new Map();
+	activeProcessor;
+	registeredLogRecordProcessors = [];
 	constructor(resource, forceFlushTimeoutMillis, logRecordLimits) {
 		this.resource = resource;
 		this.forceFlushTimeoutMillis = forceFlushTimeoutMillis;
 		this.logRecordLimits = logRecordLimits;
-		this.loggers = new Map();
-		this.registeredLogRecordProcessors = [];
 		this.activeProcessor = new NoopLogRecordProcessor();
 	}
 }
 
 const DEFAULT_LOGGER_NAME = 'unknown';
-function prepareResource(mergeWithDefaults, providedResource) {
-	const resource = providedResource ?? Resource.empty();
-	if (mergeWithDefaults) {
-		return Resource.default().merge(resource);
-	}
-	return resource;
-}
 class LoggerProvider {
+	_shutdownOnce;
+	_sharedState;
 	constructor(config = {}) {
 		const mergedConfig = merge({}, loadDefaultConfig(), config);
-		const resource = prepareResource(mergedConfig.mergeResourceWithDefaults, config.resource);
+		const resource = config.resource ?? defaultResource();
 		this._sharedState = new LoggerProviderSharedState(resource, mergedConfig.forceFlushTimeoutMillis, reconfigureLimits(mergedConfig.logRecordLimits));
 		this._shutdownOnce = new BindOnceFuture(this._shutdown, this);
 	}
@@ -327,6 +338,9 @@ class ConsoleLogRecordExporter {
 }
 
 class SimpleLogRecordProcessor {
+	_exporter;
+	_shutdownOnce;
+	_unresolvedExports;
 	constructor(_exporter) {
 		this._exporter = _exporter;
 		this._shutdownOnce = new BindOnceFuture(this._shutdown, this);
@@ -372,10 +386,8 @@ class SimpleLogRecordProcessor {
 }
 
 class InMemoryLogRecordExporter {
-	constructor() {
-		this._finishedLogRecords = [];
-		this._stopped = false;
-	}
+	_finishedLogRecords = [];
+	_stopped = false;
 	export(logs, resultCallback) {
 		if (this._stopped) {
 			return resultCallback({
@@ -400,17 +412,32 @@ class InMemoryLogRecordExporter {
 }
 
 class BatchLogRecordProcessorBase {
+	_exporter;
+	_maxExportBatchSize;
+	_maxQueueSize;
+	_scheduledDelayMillis;
+	_exportTimeoutMillis;
+	_finishedLogRecords = [];
+	_timer;
+	_shutdownOnce;
 	constructor(_exporter, config) {
 		this._exporter = _exporter;
-		this._finishedLogRecords = [];
-		const env = getEnv();
 		this._maxExportBatchSize =
-			config?.maxExportBatchSize ?? env.OTEL_BLRP_MAX_EXPORT_BATCH_SIZE;
-		this._maxQueueSize = config?.maxQueueSize ?? env.OTEL_BLRP_MAX_QUEUE_SIZE;
+			config?.maxExportBatchSize ??
+				getNumberFromEnv('OTEL_BLRP_MAX_EXPORT_BATCH_SIZE') ??
+				512;
+		this._maxQueueSize =
+			config?.maxQueueSize ??
+				getNumberFromEnv('OTEL_BLRP_MAX_QUEUE_SIZE') ??
+				2048;
 		this._scheduledDelayMillis =
-			config?.scheduledDelayMillis ?? env.OTEL_BLRP_SCHEDULE_DELAY;
+			config?.scheduledDelayMillis ??
+				getNumberFromEnv('OTEL_BLRP_SCHEDULE_DELAY') ??
+				5000;
 		this._exportTimeoutMillis =
-			config?.exportTimeoutMillis ?? env.OTEL_BLRP_EXPORT_TIMEOUT;
+			config?.exportTimeoutMillis ??
+				getNumberFromEnv('OTEL_BLRP_EXPORT_TIMEOUT') ??
+				30000;
 		this._shutdownOnce = new BindOnceFuture(this._shutdown, this);
 		if (this._maxExportBatchSize > this._maxQueueSize) {
 			diag.warn('BatchLogRecordProcessor: maxExportBatchSize must be smaller or equal to maxQueueSize, setting maxExportBatchSize to match maxQueueSize');

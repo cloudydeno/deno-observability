@@ -188,10 +188,6 @@ export const ProtobufTraceSerializer = MissingSerializer;
 
 await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/opentelemetry-instrumentation/src/platform/index.ts', `export * from './browser';`);
 
-await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-core/src/platform/node/RandomIdGenerator.ts',
-  await Deno.readTextFile('hack/opentelemetry-js/packages/opentelemetry-core/src/platform/browser/RandomIdGenerator.ts'));
-await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-core/src/platform/node/hex-to-base64.ts',
-  await Deno.readTextFile('hack/opentelemetry-js/packages/opentelemetry-core/src/platform/browser/hex-to-base64.ts'));
 await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-sdk-trace-base/src/platform/node/RandomIdGenerator.ts',
   await Deno.readTextFile('hack/opentelemetry-js/packages/opentelemetry-sdk-trace-base/src/platform/browser/RandomIdGenerator.ts'));
 
@@ -202,6 +198,11 @@ await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-resources
 await Deno.writeTextFile('hack/opentelemetry-js/experimental/packages/opentelemetry-exporter-metrics-otlp-http/src/platform/node/OTLPMetricExporter.ts',
   await Deno.readTextFile('hack/opentelemetry-js/experimental/packages/opentelemetry-exporter-metrics-otlp-http/src/platform/node/OTLPMetricExporter.ts').then(text => text
     .replace('@opentelemetry/otlp-exporter-base/node-http', '@opentelemetry/otlp-exporter-base')));
+
+await Deno.writeTextFile('hack/opentelemetry-js/packages/opentelemetry-core/src/platform/node/environment.ts',
+  await Deno.readTextFile('hack/opentelemetry-js/packages/opentelemetry-core/src/platform/node/environment.ts').then(text => text
+    .replace(`import { inspect } from 'util'`, '')
+    .replaceAll('inspect(raw)', 'JSON.stringify(raw)')));
 
 // make sure the file exists before we replace it
 await Deno.readTextFile('hack/opentelemetry-js/experimental/packages/otlp-exporter-base/src/configuration/convert-legacy-node-http-options.ts');

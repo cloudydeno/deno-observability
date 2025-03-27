@@ -15,8 +15,8 @@
  */
 /// <reference types="./exporter-metrics-otlp-http.d.ts" />
 
-import { getEnv } from './core.js';
-import { AggregationTemporality, InstrumentType, Aggregation } from './sdk-metrics.js';
+import { getStringFromEnv } from './core.js';
+import { AggregationTemporality, InstrumentType, AggregationType } from './sdk-metrics.js';
 import { OTLPExporterBase, createOtlpHttpExportDelegate, convertLegacyHttpOptions } from './otlp-exporter-base.js';
 import { diag } from './api.js';
 import { JsonMetricsSerializer } from './otlp-transformer.js';
@@ -56,8 +56,8 @@ const LowMemoryTemporalitySelector = (instrumentType) => {
 	}
 };
 function chooseTemporalitySelectorFromEnvironment() {
-	const env = getEnv();
-	const configuredTemporality = env.OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE.trim().toLowerCase();
+	const configuredTemporality = (getStringFromEnv('OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE') ??
+		'cumulative').toLowerCase();
 	if (configuredTemporality === 'cumulative') {
 		return CumulativeTemporalitySelector;
 	}
@@ -67,7 +67,7 @@ function chooseTemporalitySelectorFromEnvironment() {
 	if (configuredTemporality === 'lowmemory') {
 		return LowMemoryTemporalitySelector;
 	}
-	diag.warn(`OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE is set to '${env.OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE}', but only 'cumulative' and 'delta' are allowed. Using default ('cumulative') instead.`);
+	diag.warn(`OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE is set to '${configuredTemporality}', but only 'cumulative' and 'delta' are allowed. Using default ('cumulative') instead.`);
 	return CumulativeTemporalitySelector;
 }
 function chooseTemporalitySelector(temporalityPreference) {
@@ -82,15 +82,15 @@ function chooseTemporalitySelector(temporalityPreference) {
 	}
 	return chooseTemporalitySelectorFromEnvironment();
 }
+const DEFAULT_AGGREGATION = Object.freeze({
+	type: AggregationType.DEFAULT,
+});
 function chooseAggregationSelector(config) {
-	if (config?.aggregationPreference) {
-		return config.aggregationPreference;
-	}
-	else {
-		return (_instrumentType) => Aggregation.Default();
-	}
+	return config?.aggregationPreference ?? (() => DEFAULT_AGGREGATION);
 }
 class OTLPMetricExporterBase extends OTLPExporterBase {
+	_aggregationTemporalitySelector;
+	_aggregationSelector;
 	constructor(delegate, config) {
 		super(delegate);
 		this._aggregationSelector = chooseAggregationSelector(config);
@@ -104,7 +104,7 @@ class OTLPMetricExporterBase extends OTLPExporterBase {
 	}
 }
 
-const VERSION = "0.57.1";
+const VERSION = "0.200.0";
 
 const USER_AGENT = {
 	'User-Agent': `Deno/${Deno.version.deno} OTel-OTLP-Exporter-JavaScript/${VERSION}`,

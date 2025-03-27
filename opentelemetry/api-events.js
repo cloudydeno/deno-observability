@@ -51,8 +51,8 @@ class EventsAPI {
 		return provider;
 	}
 	getEventLoggerProvider() {
-		return (_global[GLOBAL_EVENTS_API_KEY]?.(API_BACKWARDS_COMPATIBILITY_VERSION) ??
-			NOOP_EVENT_LOGGER_PROVIDER);
+		var _a, _b;
+		return ((_b = (_a = _global[GLOBAL_EVENTS_API_KEY]) === null || _a === void 0 ? void 0 : _a.call(_global, API_BACKWARDS_COMPATIBILITY_VERSION)) !== null && _b !== void 0 ? _b : NOOP_EVENT_LOGGER_PROVIDER);
 	}
 	getEventLogger(name, version, options) {
 		return this.getEventLoggerProvider().getEventLogger(name, version, options);

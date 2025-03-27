@@ -1,4 +1,7 @@
-import { DetectorSync, Resource } from "../opentelemetry/resources.js";
+import {
+  type DetectedResource,
+  type ResourceDetector,
+} from "../opentelemetry/resources.js";
 import {
   ATTR_CLOUD_PLATFORM,
   ATTR_CLOUD_PROVIDER,
@@ -14,70 +17,73 @@ import {
   ATTR_PROCESS_RUNTIME_VERSION,
 } from "../opentelemetry/semantic-conventions.js";
 
-const runtimeResource = new Resource({
+const runtimeAttrs = {
   [ATTR_PROCESS_RUNTIME_NAME]: 'deno',
   // [ATTR_PROCESS_RUNTIME_DESCRIPTION]: 'Deno Runtime',
-});
-export class DenoRuntimeDetector implements DetectorSync {
-  detect() {
+};
+export class DenoRuntimeDetector implements ResourceDetector {
+  detect(): DetectedResource {
     const isDeno = typeof Deno !== 'undefined';
     if (!isDeno) {
-      return Resource.empty();
+      return { attributes: {} };
     }
 
     // Deno Deploy does this:
     if (!Deno.version?.deno) {
-      return runtimeResource.merge(new Resource({
+      return { attributes: {
+        ...runtimeAttrs,
         [ATTR_PROCESS_RUNTIME_DESCRIPTION]: 'Deno Deploy hosted runtime',
-      }));
+      }};
     }
 
-    return runtimeResource.merge(new Resource({
+    return { attributes: {
+      ...runtimeAttrs,
       [ATTR_PROCESS_RUNTIME_VERSION]: Deno.version.deno,
-    }));
+    }};
   }
 }
 
-export class DenoDeployDetector implements DetectorSync {
-  detect() {
+export class DenoDeployDetector implements ResourceDetector {
+  detect(): DetectedResource {
     // Deno Deploy doesn't have permissions
     const canGet = (Deno.permissions.querySync?.({
       name: 'env',
       variable: 'DENO_DEPLOYMENT_ID',
     }).state ?? 'granted') === 'granted';
     if (!canGet) {
-      return Resource.empty();
+      return { attributes: {} };
     }
 
     const deployVersion = Deno.env.get('DENO_DEPLOYMENT_ID');
     const deployRegion = Deno.env.get('DENO_REGION');
     if (!deployRegion && !deployVersion) {
-      return Resource.empty();
+      return { attributes: {} };
     }
 
-    return new Resource({
+    return { attributes: {
       [ATTR_DEPLOYMENT_ENVIRONMENT]: 'production', // TODO: main branch or not?
       [ATTR_FAAS_VERSION]: deployVersion,
       [ATTR_CLOUD_REGION]: deployRegion,
       [ATTR_CLOUD_PROVIDER]: 'deno',
       [ATTR_CLOUD_PLATFORM]: 'deno_deploy',
-    });
+    }};
   }
 }
 
-const processResource = new Resource({
+const processAttrs = {
   [ATTR_PROCESS_PID]: Deno.pid,
   [ATTR_PROCESS_COMMAND_ARGS]: Deno.args,
-});
-export class DenoProcessDetector implements DetectorSync {
-  detect() {
+};
+export class DenoProcessDetector implements ResourceDetector {
+  detect(): DetectedResource {
     //@ts-ignore deno deploy currently lacks querySync, but can take the action
     const canRead = (Deno.permissions.querySync?.({name: 'read'}).state == 'granted') ?? true;
-    if (!canRead) return processResource;
+    if (!canRead) return { attributes: processAttrs };
 
-    return processResource.merge(new Resource({
+    return { attributes: {
+      ...processAttrs,
       [ATTR_PROCESS_EXECUTABLE_PATH]: Deno.execPath(),
       [ATTR_PROCESS_COMMAND]: Deno.mainModule,
-    }));
+    }};
   }
 }

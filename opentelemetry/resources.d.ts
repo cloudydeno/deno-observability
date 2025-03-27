@@ -14,13 +14,48 @@
  * limitations under the License.
  */
 
-import { SpanAttributes } from './api.d.ts';
+import { AttributeValue, Attributes } from './api.d.ts';
+
+/**
+ * Interface for a Resource Detector.
+ * A resource detector returns a set of detected resource attributes.
+ * A detected resource attribute may be an {@link AttributeValue} or a Promise of an AttributeValue.
+ */
+interface ResourceDetector {
+	/**
+	* Detect resource attributes.
+	*
+	* @returns a {@link DetectedResource} object containing detected resource attributes
+	*/
+	detect(config?: ResourceDetectionConfig): DetectedResource;
+}
+type DetectedResource = {
+	/**
+	* Detected resource attributes.
+	*/
+	attributes?: DetectedResourceAttributes;
+};
+/**
+ * An object representing detected resource attributes.
+ * Value may be {@link AttributeValue}s, a promise to an {@link AttributeValue}, or undefined.
+ */
+type DetectedResourceAttributeValue = MaybePromise<AttributeValue | undefined>;
+/**
+ * An object representing detected resource attributes.
+ * Values may be {@link AttributeValue}s or a promise to an {@link AttributeValue}.
+ */
+type DetectedResourceAttributes = Record<string, DetectedResourceAttributeValue>;
+type MaybePromise<T> = T | Promise<T>;
+type RawResourceAttribute = [
+	string,
+	MaybePromise<AttributeValue | undefined>
+];
 
 /**
  * ResourceDetectionConfig provides an interface for configuring resource auto-detection.
  */
 interface ResourceDetectionConfig {
-	detectors?: Array<Detector | DetectorSync>;
+	detectors?: Array<ResourceDetector>;
 }
 
 /**
@@ -28,18 +63,18 @@ interface ResourceDetectionConfig {
  * collected.
  *
  */
-interface IResource {
+interface Resource {
 	/**
 	* Check if async attributes have resolved. This is useful to avoid awaiting
 	* waitForAsyncAttributes (which will introduce asynchronous behavior) when not necessary.
 	*
 	* @returns true if the resource "attributes" property is not yet settled to its final value
 	*/
-	asyncAttributesPending?: boolean;
+	readonly asyncAttributesPending?: boolean;
 	/**
 	* @returns the Resource's attributes.
 	*/
-	readonly attributes: ResourceAttributes;
+	readonly attributes: Attributes;
 	/**
 	* Returns a promise that will never be rejected. Resolves when all async attributes have finished being added to
 	* this Resource's attributes. This is useful in exporters to block until resource detection
@@ -54,191 +89,22 @@ interface IResource {
 	* @param other the Resource that will be merged with this.
 	* @returns the newly merged Resource.
 	*/
-	merge(other: IResource | null): IResource;
+	merge(other: Resource | null): Resource;
+	getRawAttributes(): RawResourceAttribute[];
 }
 
 /**
- * Interface for Resource attributes.
- * General `Attributes` interface is added in api v1.1.0.
- * To backward support older api (1.0.x), the deprecated `SpanAttributes` is used here.
+ * Runs all resource detectors and returns the results merged into a single Resource.
+ *
+ * @param config Configuration for resource detection
  */
-declare type ResourceAttributes = SpanAttributes;
-/**
- * @deprecated please use {@link DetectorSync}
- */
-interface Detector {
-	detect(config?: ResourceDetectionConfig): Promise<IResource>;
-}
-/**
- * Interface for a synchronous Resource Detector. In order to detect attributes asynchronously, a detector
- * can pass a Promise as the second parameter to the Resource constructor.
- */
-interface DetectorSync {
-	detect(config?: ResourceDetectionConfig): IResource;
-}
-
-/**
- * A Resource describes the entity for which a signals (metrics or trace) are
- * collected.
- */
-declare class Resource implements IResource {
-	static readonly EMPTY: Resource;
-	private _syncAttributes?;
-	private _asyncAttributesPromise?;
-	private _attributes?;
-	/**
-	* Check if async attributes have resolved. This is useful to avoid awaiting
-	* waitForAsyncAttributes (which will introduce asynchronous behavior) when not necessary.
-	*
-	* @returns true if the resource "attributes" property is not yet settled to its final value
-	*/
-	asyncAttributesPending?: boolean;
-	/**
-	* Returns an empty Resource
-	*/
-	static empty(): IResource;
-	/**
-	* Returns a Resource that identifies the SDK in use.
-	*/
-	static default(): IResource;
-	constructor(
-	/**
-	* A dictionary of attributes with string keys and values that provide
-	* information about the entity as numbers, strings or booleans
-	* TODO: Consider to add check/validation on attributes.
-	*/
-	attributes: ResourceAttributes, asyncAttributesPromise?: Promise<ResourceAttributes>);
-	get attributes(): ResourceAttributes;
-	/**
-	* Returns a promise that will never be rejected. Resolves when all async attributes have finished being added to
-	* this Resource's attributes. This is useful in exporters to block until resource detection
-	* has finished.
-	*/
-	waitForAsyncAttributes?(): Promise<void>;
-	/**
-	* Returns a new, merged {@link Resource} by merging the current Resource
-	* with the other Resource. In case of a collision, other Resource takes
-	* precedence.
-	*
-	* @param other the Resource that will be merged with this.
-	* @returns the newly merged Resource.
-	*/
-	merge(other: IResource | null): IResource;
-}
-
-declare function defaultServiceName(): string;
-
-/**
- * HostDetector detects the resources related to the host current process is
- * running on. Currently only non-cloud-based attributes are included.
- */
-declare class HostDetector implements Detector {
-	detect(_config?: ResourceDetectionConfig): Promise<IResource>;
-}
-declare const hostDetector: HostDetector;
-
-/**
- * HostDetectorSync detects the resources related to the host current process is
- * running on. Currently only non-cloud-based attributes are included.
- */
-declare class HostDetectorSync implements DetectorSync {
-	detect(_config?: ResourceDetectionConfig): Resource;
-	private _getAsyncAttributes;
-}
-declare const hostDetectorSync: HostDetectorSync;
-
-/**
- * OSDetector detects the resources related to the operating system (OS) on
- * which the process represented by this resource is running.
- */
-declare class OSDetector implements Detector {
-	detect(_config?: ResourceDetectionConfig): Promise<IResource>;
-}
-declare const osDetector: OSDetector;
-
-/**
- * OSDetectorSync detects the resources related to the operating system (OS) on
- * which the process represented by this resource is running.
- */
-declare class OSDetectorSync implements DetectorSync {
-	detect(_config?: ResourceDetectionConfig): Resource;
-}
-declare const osDetectorSync: OSDetectorSync;
-
-/**
- * ProcessDetector will be used to detect the resources related current process running
- * and being instrumented from the NodeJS Process module.
- */
-declare class ProcessDetector implements Detector {
-	detect(config?: ResourceDetectionConfig): Promise<IResource>;
-}
-declare const processDetector: ProcessDetector;
-
-/**
- * ProcessDetectorSync will be used to detect the resources related current process running
- * and being instrumented from the NodeJS Process module.
- */
-declare class ProcessDetectorSync implements DetectorSync {
-	detect(_config?: ResourceDetectionConfig): IResource;
-}
-declare const processDetectorSync: ProcessDetectorSync;
-
-/**
- * ServiceInstanceIdDetectorSync detects the resources related to the service instance ID.
- */
-declare class ServiceInstanceIdDetectorSync implements DetectorSync {
-	detect(_config?: ResourceDetectionConfig): Resource;
-}
-/**
- * @experimental
- */
-declare const serviceInstanceIdDetectorSync: ServiceInstanceIdDetectorSync;
-
-/**
- * BrowserDetector will be used to detect the resources related to browser.
- */
-declare class BrowserDetector implements Detector {
-	detect(config?: ResourceDetectionConfig): Promise<IResource>;
-}
-declare const browserDetector: BrowserDetector;
+declare const detectResources: (config?: ResourceDetectionConfig) => Resource;
 
 /**
  * EnvDetector can be used to detect the presence of and create a Resource
  * from the OTEL_RESOURCE_ATTRIBUTES environment variable.
  */
-declare class EnvDetector implements Detector {
-	/**
-	* Returns a {@link Resource} populated with attributes from the
-	* OTEL_RESOURCE_ATTRIBUTES environment variable. Note this is an async
-	* function to conform to the Detector interface.
-	*
-	* @param config The resource detection config
-	*/
-	detect(config?: ResourceDetectionConfig): Promise<IResource>;
-}
-declare const envDetector: EnvDetector;
-
-/**
- * BrowserDetectorSync will be used to detect the resources related to browser.
- */
-declare class BrowserDetectorSync implements DetectorSync {
-	detect(config?: ResourceDetectionConfig): IResource;
-	/**
-	* Validates process resource attribute map from process variables
-	*
-	* @param browserResource The un-sanitized resource attributes from process as key/value pairs.
-	* @param config: Config
-	* @returns The sanitized resource attributes.
-	*/
-	private _getResourceAttributes;
-}
-declare const browserDetectorSync: BrowserDetectorSync;
-
-/**
- * EnvDetectorSync can be used to detect the presence of and create a Resource
- * from the OTEL_RESOURCE_ATTRIBUTES environment variable.
- */
-declare class EnvDetectorSync implements DetectorSync {
+declare class EnvDetector implements ResourceDetector {
 	private readonly _MAX_LENGTH;
 	private readonly _COMMA_SEPARATOR;
 	private readonly _LABEL_KEY_VALUE_SPLITTER;
@@ -251,7 +117,7 @@ declare class EnvDetectorSync implements DetectorSync {
 	*
 	* @param config The resource detection config
 	*/
-	detect(_config?: ResourceDetectionConfig): IResource;
+	detect(_config?: ResourceDetectionConfig): DetectedResource;
 	/**
 	* Creates an attribute map from the OTEL_RESOURCE_ATTRIBUTES environment
 	* variable.
@@ -285,22 +151,50 @@ declare class EnvDetectorSync implements DetectorSync {
 	*/
 	private _isValidAndNotEmpty;
 }
-declare const envDetectorSync: EnvDetectorSync;
+declare const envDetector: EnvDetector;
 
 /**
- * Runs all resource detectors and returns the results merged into a single Resource. Promise
- * does not resolve until all the underlying detectors have resolved, unlike
- * detectResourcesSync.
- *
- * @deprecated use detectResourcesSync() instead.
- * @param config Configuration for resource detection
+ * HostDetector detects the resources related to the host current process is
+ * running on. Currently only non-cloud-based attributes are included.
  */
-declare const detectResources: (config?: ResourceDetectionConfig) => Promise<IResource>;
-/**
- * Runs all resource detectors synchronously, merging their results. In case of attribute collision later resources will take precedence.
- *
- * @param config Configuration for resource detection
- */
-declare const detectResourcesSync: (config?: ResourceDetectionConfig) => IResource;
+declare class HostDetector implements ResourceDetector {
+	detect(_config?: ResourceDetectionConfig): DetectedResource;
+}
+declare const hostDetector: HostDetector;
 
-export { Detector, DetectorSync, IResource, Resource, ResourceAttributes, ResourceDetectionConfig, browserDetector, browserDetectorSync, defaultServiceName, detectResources, detectResourcesSync, envDetector, envDetectorSync, hostDetector, hostDetectorSync, osDetector, osDetectorSync, processDetector, processDetectorSync, serviceInstanceIdDetectorSync };
+/**
+ * OSDetector detects the resources related to the operating system (OS) on
+ * which the process represented by this resource is running.
+ */
+declare class OSDetector implements ResourceDetector {
+	detect(_config?: ResourceDetectionConfig): DetectedResource;
+}
+declare const osDetector: OSDetector;
+
+/**
+ * ProcessDetector will be used to detect the resources related current process running
+ * and being instrumented from the NodeJS Process module.
+ */
+declare class ProcessDetector implements ResourceDetector {
+	detect(_config?: ResourceDetectionConfig): DetectedResource;
+}
+declare const processDetector: ProcessDetector;
+
+/**
+ * ServiceInstanceIdDetector detects the resources related to the service instance ID.
+ */
+declare class ServiceInstanceIdDetector implements ResourceDetector {
+	detect(_config?: ResourceDetectionConfig): DetectedResource;
+}
+/**
+ * @experimental
+ */
+declare const serviceInstanceIdDetector: ServiceInstanceIdDetector;
+
+declare function resourceFromAttributes(attributes: DetectedResourceAttributes): Resource;
+declare function emptyResource(): Resource;
+declare function defaultResource(): Resource;
+
+declare function defaultServiceName(): string;
+
+export { DetectedResource, DetectedResourceAttributes, MaybePromise, RawResourceAttribute, Resource, ResourceDetectionConfig, ResourceDetector, defaultResource, defaultServiceName, detectResources, emptyResource, envDetector, hostDetector, osDetector, processDetector, resourceFromAttributes, serviceInstanceIdDetector };

@@ -52,14 +52,16 @@ function registerInstrumentations(options) {
 }
 
 class InstrumentationAbstract {
+	instrumentationName;
+	instrumentationVersion;
+	_config = {};
+	_tracer;
+	_meter;
+	_logger;
+	_diag;
 	constructor(instrumentationName, instrumentationVersion, config) {
 		this.instrumentationName = instrumentationName;
 		this.instrumentationVersion = instrumentationVersion;
-		this._config = {};
-		this._wrap = shimmer.wrap;
-		this._unwrap = shimmer.unwrap;
-		this._massWrap = shimmer.massWrap;
-		this._massUnwrap = shimmer.massUnwrap;
 		this.setConfig(config);
 		this._diag = diag.createComponentLogger({
 			namespace: instrumentationName,
@@ -69,6 +71,10 @@ class InstrumentationAbstract {
 		this._logger = logs.getLogger(instrumentationName, instrumentationVersion);
 		this._updateMetricInstruments();
 	}
+	_wrap = shimmer.wrap;
+	_unwrap = shimmer.unwrap;
+	_massWrap = shimmer.massWrap;
+	_massUnwrap = shimmer.massUnwrap;
 	get meter() {
 		return this._meter;
 	}
@@ -135,6 +141,11 @@ function normalize(path) {
 }
 
 class InstrumentationNodeModuleDefinition {
+	name;
+	supportedVersions;
+	patch;
+	unpatch;
+	files;
 	constructor(name, supportedVersions,
 	patch,
 	unpatch, files) {
@@ -147,6 +158,10 @@ class InstrumentationNodeModuleDefinition {
 }
 
 class InstrumentationNodeModuleFile {
+	supportedVersions;
+	patch;
+	unpatch;
+	name;
 	constructor(name, supportedVersions,
 	patch,
 	unpatch) {
