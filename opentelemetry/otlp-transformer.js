@@ -15,7 +15,7 @@
  */
 /// <reference types="./otlp-transformer.d.ts" />
 
-import { hexToBinary, hrTimeToNanoseconds } from './core.js';
+import { hrTimeToNanoseconds } from './core.js';
 import { ValueType } from './api.js';
 import { DataPointType, AggregationTemporality } from './sdk-metrics.js';
 
@@ -36,6 +36,26 @@ const MissingSerializer = {
 	deserializeResponse: (arg) => { throw new Error('not implemented'); },
 };
 const ProtobufTraceSerializer = MissingSerializer;
+
+function intValue(charCode) {
+	if (charCode >= 48 && charCode <= 57) {
+		return charCode - 48;
+	}
+	if (charCode >= 97 && charCode <= 102) {
+		return charCode - 87;
+	}
+	return charCode - 55;
+}
+function hexToBinary(hexStr) {
+	const buf = new Uint8Array(hexStr.length / 2);
+	let offset = 0;
+	for (let i = 0; i < hexStr.length; i += 2) {
+		const hi = intValue(hexStr.charCodeAt(i));
+		const lo = intValue(hexStr.charCodeAt(i + 1));
+		buf[offset++] = (hi << 4) | lo;
+	}
+	return buf;
+}
 
 function hrTimeToNanos(hrTime) {
 	const NANOSECONDS = BigInt(1000000000);
@@ -343,10 +363,13 @@ const JsonMetricsSerializer = {
 function sdkSpanToOtlpSpan(span, encoder) {
 	const ctx = span.spanContext();
 	const status = span.status;
+	const parentSpanId = span.parentSpanContext?.spanId
+		? encoder.encodeSpanContext(span.parentSpanContext?.spanId)
+		: undefined;
 	return {
 		traceId: encoder.encodeSpanContext(ctx.traceId),
 		spanId: encoder.encodeSpanContext(ctx.spanId),
-		parentSpanId: encoder.encodeOptionalSpanContext(span.parentSpanId),
+		parentSpanId: parentSpanId,
 		traceState: ctx.traceState?.serialize(),
 		name: span.name,
 		kind: span.kind == null ? 0 : span.kind + 1,
@@ -392,16 +415,16 @@ function createExportTraceServiceRequest(spans, options) {
 function createResourceMap(readableSpans) {
 	const resourceMap = new Map();
 	for (const record of readableSpans) {
-		let ilmMap = resourceMap.get(record.resource);
-		if (!ilmMap) {
-			ilmMap = new Map();
-			resourceMap.set(record.resource, ilmMap);
+		let ilsMap = resourceMap.get(record.resource);
+		if (!ilsMap) {
+			ilsMap = new Map();
+			resourceMap.set(record.resource, ilsMap);
 		}
-		const instrumentationLibraryKey = `${record.instrumentationLibrary.name}@${record.instrumentationLibrary.version || ''}:${record.instrumentationLibrary.schemaUrl || ''}`;
-		let records = ilmMap.get(instrumentationLibraryKey);
+		const instrumentationScopeKey = `${record.instrumentationScope.name}@${record.instrumentationScope.version || ''}:${record.instrumentationScope.schemaUrl || ''}`;
+		let records = ilsMap.get(instrumentationScopeKey);
 		if (!records) {
 			records = [];
-			ilmMap.set(instrumentationLibraryKey, records);
+			ilsMap.set(instrumentationScopeKey, records);
 		}
 		records.push(record);
 	}
@@ -422,9 +445,9 @@ function spanRecordsToResourceSpans(readableSpans, encoder) {
 			if (scopeSpans.length > 0) {
 				const spans = scopeSpans.map(readableSpan => sdkSpanToOtlpSpan(readableSpan, encoder));
 				scopeResourceSpans.push({
-					scope: createInstrumentationScope(scopeSpans[0].instrumentationLibrary),
+					scope: createInstrumentationScope(scopeSpans[0].instrumentationScope),
 					spans: spans,
-					schemaUrl: scopeSpans[0].instrumentationLibrary.schemaUrl,
+					schemaUrl: scopeSpans[0].instrumentationScope.schemaUrl,
 				});
 			}
 			ilmEntry = ilmIterator.next();

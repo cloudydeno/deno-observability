@@ -81,17 +81,19 @@ class ProxyLogger {
 
 class ProxyLoggerProvider {
 	getLogger(name, version, options) {
-		return (this.getDelegateLogger(name, version, options) ??
-			new ProxyLogger(this, name, version, options));
+		var _a;
+		return ((_a = this.getDelegateLogger(name, version, options)) !== null && _a !== void 0 ? _a : new ProxyLogger(this, name, version, options));
 	}
 	getDelegate() {
-		return this._delegate ?? NOOP_LOGGER_PROVIDER;
+		var _a;
+		return (_a = this._delegate) !== null && _a !== void 0 ? _a : NOOP_LOGGER_PROVIDER;
 	}
 	setDelegate(delegate) {
 		this._delegate = delegate;
 	}
 	getDelegateLogger(name, version, options) {
-		return this._delegate?.getLogger(name, version, options);
+		var _a;
+		return (_a = this._delegate) === null || _a === void 0 ? void 0 : _a.getLogger(name, version, options);
 	}
 }
 
@@ -123,8 +125,8 @@ class LogsAPI {
 		return provider;
 	}
 	getLoggerProvider() {
-		return (_global[GLOBAL_LOGS_API_KEY]?.(API_BACKWARDS_COMPATIBILITY_VERSION) ??
-			this._proxyLoggerProvider);
+		var _a, _b;
+		return ((_b = (_a = _global[GLOBAL_LOGS_API_KEY]) === null || _a === void 0 ? void 0 : _a.call(_global, API_BACKWARDS_COMPATIBILITY_VERSION)) !== null && _b !== void 0 ? _b : this._proxyLoggerProvider);
 	}
 	getLogger(name, version, options) {
 		return this.getLoggerProvider().getLogger(name, version, options);

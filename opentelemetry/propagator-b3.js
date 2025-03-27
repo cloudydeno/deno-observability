@@ -175,9 +175,11 @@ var B3InjectEncoding;
 })(B3InjectEncoding || (B3InjectEncoding = {}));
 
 class B3Propagator {
+	_b3MultiPropagator = new B3MultiPropagator();
+	_b3SinglePropagator = new B3SinglePropagator();
+	_inject;
+	_fields;
 	constructor(config = {}) {
-		this._b3MultiPropagator = new B3MultiPropagator();
-		this._b3SinglePropagator = new B3SinglePropagator();
 		if (config.injectEncoding === B3InjectEncoding.MULTI_HEADER) {
 			this._inject = this._b3MultiPropagator.inject;
 			this._fields = this._b3MultiPropagator.fields();

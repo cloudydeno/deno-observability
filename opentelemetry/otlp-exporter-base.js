@@ -15,10 +15,11 @@
  */
 /// <reference types="./otlp-exporter-base.d.ts" />
 
-import { ExportResultCode, baggageUtils } from './core.js';
+import { ExportResultCode, parseKeyPairsIntoRecord } from './core.js';
 import { diag } from './api.js';
 
 class OTLPExporterBase {
+	_delegate;
 	constructor(_delegate) {
 		this._delegate = _delegate;
 	}
@@ -34,18 +35,18 @@ class OTLPExporterBase {
 }
 
 class OTLPExporterError extends Error {
+	code;
+	name = 'OTLPExporterError';
+	data;
 	constructor(message, code, data) {
 		super(message);
-		this.name = 'OTLPExporterError';
 		this.data = data;
 		this.code = code;
 	}
 }
 
 function validateTimeoutMillis(timeoutMillis) {
-	if (!Number.isNaN(timeoutMillis) &&
-		Number.isFinite(timeoutMillis) &&
-		timeoutMillis > 0) {
+	if (Number.isFinite(timeoutMillis) && timeoutMillis > 0) {
 		return timeoutMillis;
 	}
 	throw new Error(`Configuration: timeoutMillis is invalid, expected number greater than 0 (actual: '${timeoutMillis}')`);
@@ -84,8 +85,9 @@ var CompressionAlgorithm;
 })(CompressionAlgorithm || (CompressionAlgorithm = {}));
 
 class BoundedQueueExportPromiseHandler {
+	_concurrencyLimit;
+	_sendingPromises = [];
 	constructor(concurrencyLimit) {
-		this._sendingPromises = [];
 		this._concurrencyLimit = concurrencyLimit;
 	}
 	pushPromise(promise) {
@@ -128,6 +130,12 @@ function createLoggingPartialSuccessResponseHandler() {
 }
 
 class OTLPExportDelegate {
+	_transport;
+	_serializer;
+	_responseHandler;
+	_promiseQueue;
+	_timeout;
+	_diagLogger;
 	constructor(_transport, _serializer, _responseHandler, _promiseQueue, _timeout) {
 		this._transport = _transport;
 		this._serializer = _serializer;
@@ -235,6 +243,7 @@ function parseRetryAfterToMills(retryAfter) {
 }
 
 class HttpExporterTransport {
+	_parameters;
 	constructor(_parameters) {
 		this._parameters = _parameters;
 	}
@@ -277,6 +286,7 @@ function getJitter() {
 	return Math.random() * (2 * JITTER) - JITTER;
 }
 class RetryingTransport {
+	_transport;
 	constructor(_transport) {
 		this._transport = _transport;
 	}
@@ -327,9 +337,7 @@ function parseAndValidateTimeoutFromEnv(timeoutEnvVar) {
 	const envTimeout = Deno.env.get(timeoutEnvVar)?.trim();
 	if (envTimeout != null && envTimeout !== '') {
 		const definedTimeout = Number(envTimeout);
-		if (!Number.isNaN(definedTimeout) &&
-			Number.isFinite(definedTimeout) &&
-			definedTimeout > 0) {
+		if (Number.isFinite(definedTimeout) && definedTimeout > 0) {
 			return definedTimeout;
 		}
 		diag.warn(`Configuration: ${timeoutEnvVar} is invalid, expected number greater than 0 (actual: ${envTimeout})`);
@@ -426,13 +434,13 @@ function getHttpConfigurationDefaults(requiredHeaders, signalResourcePath) {
 function getStaticHeadersFromEnv(signalIdentifier) {
 	const signalSpecificRawHeaders = Deno.env.get(`OTEL_EXPORTER_OTLP_${signalIdentifier}_HEADERS`)?.trim();
 	const nonSignalSpecificRawHeaders = Deno.env.get('OTEL_EXPORTER_OTLP_HEADERS')?.trim();
-	const signalSpecificHeaders = baggageUtils.parseKeyPairsIntoRecord(signalSpecificRawHeaders);
-	const nonSignalSpecificHeaders = baggageUtils.parseKeyPairsIntoRecord(nonSignalSpecificRawHeaders);
+	const signalSpecificHeaders = parseKeyPairsIntoRecord(signalSpecificRawHeaders);
+	const nonSignalSpecificHeaders = parseKeyPairsIntoRecord(nonSignalSpecificRawHeaders);
 	if (Object.keys(signalSpecificHeaders).length === 0 &&
 		Object.keys(nonSignalSpecificHeaders).length === 0) {
 		return undefined;
 	}
-	return Object.assign({}, baggageUtils.parseKeyPairsIntoRecord(nonSignalSpecificRawHeaders), baggageUtils.parseKeyPairsIntoRecord(signalSpecificRawHeaders));
+	return Object.assign({}, parseKeyPairsIntoRecord(nonSignalSpecificRawHeaders), parseKeyPairsIntoRecord(signalSpecificRawHeaders));
 }
 function appendRootPathToUrlIfNeeded(url) {
 	try {

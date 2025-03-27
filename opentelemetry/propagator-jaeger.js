@@ -21,6 +21,8 @@ import { isTracingSuppressed } from './core.js';
 const UBER_TRACE_ID_HEADER = 'uber-trace-id';
 const UBER_BAGGAGE_HEADER_PREFIX = 'uberctx';
 class JaegerPropagator {
+	_jaegerTraceHeader;
+	_jaegerBaggageHeaderPrefix;
 	constructor(config) {
 		if (typeof config === 'string') {
 			this._jaegerTraceHeader = config;
